@@ -15,12 +15,15 @@ public class PlayerMovement : MonoBehaviour
     }
 
     private void Update()
-    { 
+    {
         float x = 0f;
         float y = 0f;
 
-        if (Input.GetKey(KeyCode.A)) x -= 1f;
-        if (Input.GetKey(KeyCode.D)) x += 1f;
+        // 좌우 반전
+        if (Input.GetKey(KeyCode.A)) x += 1f; // 왼쪽 키 → 오른쪽 이동
+        if (Input.GetKey(KeyCode.D)) x -= 1f; // 오른쪽 키 → 왼쪽 이동
+
+        // 상하는 그대로
         if (Input.GetKey(KeyCode.W)) y += 1f;
         if (Input.GetKey(KeyCode.S)) y -= 1f;
 
