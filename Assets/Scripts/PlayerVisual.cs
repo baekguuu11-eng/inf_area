@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class PlayerVisual : MonoBehaviour
 {
@@ -59,7 +59,7 @@ public class PlayerVisual : MonoBehaviour
 
         Vector2 faceDirection = Vector2.zero;
 
-        // �̵� �߿� �̵� ���� �켱
+        // ÀÌµ¿ Áß¿£ ÀÌµ¿ ¹æÇâ ¿ì¼±
         if (playerMovement != null && playerMovement.MoveInput != Vector2.zero)
             faceDirection = playerMovement.MoveInput;
         else if (playerCombat != null && playerCombat.AimDirection != Vector2.zero)
