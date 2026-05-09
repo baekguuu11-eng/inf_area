@@ -59,7 +59,7 @@ public class PlayerVisual : MonoBehaviour
 
         Vector2 faceDirection = Vector2.zero;
 
-        // ì´ë™ ì¤‘ì—” ì´ë™ ë°©í–¥ ìš°ì„ 
+        // ÀÌµ¿ Áß¿£ ÀÌµ¿ ¹æÇâ ¿ì¼±
         if (playerMovement != null && playerMovement.MoveInput != Vector2.zero)
             faceDirection = playerMovement.MoveInput;
         else if (playerCombat != null && playerCombat.AimDirection != Vector2.zero)

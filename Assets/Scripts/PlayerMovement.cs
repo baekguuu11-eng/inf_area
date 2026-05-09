@@ -15,7 +15,7 @@ public class PlayerMovement : MonoBehaviour
     }
 
     private void Update()
-    { 
+    {
         float x = 0f;
         float y = 0f;
 
