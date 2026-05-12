@@ -16,6 +16,12 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
+        if (GameInputState.IsLocked)
+        {
+            MoveInput = Vector2.zero;
+            return;
+        }
+
         float x = 0f;
         float y = 0f;
 
@@ -29,6 +35,12 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (GameInputState.IsLocked)
+        {
+            rb.linearVelocity = Vector2.zero;
+            return;
+        }
+
         rb.linearVelocity = MoveInput * moveSpeed;
     }
 }
