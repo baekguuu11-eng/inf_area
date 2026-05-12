@@ -63,6 +63,14 @@ public class PlayerCombat : MonoBehaviour
 
     private void Update()
     {
+        if (GameInputState.IsLocked)
+        {
+            if (!isAttacking && weaponVisual != null)
+                weaponVisual.SetActive(false);
+
+            return;
+        }
+
         if (!isAttacking)
             UpdateAttackDirection();
 
@@ -149,7 +157,6 @@ public class PlayerCombat : MonoBehaviour
         }
 
         Collider2D[] targets = Physics2D.OverlapCircleAll(attackOrigin.position, attackRange);
-
 
         foreach (Collider2D target in targets)
         {
