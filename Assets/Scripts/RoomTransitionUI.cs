@@ -77,6 +77,7 @@ public class RoomTransitionUI : MonoBehaviour
         // 예:
         // if (stage == 1 && room == 1) return "1-1 시작 구역";
         // if (stage == 1 && room == 5) return "1-5 포탈방";
+        if (stage == 1 && room == 5) return "1-5 Portal Room";
         return $"{stage}-{room}";
     }
 
