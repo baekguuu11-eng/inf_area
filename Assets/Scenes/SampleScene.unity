@@ -573,6 +573,7 @@ MonoBehaviour:
   stageRoomsRoot: {fileID: 838197536}
   transitionUI: {fileID: 1150773222}
   mainCamera: {fileID: 1573789587}
+  portalPrefab: {fileID: 5096729321629215908, guid: cbbf67cd5cd324d4abc626064bd4fd52, type: 3}
   gateCooldown: 0.15
   cameraSlideDistance: 0.8
   cameraSlideDuration: 0.15
