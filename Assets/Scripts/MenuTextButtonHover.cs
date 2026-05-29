@@ -14,6 +14,15 @@ public class MenuTextButtonHover : MonoBehaviour,
     [SerializeField] private TextMeshProUGUI labelText;
     [SerializeField] private Image underlineImage;
 
+    [Header("Sound")]
+    [SerializeField] private AudioSource uiAudioSource;
+    [SerializeField] private AudioClip hoverSound;
+    [SerializeField] private AudioClip clickSound;
+    [SerializeField, Range(0f, 1f)] private float hoverVolume = 0.65f;
+    [SerializeField, Range(0f, 1f)] private float clickVolume = 0.85f;
+    [SerializeField] private bool playHoverSound = true;
+    [SerializeField] private bool playClickSound = true;
+
     [Header("Text Colors")]
     [SerializeField] private Color normalColor = new Color(0.70f, 0.95f, 1.0f, 1f);
     [SerializeField] private Color hoverColor = new Color(0.95f, 1.0f, 1.0f, 1f);
@@ -53,6 +62,7 @@ public class MenuTextButtonHover : MonoBehaviour,
 
     private bool isHovering = false;
     private bool isPressing = false;
+    private bool hoverEnabled = true;
 
     private Coroutine animationCoroutine;
 
@@ -63,6 +73,8 @@ public class MenuTextButtonHover : MonoBehaviour,
         Transform underline = transform.Find("Underline");
         if (underline != null)
             underlineImage = underline.GetComponent<Image>();
+
+        uiAudioSource = GetComponentInParent<AudioSource>();
     }
 
     private void Awake()
@@ -76,6 +88,9 @@ public class MenuTextButtonHover : MonoBehaviour,
             if (underline != null)
                 underlineImage = underline.GetComponent<Image>();
         }
+
+        if (uiAudioSource == null)
+            uiAudioSource = GetComponentInParent<AudioSource>();
 
         if (labelText != null)
         {
@@ -118,6 +133,9 @@ public class MenuTextButtonHover : MonoBehaviour,
 
     private void Update()
     {
+        if (!hoverEnabled)
+            return;
+
         if (!enableHoverPulse || !isHovering || isPressing || labelText == null)
             return;
 
@@ -128,7 +146,12 @@ public class MenuTextButtonHover : MonoBehaviour,
 
     public void OnPointerEnter(PointerEventData eventData)
     {
+        if (!hoverEnabled)
+            return;
+
         isHovering = true;
+
+        PlayUISound(hoverSound, hoverVolume, playHoverSound);
 
         if (!isPressing)
             AnimateToHoverState();
@@ -136,6 +159,9 @@ public class MenuTextButtonHover : MonoBehaviour,
 
     public void OnPointerExit(PointerEventData eventData)
     {
+        if (!hoverEnabled)
+            return;
+
         isHovering = false;
         isPressing = false;
 
@@ -144,18 +170,55 @@ public class MenuTextButtonHover : MonoBehaviour,
 
     public void OnPointerDown(PointerEventData eventData)
     {
+        if (!hoverEnabled)
+            return;
+
         isPressing = true;
+
+        PlayUISound(clickSound, clickVolume, playClickSound);
+
         AnimateToClickState();
     }
 
     public void OnPointerUp(PointerEventData eventData)
     {
+        if (!hoverEnabled)
+            return;
+
         isPressing = false;
 
         if (isHovering)
             AnimateToHoverState();
         else
             AnimateToNormalState();
+    }
+
+    public void SetHoverEnabled(bool enabled)
+    {
+        hoverEnabled = enabled;
+
+        if (!hoverEnabled)
+        {
+            isHovering = false;
+            isPressing = false;
+            AnimateToNormalState();
+        }
+    }
+
+    private void PlayUISound(AudioClip clip, float volume, bool canPlay)
+    {
+        if (!canPlay)
+            return;
+
+        if (clip == null)
+            return;
+
+        AudioSource source = GetGlobalUISoundSource();
+
+        if (source == null)
+            return;
+
+        source.PlayOneShot(clip, volume);
     }
 
     private void AnimateToNormalState()
@@ -292,5 +355,23 @@ public class MenuTextButtonHover : MonoBehaviour,
         Color c = underlineImage.color;
         c.a = finalWidth <= 0.01f ? 0f : underlineColor.a;
         underlineImage.color = c;
+    }
+    private static AudioSource globalUISoundSource;
+
+    private AudioSource GetGlobalUISoundSource()
+    {
+        if (globalUISoundSource != null)
+            return globalUISoundSource;
+
+        GameObject soundObject = new GameObject("Global_UI_Sound_Player");
+        DontDestroyOnLoad(soundObject);
+
+        globalUISoundSource = soundObject.AddComponent<AudioSource>();
+        globalUISoundSource.playOnAwake = false;
+        globalUISoundSource.loop = false;
+        globalUISoundSource.spatialBlend = 0f;
+        globalUISoundSource.volume = 1f;
+
+        return globalUISoundSource;
     }
 }

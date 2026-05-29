@@ -8,7 +8,7 @@ public class MainMenuAtmosphereEffect : MonoBehaviour
     [SerializeField] private bool enableWarningPulse = true;
     [SerializeField] private Color warningColor = new Color(1f, 0f, 0f, 0.05f);
     [SerializeField] private float pulseSpeed = 1.0f;
-    [SerializeField, Range(0f, 0.15f)] private float pulseMaxAlpha = 0.035f;
+    [SerializeField, Range(0f, 0.15f)] private float pulseMaxAlpha = 0.03f;
 
     [Header("Glitch")]
     [SerializeField] private bool enableGlitch = true;
@@ -23,30 +23,53 @@ public class MainMenuAtmosphereEffect : MonoBehaviour
     private Image warningPulseImage;
     private Image[] glitchLines;
     private Coroutine glitchCoroutine;
+    private bool effectsEnabled = false;
 
     private void Awake()
     {
         CreateWarningPulseImage();
         CreateGlitchLines();
+        DisableEffects();
     }
 
-    private void OnEnable()
+    private void OnDisable()
     {
+        if (glitchCoroutine != null)
+        {
+            StopCoroutine(glitchCoroutine);
+            glitchCoroutine = null;
+        }
+    }
+
+    private void Update()
+    {
+        UpdateWarningPulse();
+    }
+
+    public void EnableEffects()
+    {
+        effectsEnabled = true;
+
         if (glitchCoroutine != null)
             StopCoroutine(glitchCoroutine);
 
         glitchCoroutine = StartCoroutine(GlitchRoutine());
     }
 
-    private void OnDisable()
+    public void DisableEffects()
     {
-        if (glitchCoroutine != null)
-            StopCoroutine(glitchCoroutine);
-    }
+        effectsEnabled = false;
 
-    private void Update()
-    {
-        UpdateWarningPulse();
+        if (warningPulseImage != null)
+            warningPulseImage.color = Color.clear;
+
+        HideGlitchLines();
+
+        if (glitchCoroutine != null)
+        {
+            StopCoroutine(glitchCoroutine);
+            glitchCoroutine = null;
+        }
     }
 
     private void CreateWarningPulseImage()
@@ -94,7 +117,7 @@ public class MainMenuAtmosphereEffect : MonoBehaviour
         if (warningPulseImage == null)
             return;
 
-        if (!enableWarningPulse)
+        if (!effectsEnabled || !enableWarningPulse)
         {
             warningPulseImage.color = Color.clear;
             return;
@@ -109,12 +132,12 @@ public class MainMenuAtmosphereEffect : MonoBehaviour
 
     private IEnumerator GlitchRoutine()
     {
-        while (true)
+        while (effectsEnabled)
         {
             float wait = Random.Range(glitchMinInterval, glitchMaxInterval);
             yield return new WaitForSecondsRealtime(wait);
 
-            if (!enableGlitch || glitchLines == null)
+            if (!effectsEnabled || !enableGlitch)
                 continue;
 
             ShowGlitchLines();
@@ -125,6 +148,9 @@ public class MainMenuAtmosphereEffect : MonoBehaviour
 
     private void ShowGlitchLines()
     {
+        if (glitchLines == null)
+            return;
+
         for (int i = 0; i < glitchLines.Length; i++)
         {
             if (glitchLines[i] == null)
@@ -145,6 +171,9 @@ public class MainMenuAtmosphereEffect : MonoBehaviour
 
     private void HideGlitchLines()
     {
+        if (glitchLines == null)
+            return;
+
         for (int i = 0; i < glitchLines.Length; i++)
         {
             if (glitchLines[i] != null)
