@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: a511bcbd29d7ebc43af9aa5b62df7303
+guid: 99f4c906bd0519c4996cb100d457b92c
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -7465987627969238038
-    second: KakaoTalk_20260523_191031872_0
+      213: -2876907813159754722
+    second: "ChatGPT Image 2026\uB144 5\uC6D4 23\uC77C \uC624\uD6C4 08_40_59_0"
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -37,7 +37,7 @@ TextureImporter:
   maxTextureSize: 2048
   textureSettings:
     serializedVersion: 2
-    filterMode: 1
+    filterMode: 0
     aniso: 1
     mipBias: 0
     wrapU: 1
@@ -46,7 +46,7 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 2
+  spriteMode: 1
   spriteExtrude: 1
   spriteMeshType: 1
   alignment: 0
@@ -75,7 +75,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 1
+    textureCompression: 0
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -96,24 +96,11 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 4
-    buildTarget: WebGL
-    maxTextureSize: 2048
-    resizeAlgorithm: 0
-    textureFormat: -1
-    textureCompression: 1
-    compressionQuality: 50
-    crunchedCompression: 0
-    allowsAlphaSplitting: 0
-    overridden: 0
-    ignorePlatformSupport: 0
-    androidETC2FallbackOverride: 0
-    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: KakaoTalk_20260523_191031872_0
+      name: "ChatGPT Image 2026\uB144 5\uC6D4 23\uC77C \uC624\uD6C4 08_40_59_0"
       rect:
         serializedVersion: 2
         x: 0
@@ -128,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: aebae611fcb736890800000000000000
-      internalID: -7465987627969238038
+      spriteID: e142111269b2318d0800000000000000
+      internalID: -2876907813159754722
       vertices: []
       indices: 
       edges: []
@@ -138,7 +125,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 
+    spriteID: 5e97eb03825dee720800000000000000
     internalID: 0
     vertices: []
     indices: 
@@ -148,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      KakaoTalk_20260523_191031872_0: -7465987627969238038
+      "ChatGPT Image 2026\uB144 5\uC6D4 23\uC77C \uC624\uD6C4 08_40_59_0": -2876907813159754722
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
