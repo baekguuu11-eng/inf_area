@@ -12,6 +12,11 @@ public class PlayerHealth : MonoBehaviour
     [Header("사망 UI")]
     public GameObject deathPanel;
 
+    [Header("무적 시간")]
+    public float invincibleTime = 0.5f;
+
+    private bool isInvincible = false;
+
     private SpriteRenderer sr;
 
     void Start()
@@ -40,6 +45,10 @@ public class PlayerHealth : MonoBehaviour
 
     public void TakeDamage(int damage)
     {
+        // 무적 상태면 데미지 무시
+        if (isInvincible)
+            return;
+
         // 체력 감소
         currentHealth -= damage;
 
@@ -55,8 +64,10 @@ public class PlayerHealth : MonoBehaviour
         heartUI.UpdateHearts(currentHealth);
 
         // 피격 효과
-        StopAllCoroutines();
         StartCoroutine(HitEffect());
+
+        // 무적 시작
+        StartCoroutine(InvincibleCoroutine());
 
         // 사망 체크
         if (currentHealth <= 0)
@@ -67,12 +78,10 @@ public class PlayerHealth : MonoBehaviour
 
     System.Collections.IEnumerator HitEffect()
     {
-        // 빨간색 피격 효과
         sr.color = Color.red;
 
         yield return new WaitForSeconds(0.2f);
 
-        // 원래 색상 복귀
         sr.color = Color.white;
     }
 
@@ -80,10 +89,17 @@ public class PlayerHealth : MonoBehaviour
     {
         Debug.Log("플레이어 사망!");
 
-        // 사망 UI 표시
         deathPanel.SetActive(true);
 
-        // 게임 정지
         Time.timeScale = 0f;
+    }
+
+    System.Collections.IEnumerator InvincibleCoroutine()
+    {
+        isInvincible = true;
+
+        yield return new WaitForSeconds(invincibleTime);
+
+        isInvincible = false;
     }
 }
