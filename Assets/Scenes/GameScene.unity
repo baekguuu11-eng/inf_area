@@ -815,7 +815,7 @@ GameObject:
   - component: {fileID: 810492519}
   - component: {fileID: 810492518}
   - component: {fileID: 810492520}
-  - component: {fileID: 810492521}
+  - component: {fileID: 810492522}
   m_Layer: 0
   m_Name: Enemy
   m_TagString: Untagged
@@ -912,8 +912,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyDamage
   damage: 1
---- !u!70 &810492521
-CapsuleCollider2D:
+--- !u!61 &810492522
+BoxCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -947,8 +947,17 @@ CapsuleCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_Size: {x: 1, y: 1}
-  m_Direction: 0
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0.5, y: 0.5}
+    oldSize: {x: 1, y: 1}
+    newSize: {x: 1, y: 1}
+    adaptiveTilingThreshold: 0.5
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  m_Size: {x: 1.1, y: 1.1}
+  m_EdgeRadius: 0
 --- !u!1 &838197535
 GameObject:
   m_ObjectHideFlags: 0
@@ -1339,6 +1348,7 @@ MonoBehaviour:
   currentHealth: 0
   heartUI: {fileID: 230938027}
   deathPanel: {fileID: 1935058706}
+  invincibleTime: 0.5
 --- !u!1 &1071038132
 GameObject:
   m_ObjectHideFlags: 0
