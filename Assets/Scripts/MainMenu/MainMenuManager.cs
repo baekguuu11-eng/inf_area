@@ -4,41 +4,35 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using UnityEngine.Serialization;
 
 public class MainMenuManager : MonoBehaviour
 {
     [System.Serializable]
     public class LoadingStep
     {
-        [Range(0f, 1f)]
-        public float targetFillAmount = 0.5f;
-
-        [Min(0f)]
-        public float duration = 0.5f;
-
-        [Min(0f)]
-        public float waitAfterStep = 0f;
+        [Range(0f, 1f)] public float targetFillAmount = 0.5f;
+        [Min(0f)] public float duration = 0.5f;
+        [Min(0f)] public float waitAfterStep = 0f;
     }
 
     [System.Serializable]
     public class LoadingPattern
     {
-        public string patternName = "기본 로딩 패턴";
+        public string patternName = "Default Loading";
         public List<LoadingStep> steps = new List<LoadingStep>();
     }
 
     [System.Serializable]
     public class LoadingTip
     {
-        [TextArea]
-        public string message = "Entering infected area...";
-
-        [Min(0.1f)]
-        public float displayTime = 2f;
+        [TextArea] public string message = "감염된 구역에 진입하는 중...";
+        [Min(0.1f)] public float displayTime = 2f;
     }
 
     [Header("Scene")]
-    [SerializeField] private string gameSceneName = "GameScene";
+    [FormerlySerializedAs("gameSceneName")]
+    [SerializeField] private string sceneNameAfterLoading = "OpeningCutscene";
 
     [Header("Main Menu References")]
     [SerializeField] private GameObject menuGroup;
@@ -50,8 +44,17 @@ public class MainMenuManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI loadingPercentText;
     [SerializeField] private Image loadingBarFill;
 
+    [Header("Loading Panel Visual")]
+    [SerializeField] private bool keepMainBackgroundVisible = true;
+    [SerializeField] private bool makeLoadingPanelBackgroundTransparent = true;
+
+    [Header("Loading Tip Typewriter")]
+    [SerializeField] private bool useLoadingTipTypewriter = true;
+    [SerializeField] private float loadingTipCharacterInterval = 0.035f;
+
     [Header("Fade UI")]
     [SerializeField] private CanvasGroup fadeCanvasGroup;
+    [SerializeField] private bool useFinalFadeBeforeSceneChange = true;
     [SerializeField] private float fadeOutDuration = 0.7f;
 
     [Header("Loading Timing")]
@@ -59,7 +62,7 @@ public class MainMenuManager : MonoBehaviour
     [SerializeField] private float completeWaitTime = 0.7f;
 
     [Header("Final Message")]
-    [SerializeField] private string finalLoadingMessage = "Ready to enter infected area";
+    [SerializeField] private string finalLoadingMessage = "컷신 데이터를 불러오는 중...";
 
     [Header("Random Loading Patterns")]
     [SerializeField] private List<LoadingPattern> loadingPatterns = new List<LoadingPattern>();
@@ -73,6 +76,7 @@ public class MainMenuManager : MonoBehaviour
     private float currentFillAmount = 0f;
 
     private Coroutine tipCoroutine;
+    private Coroutine typingCoroutine;
 
     private void Reset()
     {
@@ -82,6 +86,9 @@ public class MainMenuManager : MonoBehaviour
 
     private void Awake()
     {
+        AutoFindReferences();
+        PrepareLoadingPanel();
+
         if (loadingPanel != null)
             loadingPanel.SetActive(false);
 
@@ -101,6 +108,54 @@ public class MainMenuManager : MonoBehaviour
             SetDefaultLoadingTips();
     }
 
+    private void AutoFindReferences()
+    {
+        if (menuGroup == null)
+        {
+            GameObject found = GameObject.Find("MenuGroup");
+            if (found != null)
+                menuGroup = found;
+        }
+
+        if (loadingPanel == null)
+        {
+            GameObject found = GameObject.Find("LoadingPanel");
+            if (found != null)
+                loadingPanel = found;
+        }
+    }
+
+    private void PrepareLoadingPanel()
+    {
+        if (loadingPanel == null)
+            return;
+
+        RectTransform rt = loadingPanel.GetComponent<RectTransform>();
+
+        if (rt != null)
+        {
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+        }
+
+        if (makeLoadingPanelBackgroundTransparent)
+        {
+            Image panelImage = loadingPanel.GetComponent<Image>();
+
+            if (panelImage != null)
+            {
+                Color c = panelImage.color;
+                c.a = 0f;
+                panelImage.color = c;
+                panelImage.raycastTarget = false;
+            }
+        }
+    }
+
     public void StartGameWithLoading()
     {
         if (isLoading)
@@ -118,18 +173,56 @@ public class MainMenuManager : MonoBehaviour
         if (startButton != null)
             startButton.interactable = false;
 
+        // 메뉴 버튼만 숨김. 배경은 건드리지 않음.
         if (menuGroup != null)
             menuGroup.SetActive(false);
 
         if (loadingPanel != null)
+        {
             loadingPanel.SetActive(true);
+            loadingPanel.transform.SetAsLastSibling();
+        }
+
+        if (fadeCanvasGroup != null)
+        {
+            fadeCanvasGroup.alpha = 0f;
+            fadeCanvasGroup.interactable = false;
+            fadeCanvasGroup.blocksRaycasts = false;
+        }
 
         SetLoadingFill(0f);
 
+        if (loadingTipText != null)
+            loadingTipText.text = "";
+
         tipCoroutine = StartCoroutine(RandomTipLoop());
 
-        float loadingStartTime = Time.unscaledTime;
+        AsyncOperation sceneLoadOperation = SceneManager.LoadSceneAsync(sceneNameAfterLoading);
 
+        if (sceneLoadOperation == null)
+        {
+            Debug.LogError("[MainMenuManager] 씬 로딩 실패: " + sceneNameAfterLoading +
+                           "\nBuild Profiles / Build Settings에 이 씬이 등록되어 있는지 확인하세요.");
+
+            if (tipCoroutine != null)
+                StopCoroutine(tipCoroutine);
+
+            if (typingCoroutine != null)
+                StopCoroutine(typingCoroutine);
+
+            if (loadingTipText != null)
+                loadingTipText.text = "씬 로딩 실패: Build Settings 확인 필요";
+
+            if (startButton != null)
+                startButton.interactable = true;
+
+            isLoading = false;
+            yield break;
+        }
+
+        sceneLoadOperation.allowSceneActivation = false;
+
+        float loadingStartTime = Time.unscaledTime;
         List<LoadingStep> selectedSteps = GetRandomLoadingSteps();
 
         for (int i = 0; i < selectedSteps.Count; i++)
@@ -160,15 +253,15 @@ public class MainMenuManager : MonoBehaviour
                 yield return new WaitForSecondsRealtime(step.waitAfterStep);
         }
 
-        SetLoadingFill(1f);
+        while (sceneLoadOperation.progress < 0.9f)
+            yield return null;
 
         float loadingElapsed = Time.unscaledTime - loadingStartTime;
 
         if (loadingElapsed < minimumLoadingTime)
-        {
-            float remainTime = minimumLoadingTime - loadingElapsed;
-            yield return new WaitForSecondsRealtime(remainTime);
-        }
+            yield return new WaitForSecondsRealtime(minimumLoadingTime - loadingElapsed);
+
+        SetLoadingFill(1f);
 
         stopTipLoop = true;
 
@@ -178,12 +271,18 @@ public class MainMenuManager : MonoBehaviour
             tipCoroutine = null;
         }
 
+        if (typingCoroutine != null)
+        {
+            StopCoroutine(typingCoroutine);
+            typingCoroutine = null;
+        }
+
         if (loadingTipText != null)
         {
-            if (string.IsNullOrWhiteSpace(finalLoadingMessage))
-                loadingTipText.text = "Ready to enter infected area";
+            if (useLoadingTipTypewriter)
+                yield return TypeLoadingText(string.IsNullOrWhiteSpace(finalLoadingMessage) ? "컷신 데이터를 불러오는 중..." : finalLoadingMessage);
             else
-                loadingTipText.text = finalLoadingMessage;
+                loadingTipText.text = string.IsNullOrWhiteSpace(finalLoadingMessage) ? "컷신 데이터를 불러오는 중..." : finalLoadingMessage;
         }
 
         if (loadingPercentText != null)
@@ -191,9 +290,10 @@ public class MainMenuManager : MonoBehaviour
 
         yield return new WaitForSecondsRealtime(completeWaitTime);
 
-        yield return FadeOut();
+        if (useFinalFadeBeforeSceneChange)
+            yield return FadeOut();
 
-        SceneManager.LoadScene(gameSceneName);
+        sceneLoadOperation.allowSceneActivation = true;
     }
 
     private IEnumerator RandomTipLoop()
@@ -203,7 +303,15 @@ public class MainMenuManager : MonoBehaviour
             LoadingTip tip = GetRandomTip();
 
             if (loadingTipText != null)
-                loadingTipText.text = tip.message;
+            {
+                if (typingCoroutine != null)
+                    StopCoroutine(typingCoroutine);
+
+                if (useLoadingTipTypewriter)
+                    typingCoroutine = StartCoroutine(TypeLoadingText(tip.message));
+                else
+                    loadingTipText.text = tip.message;
+            }
 
             float displayTime = Mathf.Max(0.1f, tip.displayTime);
             float elapsed = 0f;
@@ -219,13 +327,39 @@ public class MainMenuManager : MonoBehaviour
         }
     }
 
+    private IEnumerator TypeLoadingText(string message)
+    {
+        if (loadingTipText == null)
+            yield break;
+
+        if (string.IsNullOrEmpty(message))
+        {
+            loadingTipText.text = "";
+            yield break;
+        }
+
+        loadingTipText.text = "";
+
+        float interval = Mathf.Max(0f, loadingTipCharacterInterval);
+
+        for (int i = 0; i < message.Length; i++)
+        {
+            loadingTipText.text = message.Substring(0, i + 1);
+
+            if (interval > 0f)
+                yield return new WaitForSecondsRealtime(interval);
+            else
+                yield return null;
+        }
+    }
+
     private LoadingTip GetRandomTip()
     {
         if (loadingTips == null || loadingTips.Count == 0)
         {
             return new LoadingTip
             {
-                message = "Entering infected area...",
+                message = "감염된 구역에 진입하는 중...",
                 displayTime = 2f
             };
         }
@@ -255,6 +389,7 @@ public class MainMenuManager : MonoBehaviour
             yield break;
 
         fadeCanvasGroup.gameObject.SetActive(true);
+        fadeCanvasGroup.transform.SetAsLastSibling();
         fadeCanvasGroup.interactable = true;
         fadeCanvasGroup.blocksRaycasts = true;
 
@@ -311,50 +446,37 @@ public class MainMenuManager : MonoBehaviour
         {
             new LoadingPattern
             {
+                patternName = "Default Loading",
+                steps = new List<LoadingStep>
+                {
+                    new LoadingStep { targetFillAmount = 0.12f, duration = 0.35f, waitAfterStep = 0.05f },
+                    new LoadingStep { targetFillAmount = 0.36f, duration = 0.55f, waitAfterStep = 0.10f },
+                    new LoadingStep { targetFillAmount = 0.62f, duration = 0.45f, waitAfterStep = 0.05f },
+                    new LoadingStep { targetFillAmount = 0.84f, duration = 0.55f, waitAfterStep = 0.15f },
+                    new LoadingStep { targetFillAmount = 1.00f, duration = 0.45f, waitAfterStep = 0.00f }
+                }
+            },
+            new LoadingPattern
+            {
+                patternName = "Interrupted Signal",
+                steps = new List<LoadingStep>
+                {
+                    new LoadingStep { targetFillAmount = 0.18f, duration = 0.25f, waitAfterStep = 0.20f },
+                    new LoadingStep { targetFillAmount = 0.31f, duration = 0.50f, waitAfterStep = 0.10f },
+                    new LoadingStep { targetFillAmount = 0.57f, duration = 0.35f, waitAfterStep = 0.25f },
+                    new LoadingStep { targetFillAmount = 0.79f, duration = 0.45f, waitAfterStep = 0.10f },
+                    new LoadingStep { targetFillAmount = 1.00f, duration = 0.60f, waitAfterStep = 0.00f }
+                }
+            },
+            new LoadingPattern
+            {
                 patternName = "Fast Entry",
                 steps = new List<LoadingStep>
                 {
-                    new LoadingStep { targetFillAmount = 0.45f, duration = 0.4f, waitAfterStep = 0f },
-                    new LoadingStep { targetFillAmount = 0.72f, duration = 0.8f, waitAfterStep = 0f },
-                    new LoadingStep { targetFillAmount = 0.96f, duration = 1.2f, waitAfterStep = 0.3f },
-                    new LoadingStep { targetFillAmount = 1.0f, duration = 0.25f, waitAfterStep = 0f }
-                }
-            },
-            new LoadingPattern
-            {
-                patternName = "Stuck At 99",
-                steps = new List<LoadingStep>
-                {
-                    new LoadingStep { targetFillAmount = 0.30f, duration = 0.35f, waitAfterStep = 0f },
-                    new LoadingStep { targetFillAmount = 0.62f, duration = 0.9f, waitAfterStep = 0f },
-                    new LoadingStep { targetFillAmount = 0.91f, duration = 1.1f, waitAfterStep = 0f },
-                    new LoadingStep { targetFillAmount = 0.99f, duration = 1.0f, waitAfterStep = 0.8f },
-                    new LoadingStep { targetFillAmount = 1.0f, duration = 0.35f, waitAfterStep = 0f }
-                }
-            },
-            new LoadingPattern
-            {
-                patternName = "Middle Delay",
-                steps = new List<LoadingStep>
-                {
-                    new LoadingStep { targetFillAmount = 0.18f, duration = 0.25f, waitAfterStep = 0f },
-                    new LoadingStep { targetFillAmount = 0.50f, duration = 1.1f, waitAfterStep = 0.4f },
-                    new LoadingStep { targetFillAmount = 0.74f, duration = 0.8f, waitAfterStep = 0f },
-                    new LoadingStep { targetFillAmount = 0.97f, duration = 1.4f, waitAfterStep = 0.3f },
-                    new LoadingStep { targetFillAmount = 1.0f, duration = 0.4f, waitAfterStep = 0f }
-                }
-            },
-            new LoadingPattern
-            {
-                patternName = "Step Loading",
-                steps = new List<LoadingStep>
-                {
-                    new LoadingStep { targetFillAmount = 0.22f, duration = 0.3f, waitAfterStep = 0.15f },
-                    new LoadingStep { targetFillAmount = 0.38f, duration = 0.35f, waitAfterStep = 0.2f },
-                    new LoadingStep { targetFillAmount = 0.57f, duration = 0.45f, waitAfterStep = 0.15f },
-                    new LoadingStep { targetFillAmount = 0.79f, duration = 0.8f, waitAfterStep = 0.25f },
-                    new LoadingStep { targetFillAmount = 0.99f, duration = 1.1f, waitAfterStep = 0.5f },
-                    new LoadingStep { targetFillAmount = 1.0f, duration = 0.25f, waitAfterStep = 0f }
+                    new LoadingStep { targetFillAmount = 0.25f, duration = 0.25f, waitAfterStep = 0.05f },
+                    new LoadingStep { targetFillAmount = 0.50f, duration = 0.35f, waitAfterStep = 0.05f },
+                    new LoadingStep { targetFillAmount = 0.75f, duration = 0.35f, waitAfterStep = 0.10f },
+                    new LoadingStep { targetFillAmount = 1.00f, duration = 0.50f, waitAfterStep = 0.00f }
                 }
             }
         };
@@ -363,28 +485,14 @@ public class MainMenuManager : MonoBehaviour
     private void SetDefaultLoadingTips()
     {
         loadingTips = new List<LoadingTip>
-    {
-        new LoadingTip { message = "이 게임은 약 9개월 동안 개발되었습니다.", displayTime = 2f },
-        new LoadingTip { message = "주인공의 이름은 라파엘입니다.", displayTime = 2f },
-        new LoadingTip { message = "라파엘은 감염된 구역을 정화하기 위해 투입되었습니다.", displayTime = 2f },
-        new LoadingTip { message = "감염된 구역의 모든 게이트가 안전한 것은 아닙니다.", displayTime = 2f },
-        new LoadingTip { message = "적을 처치하면 방을 정화할 수 있습니다.", displayTime = 2f },
-        new LoadingTip { message = "일부 적은 원거리 공격을 사용합니다.", displayTime = 2f },
-        new LoadingTip { message = "포탈방은 다음 스테이지로 이어지는 핵심 지점입니다.", displayTime = 2f },
-        new LoadingTip { message = "각 스테이지는 일반 방과 포탈방으로 구성됩니다.", displayTime = 2f },
-        new LoadingTip { message = "라파엘의 검은 감염체를 베어내기 위해 제작되었습니다.", displayTime = 2f },
-        new LoadingTip { message = "붉은 경고등은 감염 위험 구역을 의미합니다.", displayTime = 2f },
-        new LoadingTip { message = "게이트를 통과하면 새로운 방이 열립니다.", displayTime = 2f },
-        new LoadingTip { message = "감염도 시스템은 추후 게임 난이도에 영향을 줄 예정입니다.", displayTime = 2f },
-        new LoadingTip { message = "감염체들은 종류에 따라 서로 다른 방식으로 공격합니다.", displayTime = 2f },
-        new LoadingTip { message = "게이트 너머에는 새로운 위험이 기다리고 있습니다.", displayTime = 2f },
-        new LoadingTip { message = "격리 시스템이 실패한 뒤 감염은 빠르게 확산되었습니다.", displayTime = 2f },
-        new LoadingTip { message = "라파엘은 마지막 백신 실험체입니다.", displayTime = 2f },
-        new LoadingTip { message = "포탈은 아직 정화되지 않은 구역으로 이어질 수 있습니다.", displayTime = 2f },
-        new LoadingTip { message = "경고 표식이 보인다면 신중하게 접근해야 합니다.", displayTime = 2f },
-        new LoadingTip { message = "바이러스형 적은 단순하지만 빠르게 접근할 수 있습니다.", displayTime = 2f },
-        new LoadingTip { message = "기계형 감염체는 예측하기 어려운 움직임을 보일 수 있습니다.", displayTime = 2f }
-    };
+        {
+            new LoadingTip { message = "감염된 구역에 진입하는 중...", displayTime = 2f },
+            new LoadingTip { message = "방화벽 우회 경로를 계산하는 중...", displayTime = 2f },
+            new LoadingTip { message = "라파엘 백신 데이터를 준비하는 중...", displayTime = 2f },
+            new LoadingTip { message = "아크 중심부 접속을 대기하는 중...", displayTime = 2f },
+            new LoadingTip { message = "적을 처치하면 방을 정화할 수 있습니다.", displayTime = 2f },
+            new LoadingTip { message = "경고 표식이 보인다면 신중하게 접근해야 합니다.", displayTime = 2f }
+        };
     }
 
     private void OnValidate()
@@ -392,6 +500,7 @@ public class MainMenuManager : MonoBehaviour
         minimumLoadingTime = Mathf.Max(0f, minimumLoadingTime);
         completeWaitTime = Mathf.Max(0f, completeWaitTime);
         fadeOutDuration = Mathf.Max(0f, fadeOutDuration);
+        loadingTipCharacterInterval = Mathf.Max(0f, loadingTipCharacterInterval);
 
         if (loadingPatterns == null)
             return;
