@@ -13,6 +13,9 @@ public class MainMenuIntroAnimator : MonoBehaviour
     [SerializeField] private MainMenuBackgroundParallax backgroundParallax;
     [SerializeField] private MainMenuAtmosphereEffect atmosphereEffect;
 
+    [Header("Audio Spectrum")]
+    [SerializeField] private MainMenuAudioSpectrum audioSpectrum;
+
     [Header("Background Intro")]
     [SerializeField] private bool playIntroOnStart = true;
     [SerializeField] private float introStartDelay = 0.1f;
@@ -44,6 +47,7 @@ public class MainMenuIntroAnimator : MonoBehaviour
 
         CacheBackground();
         CacheItems();
+        CacheAudioSpectrum();
         PrepareIntroState();
     }
 
@@ -91,11 +95,20 @@ public class MainMenuIntroAnimator : MonoBehaviour
         }
     }
 
+    private void CacheAudioSpectrum()
+    {
+        if (audioSpectrum == null)
+            audioSpectrum = Object.FindAnyObjectByType<MainMenuAudioSpectrum>();
+    }
+
     private void PrepareIntroState()
     {
         menuGroupCanvasGroup.alpha = 1f;
         menuGroupCanvasGroup.interactable = false;
         menuGroupCanvasGroup.blocksRaycasts = false;
+
+        if (audioSpectrum != null)
+            audioSpectrum.HideInstant();
 
         if (backgroundParallax != null)
             backgroundParallax.SetParallaxEnabled(false);
@@ -133,6 +146,9 @@ public class MainMenuIntroAnimator : MonoBehaviour
             if (itemDelayAfterComplete > 0f)
                 yield return new WaitForSecondsRealtime(itemDelayAfterComplete);
         }
+
+        if (audioSpectrum != null)
+            audioSpectrum.PlayFadeIn();
 
         EnableMenuInteraction();
         EnableMenuEffects();
@@ -256,6 +272,9 @@ public class MainMenuIntroAnimator : MonoBehaviour
                 hoverScripts[i].SetHoverEnabled(true);
         }
 
+        if (audioSpectrum != null)
+            audioSpectrum.ShowInstant();
+
         EnableMenuEffects();
     }
 
@@ -274,6 +293,9 @@ public class MainMenuIntroAnimator : MonoBehaviour
 
         menuGroupCanvasGroup.interactable = false;
         menuGroupCanvasGroup.blocksRaycasts = false;
+
+        if (audioSpectrum != null)
+            audioSpectrum.PlayFadeOut(menuFadeOutDuration);
 
         float elapsed = 0f;
         float startAlpha = menuGroupCanvasGroup.alpha;
