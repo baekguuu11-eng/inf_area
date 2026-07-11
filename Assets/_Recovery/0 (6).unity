@@ -568,10 +568,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MainMenuAtmosphereEffect
   enableWarningPulse: 1
   warningColor: {r: 1, g: 0, b: 0, a: 0.019607844}
-  baseRedAlpha: 0.012
-  pulseMaxAlpha: 0.08
   pulseSpeed: 1.2
-  effectFadeInDuration: 1.8
+  pulseMaxAlpha: 0.08
   enableGlitch: 1
   glitchMinInterval: 8
   glitchMaxInterval: 12
@@ -1929,8 +1927,6 @@ RectTransform:
   - {fileID: 1716394401}
   - {fileID: 120360300}
   - {fileID: 873781413}
-  - {fileID: 1822184545}
-  - {fileID: 1447417110}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -2013,81 +2009,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1343120410}
   m_CullTransparentMesh: 1
---- !u!1 &1447417109
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1447417110}
-  - component: {fileID: 1447417111}
-  - component: {fileID: 1447417112}
-  m_Layer: 5
-  m_Name: AudioSpectrumArea
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!224 &1447417110
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1447417109}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1234343757}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 100}
-  m_Pivot: {x: 0.5, y: 0}
---- !u!114 &1447417111
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1447417109}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 028a281b36914f3c89346f6bea132159, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MainMenuAudioSpectrum
-  bgmAudioSource: {fileID: 826509987}
-  barCount: 128
-  minHeight: 4
-  maxHeight: 90
-  sensitivity: 300
-  smoothSpeed: 12
-  frequencyCurve: 1.6
-  widthRatio: 0.95
-  barWidthRatio: 0.65
-  mirrorFromCenter: 0
-  hideOnStart: 1
-  visibleAlpha: 0.233
-  fadeInDuration: 5
-  barColor: {r: 0.9803922, g: 0.058823533, b: 0.09019608, a: 1}
---- !u!225 &1447417112
-CanvasGroup:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1447417109}
-  m_Enabled: 1
-  m_Alpha: 1
-  m_Interactable: 1
-  m_BlocksRaycasts: 1
-  m_IgnoreParentGroups: 0
 --- !u!1 &1460638201
 GameObject:
   m_ObjectHideFlags: 0
@@ -2631,7 +2552,6 @@ MonoBehaviour:
   mainMenuManager: {fileID: 1822184544}
   backgroundParallax: {fileID: 294796582}
   atmosphereEffect: {fileID: 144482036}
-  audioSpectrum: {fileID: 0}
   playIntroOnStart: 1
   introStartDelay: 0.2
   backgroundStartOffsetY: -120
@@ -2778,19 +2698,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b5200fecebf5c447a4b34970e9b6d17, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MainMenuManager
-  sceneNameAfterLoading: OpeningCutscene
+  gameSceneName: GameScene
   menuGroup: {fileID: 1716394400}
   startButton: {fileID: 1688217294}
   loadingPanel: {fileID: 120360299}
   loadingTipText: {fileID: 1841879894}
   loadingPercentText: {fileID: 2131492331}
   loadingBarFill: {fileID: 1222921557}
-  keepMainBackgroundVisible: 1
-  makeLoadingPanelBackgroundTransparent: 1
-  useLoadingTipTypewriter: 0
-  loadingTipCharacterInterval: 0.035
   fadeCanvasGroup: {fileID: 873781414}
-  useFinalFadeBeforeSceneChange: 1
   fadeOutDuration: 0.7
   minimumLoadingTime: 7
   completeWaitTime: 1.5
@@ -2929,12 +2844,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1822184543}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -235.15247, y: -47.27545, z: 0}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 724.84753, y: 492.72455, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1234343757}
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1825210147
 GameObject:
@@ -3381,4 +3296,5 @@ SceneRoots:
   - {fileID: 1220105238}
   - {fileID: 519896982}
   - {fileID: 1234343757}
+  - {fileID: 1822184545}
   - {fileID: 826509988}

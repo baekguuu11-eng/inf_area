@@ -9,6 +9,9 @@ public class EnemyHealth : MonoBehaviour
     [SerializeField] private EnemyHitEffect hitEffect;
     [SerializeField] private EnemyDeathEffect deathEffect;
 
+    [Header("Reward")]
+    [SerializeField] private ByteDropper byteDropper;
+
     private int currentHealth;
     private bool isDead = false;
     private Vector2 lastHitDirection = Vector2.down;
@@ -27,6 +30,9 @@ public class EnemyHealth : MonoBehaviour
 
         if (deathEffect == null)
             deathEffect = rootTransform.GetComponentInChildren<EnemyDeathEffect>(true);
+
+        if (byteDropper == null)
+            byteDropper = rootTransform.GetComponentInChildren<ByteDropper>(true);
     }
 
     public void TakeDamage(int damage)
@@ -61,6 +67,9 @@ public class EnemyHealth : MonoBehaviour
         Collider2D[] colliders = rootTransform.GetComponentsInChildren<Collider2D>(true);
         for (int i = 0; i < colliders.Length; i++)
             colliders[i].enabled = false;
+
+        if (byteDropper != null)
+            byteDropper.DropBytes(rootTransform.position);
 
         if (deathEffect != null)
             deathEffect.PlayDeath(rootTransform.position, lastHitDirection);

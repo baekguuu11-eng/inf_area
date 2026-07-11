@@ -6,9 +6,19 @@ public class MainMenuAtmosphereEffect : MonoBehaviour
 {
     [Header("Warning Pulse")]
     [SerializeField] private bool enableWarningPulse = true;
-    [SerializeField] private Color warningColor = new Color(1f, 0f, 0f, 0.05f);
-    [SerializeField] private float pulseSpeed = 1.0f;
-    [SerializeField, Range(0f, 0.15f)] private float pulseMaxAlpha = 0.03f;
+    [SerializeField] private Color warningColor = new Color(1f, 0f, 0f, 1f);
+
+    [Tooltip("빨간 분위기가 기본으로 깔리는 정도")]
+    [SerializeField, Range(0f, 0.08f)] private float baseRedAlpha = 0.012f;
+
+    [Tooltip("빨간 경고등이 맥박처럼 추가로 강해지는 정도")]
+    [SerializeField, Range(0f, 0.15f)] private float pulseMaxAlpha = 0.025f;
+
+    [SerializeField] private float pulseSpeed = 0.8f;
+
+    [Header("Atmosphere Fade In")]
+    [Tooltip("버튼들이 다 올라온 뒤 빨간 분위기가 서서히 나타나는 시간")]
+    [SerializeField] private float effectFadeInDuration = 1.8f;
 
     [Header("Glitch")]
     [SerializeField] private bool enableGlitch = true;
@@ -22,8 +32,12 @@ public class MainMenuAtmosphereEffect : MonoBehaviour
 
     private Image warningPulseImage;
     private Image[] glitchLines;
+
     private Coroutine glitchCoroutine;
+    private Coroutine fadeCoroutine;
+
     private bool effectsEnabled = false;
+    private float effectIntensity = 0f;
 
     private void Awake()
     {
@@ -34,11 +48,7 @@ public class MainMenuAtmosphereEffect : MonoBehaviour
 
     private void OnDisable()
     {
-        if (glitchCoroutine != null)
-        {
-            StopCoroutine(glitchCoroutine);
-            glitchCoroutine = null;
-        }
+        StopAllEffectCoroutines();
     }
 
     private void Update()
@@ -49,6 +59,17 @@ public class MainMenuAtmosphereEffect : MonoBehaviour
     public void EnableEffects()
     {
         effectsEnabled = true;
+        effectIntensity = 0f;
+
+        if (warningPulseImage != null)
+            warningPulseImage.color = Color.clear;
+
+        HideGlitchLines();
+
+        if (fadeCoroutine != null)
+            StopCoroutine(fadeCoroutine);
+
+        fadeCoroutine = StartCoroutine(FadeInAtmosphereRoutine());
 
         if (glitchCoroutine != null)
             StopCoroutine(glitchCoroutine);
@@ -59,16 +80,28 @@ public class MainMenuAtmosphereEffect : MonoBehaviour
     public void DisableEffects()
     {
         effectsEnabled = false;
+        effectIntensity = 0f;
+
+        StopAllEffectCoroutines();
 
         if (warningPulseImage != null)
             warningPulseImage.color = Color.clear;
 
         HideGlitchLines();
+    }
 
+    private void StopAllEffectCoroutines()
+    {
         if (glitchCoroutine != null)
         {
             StopCoroutine(glitchCoroutine);
             glitchCoroutine = null;
+        }
+
+        if (fadeCoroutine != null)
+        {
+            StopCoroutine(fadeCoroutine);
+            fadeCoroutine = null;
         }
     }
 
@@ -112,6 +145,31 @@ public class MainMenuAtmosphereEffect : MonoBehaviour
         }
     }
 
+    private IEnumerator FadeInAtmosphereRoutine()
+    {
+        float elapsed = 0f;
+        float safeDuration = Mathf.Max(0.01f, effectFadeInDuration);
+
+        effectIntensity = 0f;
+
+        while (elapsed < safeDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+
+            float t = Mathf.Clamp01(elapsed / safeDuration);
+
+            // 부드러운 Ease In Out
+            float smoothT = t * t * (3f - 2f * t);
+
+            effectIntensity = smoothT;
+
+            yield return null;
+        }
+
+        effectIntensity = 1f;
+        fadeCoroutine = null;
+    }
+
     private void UpdateWarningPulse()
     {
         if (warningPulseImage == null)
@@ -123,10 +181,14 @@ public class MainMenuAtmosphereEffect : MonoBehaviour
             return;
         }
 
-        float alpha = (Mathf.Sin(Time.unscaledTime * pulseSpeed) + 1f) * 0.5f * pulseMaxAlpha;
+        float pulse = (Mathf.Sin(Time.unscaledTime * pulseSpeed) + 1f) * 0.5f;
+        float pulseAlpha = pulse * pulseMaxAlpha;
+
+        float finalAlpha = (baseRedAlpha + pulseAlpha) * effectIntensity;
 
         Color c = warningColor;
-        c.a = alpha;
+        c.a = finalAlpha;
+
         warningPulseImage.color = c;
     }
 
