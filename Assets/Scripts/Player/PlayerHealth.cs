@@ -18,6 +18,13 @@ public class PlayerHealth : MonoBehaviour
     public float invincibleTime = 0.5f;
     public float hitFlashTime = 0.2f;
 
+    [Header("Sound")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip hurtSound;
+    [SerializeField] private float hurtVolume = 0.55f;
+    [SerializeField] private bool randomizeHurtPitch = true;
+    [SerializeField] private Vector2 hurtPitchRange = new Vector2(0.92f, 1.08f);
+
     private bool isInvincible;
     private bool isDead;
 
@@ -35,6 +42,19 @@ public class PlayerHealth : MonoBehaviour
         {
             originalColor = spriteRenderer.color;
         }
+
+        if (audioSource == null)
+        {
+            audioSource = GetComponent<AudioSource>();
+        }
+
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+        }
+
+        audioSource.playOnAwake = false;
+        audioSource.spatialBlend = 0f;
     }
 
     private void Start()
@@ -86,6 +106,7 @@ public class PlayerHealth : MonoBehaviour
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
 
         RefreshUI();
+        PlayHurtSound();
 
         StopCoroutine(nameof(HitEffect));
         StartCoroutine(nameof(HitEffect));
@@ -157,6 +178,30 @@ public class PlayerHealth : MonoBehaviour
         {
             heartUI.RefreshUI(currentHealth, maxHealth, baseMaxHealth);
         }
+    }
+
+    private void PlayHurtSound()
+    {
+        if (audioSource == null)
+        {
+            return;
+        }
+
+        if (hurtSound == null)
+        {
+            return;
+        }
+
+        float originalPitch = audioSource.pitch;
+
+        if (randomizeHurtPitch)
+        {
+            audioSource.pitch = Random.Range(hurtPitchRange.x, hurtPitchRange.y);
+        }
+
+        audioSource.PlayOneShot(hurtSound, hurtVolume);
+
+        audioSource.pitch = originalPitch;
     }
 
     private IEnumerator HitEffect()

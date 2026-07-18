@@ -8,9 +8,9 @@ public class BytePickup : MonoBehaviour
     [SerializeField] private int value = 1;
 
     [Header("Spawn Motion")]
-    [SerializeField] private float scatterRadius = 0.75f;
-    [SerializeField] private float scatterDuration = 0.25f;
-    [SerializeField] private float arcHeight = 0.35f;
+    [SerializeField] private float scatterRadius = 1.4f;
+    [SerializeField] private float scatterDuration = 0.35f;
+    [SerializeField] private float arcHeight = 0.45f;
 
     [Header("Wait Before Flying")]
     [SerializeField] private float minWaitTime = 2f;
@@ -34,19 +34,27 @@ public class BytePickup : MonoBehaviour
         originalScale = transform.localScale;
 
         if (spriteRenderer.sprite == null)
+        {
             spriteRenderer.sprite = GetFallbackSprite();
-    }
-
-    private void Start()
-    {
-        if (!isInitialized)
-            Initialize(1, ByteCurrencyManager.Instance);
+        }
     }
 
     public void Initialize(int byteValue, ByteCurrencyManager manager)
     {
+        Initialize(byteValue, manager, scatterRadius);
+    }
+
+    public void Initialize(int byteValue, ByteCurrencyManager manager, float newScatterRadius)
+    {
+        if (isInitialized)
+        {
+            return;
+        }
+
         value = Mathf.Max(1, byteValue);
         currencyManager = manager != null ? manager : ByteCurrencyManager.Instance;
+        scatterRadius = Mathf.Max(0.1f, newScatterRadius);
+
         isInitialized = true;
 
         StopAllCoroutines();
@@ -56,12 +64,15 @@ public class BytePickup : MonoBehaviour
     private IEnumerator PickupRoutine()
     {
         Vector3 startPosition = transform.position;
+
         Vector2 randomDirection = Random.insideUnitCircle.normalized;
 
         if (randomDirection == Vector2.zero)
+        {
             randomDirection = Vector2.up;
+        }
 
-        float randomDistance = Random.Range(scatterRadius * 0.45f, scatterRadius);
+        float randomDistance = Random.Range(scatterRadius * 0.55f, scatterRadius);
         Vector3 landPosition = startPosition + (Vector3)(randomDirection * randomDistance);
         landPosition.z = 0f;
 
@@ -70,6 +81,7 @@ public class BytePickup : MonoBehaviour
         while (elapsed < scatterDuration)
         {
             elapsed += Time.deltaTime;
+
             float t = Mathf.Clamp01(elapsed / scatterDuration);
             float eased = EaseOutQuad(t);
 
@@ -88,7 +100,9 @@ public class BytePickup : MonoBehaviour
         yield return new WaitForSeconds(waitTime);
 
         if (currencyManager == null)
+        {
             currencyManager = ByteCurrencyManager.Instance;
+        }
 
         if (currencyManager == null)
         {
@@ -98,6 +112,7 @@ public class BytePickup : MonoBehaviour
 
         Vector3 flyStart = transform.position;
         Vector3 flyEnd = currencyManager.GetByteIconWorldPosition();
+
         Vector3 startScale = transform.localScale;
         Vector3 targetScale = originalScale * endScale;
 
@@ -106,6 +121,7 @@ public class BytePickup : MonoBehaviour
         while (elapsed < flyDuration)
         {
             elapsed += Time.deltaTime;
+
             float t = Mathf.Clamp01(elapsed / flyDuration);
             float eased = EaseInCubic(t);
 
@@ -140,7 +156,9 @@ public class BytePickup : MonoBehaviour
     private static Sprite GetFallbackSprite()
     {
         if (fallbackSprite != null)
+        {
             return fallbackSprite;
+        }
 
         int size = 16;
         Texture2D texture = new Texture2D(size, size);
@@ -160,9 +178,13 @@ public class BytePickup : MonoBehaviour
                 float distance = Vector2.Distance(new Vector2(x, y), center);
 
                 if (distance <= radius)
+                {
                     texture.SetPixel(x, y, distance > radius - 2f ? edge : main);
+                }
                 else
+                {
                     texture.SetPixel(x, y, clear);
+                }
             }
         }
 

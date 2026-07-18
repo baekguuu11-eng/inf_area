@@ -9,12 +9,22 @@ public class OverclockChip : MonoBehaviour
     [Header("Buff Icon")]
     public GameObject buffIcon;
 
+    [Header("Extra Buff Icons")]
+    [SerializeField] private GameObject[] extraBuffIcons;
+
     [Header("Input")]
     public KeyCode toggleKey = KeyCode.F;
 
     [Header("Overclock Settings")]
     public int bonusHealthAmount = 3;
     public float heartDelay = 0.15f;
+
+    [Header("Sound")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip applySound;
+    [SerializeField] private float applyVolume = 0.5f;
+    [SerializeField] private bool randomizeApplyPitch = true;
+    [SerializeField] private Vector2 applyPitchRange = new Vector2(0.95f, 1.08f);
 
     private bool isOverclockActive;
     private Coroutine overclockCoroutine;
@@ -24,14 +34,24 @@ public class OverclockChip : MonoBehaviour
     private void Awake()
     {
         FindPlayerHealthIfNeeded();
+
+        if (audioSource == null)
+        {
+            audioSource = GetComponent<AudioSource>();
+        }
+
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+        }
+
+        audioSource.playOnAwake = false;
+        audioSource.spatialBlend = 0f;
     }
 
     private void Start()
     {
-        if (buffIcon != null)
-        {
-            buffIcon.SetActive(false);
-        }
+        HideAllBuffIcons();
 
         if (playerHealth != null && playerHealth.heartUI != null)
         {
@@ -102,10 +122,7 @@ public class OverclockChip : MonoBehaviour
 
         isOverclockActive = false;
 
-        if (buffIcon != null)
-        {
-            buffIcon.SetActive(false);
-        }
+        HideAllBuffIcons();
 
         if (playerHealth != null)
         {
@@ -131,10 +148,8 @@ public class OverclockChip : MonoBehaviour
 
         isOverclockActive = true;
 
-        if (buffIcon != null)
-        {
-            buffIcon.SetActive(true);
-        }
+        ShowAllBuffIcons();
+        PlayApplySound();
 
         HeartUI heartUI = playerHealth.heartUI;
 
@@ -166,6 +181,72 @@ public class OverclockChip : MonoBehaviour
         }
 
         overclockCoroutine = null;
+    }
+
+    private void ShowAllBuffIcons()
+    {
+        if (buffIcon != null)
+        {
+            buffIcon.SetActive(true);
+        }
+
+        if (extraBuffIcons == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < extraBuffIcons.Length; i++)
+        {
+            if (extraBuffIcons[i] != null)
+            {
+                extraBuffIcons[i].SetActive(true);
+            }
+        }
+    }
+
+    private void HideAllBuffIcons()
+    {
+        if (buffIcon != null)
+        {
+            buffIcon.SetActive(false);
+        }
+
+        if (extraBuffIcons == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < extraBuffIcons.Length; i++)
+        {
+            if (extraBuffIcons[i] != null)
+            {
+                extraBuffIcons[i].SetActive(false);
+            }
+        }
+    }
+
+    private void PlayApplySound()
+    {
+        if (audioSource == null)
+        {
+            return;
+        }
+
+        if (applySound == null)
+        {
+            return;
+        }
+
+        float originalPitch = audioSource.pitch;
+
+        if (randomizeApplyPitch)
+        {
+            audioSource.pitch = Random.Range(applyPitchRange.x, applyPitchRange.y);
+        }
+
+        audioSource.PlayOneShot(applySound, applyVolume);
+
+        audioSource.pitch = originalPitch;
     }
 
     private void FindPlayerHealthIfNeeded()
