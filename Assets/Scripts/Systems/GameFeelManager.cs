@@ -8,6 +8,10 @@ public class GameFeelManager : MonoBehaviour
     private Vector3 originalLocalPosition;
     private Coroutine shakeCoroutine;
 
+    // [버그 수정] 히트스탑이 겹쳐서 호출될 때 Time.timeScale이 0에 고정되던 문제 방지용
+    private int hitStopDepth = 0;
+    private float timeScaleBeforeHitStop = 1f;
+
     private void Awake()
     {
         if (Instance == null)
@@ -28,12 +32,22 @@ public class GameFeelManager : MonoBehaviour
 
     private IEnumerator HitStopRoutine(float duration)
     {
-        float previousTimeScale = Time.timeScale;
+        // 여러 히트스탑이 겹쳐도 "제일 처음" timeScale만 기억해서 나중에 그걸로 복구함.
+        // (기존 코드는 매 호출마다 '현재' timeScale을 저장했는데, 겹쳐서 호출되면
+        //  이미 0으로 바뀐 값을 저장해버려서 나중에 0으로 영구 고정되는 버그가 있었음)
+        if (hitStopDepth == 0)
+            timeScaleBeforeHitStop = Time.timeScale;
+
+        hitStopDepth++;
         Time.timeScale = 0f;
 
         yield return new WaitForSecondsRealtime(duration);
 
-        Time.timeScale = previousTimeScale;
+        hitStopDepth = Mathf.Max(0, hitStopDepth - 1);
+
+        // 겹쳐 있던 히트스탑이 전부 끝났을 때만 원래 속도로 복구
+        if (hitStopDepth == 0)
+            Time.timeScale = timeScaleBeforeHitStop;
     }
 
     public void Shake(float duration, float magnitude)
