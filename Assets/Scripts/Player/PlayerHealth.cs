@@ -1,42 +1,90 @@
+using System.Collections;
 using UnityEngine;
 
 public class PlayerHealth : MonoBehaviour
 {
-    [Header("체력 설정")]
+    [Header("Health Settings")]
+    public int baseMaxHealth = 5;
     public int maxHealth = 5;
-    public int currentHealth;
+    public int currentHealth = 5;
 
-    [Header("하트 UI")]
+    [Header("UI")]
     public HeartUI heartUI;
 
-    [Header("사망 UI")]
+    [Header("Death UI")]
     public GameObject deathPanel;
 
-    [Header("무적 시간")]
+    [Header("Hit / Invincible")]
     public float invincibleTime = 0.5f;
+    public float hitFlashTime = 0.2f;
 
-    private bool isInvincible = false;
+    [Header("Hit Visual")]
+    [SerializeField] private SpriteRenderer playerSpriteRenderer;
+    [SerializeField] private Color hitColor = Color.red;
 
-    private SpriteRenderer sr;
+    [Header("Sound")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip hurtSound;
+    [SerializeField] private float hurtVolume = 0.55f;
+    [SerializeField] private bool randomizeHurtPitch = true;
+    [SerializeField] private Vector2 hurtPitchRange = new Vector2(0.92f, 1.08f);
 
-    void Start()
+    private bool isInvincible;
+    private bool isDead;
+
+    private Color originalColor = Color.white;
+    private Coroutine hitEffectCoroutine;
+    private Coroutine invincibleCoroutine;
+
+    public bool IsDead => isDead;
+    public bool IsInvincible => isInvincible;
+
+    private void Awake()
     {
-        // 시작 체력 설정
-        currentHealth = maxHealth;
+        FindSpriteRendererIfNeeded();
 
-        // 플레이어 스프라이트 가져오기
-        sr = GetComponentInChildren<SpriteRenderer>();
+        if (playerSpriteRenderer != null)
+        {
+            originalColor = playerSpriteRenderer.color;
+        }
 
-        // 하트 UI 업데이트
-        heartUI.UpdateHearts(currentHealth);
+        if (audioSource == null)
+        {
+            audioSource = GetComponent<AudioSource>();
+        }
 
-        // 사망창 숨기기
-        deathPanel.SetActive(false);
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+        }
+
+        audioSource.playOnAwake = false;
+        audioSource.spatialBlend = 0f;
     }
 
-    void Update()
+    private void Start()
     {
-        // 테스트용 데미지
+        baseMaxHealth = Mathf.Max(1, baseMaxHealth);
+
+        maxHealth = baseMaxHealth;
+
+        if (currentHealth <= 0)
+        {
+            currentHealth = baseMaxHealth;
+        }
+
+        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
+
+        if (deathPanel != null)
+        {
+            deathPanel.SetActive(false);
+        }
+
+        RefreshUI();
+    }
+
+    private void Update()
+    {
         if (Input.GetKeyDown(KeyCode.N))
         {
             TakeDamage(1);
@@ -45,61 +93,225 @@ public class PlayerHealth : MonoBehaviour
 
     public void TakeDamage(int damage)
     {
-        // 무적 상태면 데미지 무시
-        if (isInvincible)
-            return;
-
-        // 체력 감소
-        currentHealth -= damage;
-
-        // 체력 최소값 제한
-        if (currentHealth < 0)
+        if (damage <= 0)
         {
-            currentHealth = 0;
+            return;
         }
 
-        Debug.Log("현재 체력 : " + currentHealth);
+        if (isDead)
+        {
+            return;
+        }
 
-        // 하트 UI 갱신
-        heartUI.UpdateHearts(currentHealth);
+        if (isInvincible)
+        {
+            return;
+        }
 
-        // 피격 효과
-        StartCoroutine(HitEffect());
+        int finalDamage = GetFinalDamage(damage);
 
-        // 무적 시작
-        StartCoroutine(InvincibleCoroutine());
+        currentHealth -= finalDamage;
+        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
 
-        // 사망 체크
+        Debug.Log("현재 체력 : " + currentHealth + " / 받은 데미지 : " + finalDamage);
+
+        RefreshUI();
+        PlayHurtSound();
+        PlayHitEffect();
+        StartInvincible();
+
         if (currentHealth <= 0)
         {
             Die();
         }
     }
 
-    System.Collections.IEnumerator HitEffect()
+    private int GetFinalDamage(int damage)
     {
-        sr.color = Color.red;
+        if (ChipSlotManager.Instance == null)
+        {
+            return damage;
+        }
 
-        yield return new WaitForSeconds(0.2f);
+        float multiplier = ChipSlotManager.Instance.DefenseDamageMultiplier;
+        int finalDamage = Mathf.CeilToInt(damage * multiplier);
 
-        sr.color = Color.white;
+        return Mathf.Max(1, finalDamage);
     }
 
-    void Die()
+    public void Heal(int amount)
     {
-        Debug.Log("플레이어 사망!");
+        if (amount <= 0)
+        {
+            return;
+        }
 
-        deathPanel.SetActive(true);
+        if (isDead)
+        {
+            return;
+        }
 
-        Time.timeScale = 0f;
+        currentHealth += amount;
+        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
+
+        RefreshUI();
     }
 
-    System.Collections.IEnumerator InvincibleCoroutine()
+    public void ApplyOverclockHealth(int bonusAmount)
+    {
+        if (bonusAmount <= 0)
+        {
+            return;
+        }
+
+        if (isDead)
+        {
+            return;
+        }
+
+        maxHealth = baseMaxHealth + bonusAmount;
+
+        currentHealth += bonusAmount;
+        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
+
+        RefreshUI();
+    }
+
+    public void RemoveOverclockHealth()
+    {
+        maxHealth = baseMaxHealth;
+
+        if (currentHealth > baseMaxHealth)
+        {
+            currentHealth = baseMaxHealth;
+        }
+
+        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
+
+        RefreshUI();
+    }
+
+    public void RefreshUI()
+    {
+        if (heartUI != null)
+        {
+            heartUI.RefreshUI(currentHealth, maxHealth, baseMaxHealth);
+        }
+    }
+
+    private void PlayHitEffect()
+    {
+        FindSpriteRendererIfNeeded();
+
+        if (hitEffectCoroutine != null)
+        {
+            StopCoroutine(hitEffectCoroutine);
+        }
+
+        hitEffectCoroutine = StartCoroutine(HitEffect());
+    }
+
+    private IEnumerator HitEffect()
+    {
+        if (playerSpriteRenderer != null)
+        {
+            playerSpriteRenderer.color = hitColor;
+        }
+
+        yield return new WaitForSeconds(hitFlashTime);
+
+        if (playerSpriteRenderer != null && !isDead)
+        {
+            playerSpriteRenderer.color = originalColor;
+        }
+
+        hitEffectCoroutine = null;
+    }
+
+    private void StartInvincible()
+    {
+        if (invincibleCoroutine != null)
+        {
+            StopCoroutine(invincibleCoroutine);
+        }
+
+        invincibleCoroutine = StartCoroutine(InvincibleCoroutine());
+    }
+
+    private IEnumerator InvincibleCoroutine()
     {
         isInvincible = true;
 
         yield return new WaitForSeconds(invincibleTime);
 
         isInvincible = false;
+        invincibleCoroutine = null;
+    }
+
+    private void PlayHurtSound()
+    {
+        if (audioSource == null)
+        {
+            return;
+        }
+
+        if (hurtSound == null)
+        {
+            return;
+        }
+
+        float originalPitch = audioSource.pitch;
+
+        if (randomizeHurtPitch)
+        {
+            audioSource.pitch = Random.Range(hurtPitchRange.x, hurtPitchRange.y);
+        }
+
+        audioSource.PlayOneShot(hurtSound, hurtVolume);
+
+        audioSource.pitch = originalPitch;
+    }
+
+    private void FindSpriteRendererIfNeeded()
+    {
+        if (playerSpriteRenderer != null)
+        {
+            return;
+        }
+
+        SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>(true);
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] == null)
+            {
+                continue;
+            }
+
+            if (renderers[i].sprite != null)
+            {
+                playerSpriteRenderer = renderers[i];
+                return;
+            }
+        }
+    }
+
+    private void Die()
+    {
+        if (isDead)
+        {
+            return;
+        }
+
+        isDead = true;
+
+        Debug.Log("플레이어 사망!");
+
+        if (deathPanel != null)
+        {
+            deathPanel.SetActive(true);
+        }
+
+        Time.timeScale = 0f;
     }
 }

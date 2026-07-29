@@ -3,6 +3,7 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody2D))]
 public class PlayerMovement : MonoBehaviour
 {
+    [Header("Movement")]
     [SerializeField] private float moveSpeed = 5f;
 
     private Rigidbody2D rb;
@@ -41,6 +42,18 @@ public class PlayerMovement : MonoBehaviour
             return;
         }
 
-        rb.linearVelocity = MoveInput * moveSpeed;
+        float finalMoveSpeed = GetFinalMoveSpeed();
+
+        rb.linearVelocity = MoveInput * finalMoveSpeed;
+    }
+
+    private float GetFinalMoveSpeed()
+    {
+        if (ChipSlotManager.Instance == null)
+        {
+            return moveSpeed;
+        }
+
+        return moveSpeed * ChipSlotManager.Instance.MoveSpeedMultiplier;
     }
 }
