@@ -228,7 +228,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 880, y: 145}
+  m_AnchoredPosition: {x: 873, y: 184}
   m_SizeDelta: {x: 60, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &138821946
@@ -503,6 +503,10 @@ MonoBehaviour:
   fullHeart: {fileID: 8832167503239892954, guid: 6b917903e1bd8054c87662fdf01e863b, type: 3}
   emptyHeart: {fileID: -5677486250916488663, guid: 9fc558447f7222e4489d58631db7969f, type: 3}
   sortByXPosition: 1
+  feedbackScale: 1.25
+  feedbackDuration: 0.12
+  damageFeedbackColor: {r: 1, g: 0.45, b: 0.45, a: 1}
+  defenseFeedbackColor: {r: 0.45, g: 0.8, b: 1, a: 1}
 --- !u!4 &230938028
 Transform:
   m_ObjectHideFlags: 0
@@ -1234,7 +1238,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 876, y: 242}
+  m_AnchoredPosition: {x: 873, y: 260}
   m_SizeDelta: {x: 60, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &586618980
@@ -1386,16 +1390,16 @@ MonoBehaviour:
   defenseSprite: {fileID: 21300000, guid: 2f13a16e299344a458e53575d98d64b9, type: 3}
   maxHealthSprite: {fileID: 8416251846642259151, guid: aa9930905a35818489cc9237d8d39188, type: 3}
   moveSpeedSprite: {fileID: 21300000, guid: 6512940a27683954daa25641143e5897, type: 3}
-  overclockObject: {fileID: 0}
+  overclockObject: {fileID: 598522033}
   meleeDamageMultiplier: 1.5
   meleeAttackSpeedMultiplier: 1.3
   meleeRangeMultiplier: 1.4
   rangedDamageMultiplier: 1.5
   rangedAttackSpeedMultiplier: 1.3
   rangedPierceEnabled: 1
-  defenseDamageMultiplier: 0.7
+  defenseDamageMultiplier: 0.5
   moveSpeedMultiplier: 1.3
-  allowTopNumberKeys: 0
+  allowTopNumberKeys: 1
 --- !u!4 &618250526
 Transform:
   m_ObjectHideFlags: 0
@@ -2275,6 +2279,8 @@ MonoBehaviour:
   hitFlashTime: 0.2
   playerSpriteRenderer: {fileID: 1520325030}
   hitColor: {r: 1, g: 0, b: 0, a: 1}
+  showDefenseLog: 1
+  testDamage: 1
   audioSource: {fileID: 0}
   hurtSound: {fileID: 0}
   hurtVolume: 0.55
@@ -2330,18 +2336,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerSpeedTrailEffect
   playerMovement: {fileID: 0}
-  playerSpriteRenderer: {fileID: 0}
+  playerSpriteRenderer: {fileID: 1520325030}
+  onlyWhenMoveSpeedChipEquipped: 1
+  backOffset: 0.18
+  verticalOffset: 0
   spawnInterval: 0.045
   trailLifeTime: 0.18
-  backOffset: 0.35
   lineCount: 4
-  lineLength: 0.45
-  lineThickness: 0.045
-  lineSpacing: 0.12
+  lineLength: 0.38
+  lineThickness: 0.035
+  lineSpacing: 0.1
   startAlpha: 0.55
   lineColor: {r: 0.45, g: 0.95, b: 1, a: 0.55}
   sortingOrderOffset: -1
-  showDebugLog: 0
 --- !u!1 &1071038132
 GameObject:
   m_ObjectHideFlags: 0

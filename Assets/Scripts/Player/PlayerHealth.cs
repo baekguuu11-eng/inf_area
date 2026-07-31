@@ -15,12 +15,18 @@ public class PlayerHealth : MonoBehaviour
     public GameObject deathPanel;
 
     [Header("Hit / Invincible")]
-    public float invincibleTime = 0.5f;
+    public float invincibleTime = 0.6f;
     public float hitFlashTime = 0.2f;
 
     [Header("Hit Visual")]
     [SerializeField] private SpriteRenderer playerSpriteRenderer;
     [SerializeField] private Color hitColor = Color.red;
+
+    [Header("Defense Chip")]
+    [SerializeField] private bool showDefenseLog = true;
+
+    [Header("Test")]
+    [SerializeField] private int testDamage = 1;
 
     [Header("Sound")]
     [SerializeField] private AudioSource audioSource;
@@ -31,6 +37,9 @@ public class PlayerHealth : MonoBehaviour
 
     private bool isInvincible;
     private bool isDead;
+
+    private int defenseStoredDamage = 0;
+    private float lastDamageTime = -999f;
 
     private Color originalColor = Color.white;
     private Coroutine hitEffectCoroutine;
@@ -65,7 +74,6 @@ public class PlayerHealth : MonoBehaviour
     private void Start()
     {
         baseMaxHealth = Mathf.Max(1, baseMaxHealth);
-
         maxHealth = baseMaxHealth;
 
         if (currentHealth <= 0)
@@ -87,7 +95,7 @@ public class PlayerHealth : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.N))
         {
-            TakeDamage(1);
+            TakeDamage(testDamage);
         }
     }
 
@@ -103,12 +111,37 @@ public class PlayerHealth : MonoBehaviour
             return;
         }
 
-        if (isInvincible)
+        // 핵심: 무적시간 중이면 데미지 자체를 완전히 무시
+        if (IsInInvincibleTime())
         {
+            Debug.Log("무적시간 중: 데미지 무시");
+
+            if (heartUI != null)
+            {
+                heartUI.PlayDefenseFeedback(currentHealth);
+            }
+
             return;
         }
 
+        int healthBefore = currentHealth;
         int finalDamage = GetFinalDamage(damage);
+
+        // 방어칩 때문에 이번 공격이 막힌 경우
+        if (finalDamage <= 0)
+        {
+            Debug.Log("방어 칩 적용: 이번 공격은 하트가 닳지 않음");
+
+            if (heartUI != null)
+            {
+                heartUI.PlayDefenseFeedback(currentHealth);
+            }
+
+            PlayHitEffect();
+            StartInvincible();
+
+            return;
+        }
 
         currentHealth -= finalDamage;
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
@@ -116,6 +149,12 @@ public class PlayerHealth : MonoBehaviour
         Debug.Log("현재 체력 : " + currentHealth + " / 받은 데미지 : " + finalDamage);
 
         RefreshUI();
+
+        if (heartUI != null)
+        {
+            heartUI.PlayDamageFeedback(healthBefore, currentHealth);
+        }
+
         PlayHurtSound();
         PlayHitEffect();
         StartInvincible();
@@ -126,17 +165,50 @@ public class PlayerHealth : MonoBehaviour
         }
     }
 
+    private bool IsInInvincibleTime()
+    {
+        if (isInvincible)
+        {
+            return true;
+        }
+
+        if (Time.time - lastDamageTime < invincibleTime)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     private int GetFinalDamage(int damage)
     {
-        if (ChipSlotManager.Instance == null)
+        if (!IsDefenseChipEquipped())
         {
+            defenseStoredDamage = 0;
             return damage;
         }
 
-        float multiplier = ChipSlotManager.Instance.DefenseDamageMultiplier;
-        int finalDamage = Mathf.CeilToInt(damage * multiplier);
+        defenseStoredDamage += damage;
 
-        return Mathf.Max(1, finalDamage);
+        int finalDamage = defenseStoredDamage / 2;
+        defenseStoredDamage = defenseStoredDamage % 2;
+
+        if (showDefenseLog)
+        {
+            Debug.Log("방어 칩 누적 데미지 처리 / 이번 최종 데미지: " + finalDamage);
+        }
+
+        return finalDamage;
+    }
+
+    private bool IsDefenseChipEquipped()
+    {
+        if (ChipSlotManager.Instance == null)
+        {
+            return false;
+        }
+
+        return ChipSlotManager.Instance.IsChipEquipped(ChipSlotManager.ChipType.Defense);
     }
 
     public void Heal(int amount)
@@ -230,6 +302,8 @@ public class PlayerHealth : MonoBehaviour
 
     private void StartInvincible()
     {
+        lastDamageTime = Time.time;
+
         if (invincibleCoroutine != null)
         {
             StopCoroutine(invincibleCoroutine);

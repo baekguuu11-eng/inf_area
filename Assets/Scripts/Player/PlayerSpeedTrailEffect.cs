@@ -7,32 +7,30 @@ public class PlayerSpeedTrailEffect : MonoBehaviour
     [SerializeField] private PlayerMovement playerMovement;
     [SerializeField] private SpriteRenderer playerSpriteRenderer;
 
-    [Header("Trail Settings")]
+    [Header("Trail Condition")]
+    [SerializeField] private bool onlyWhenMoveSpeedChipEquipped = true;
+
+    [Header("Trail Position")]
+    [SerializeField] private float backOffset = 0.28f;
+    [SerializeField] private float verticalOffset = 0f;
+
+    [Header("Trail Visual")]
     [SerializeField] private float spawnInterval = 0.045f;
     [SerializeField] private float trailLifeTime = 0.18f;
-    [SerializeField] private float backOffset = 0.35f;
-
-    [Header("Wind Line Visual")]
     [SerializeField] private int lineCount = 4;
-    [SerializeField] private float lineLength = 0.45f;
-    [SerializeField] private float lineThickness = 0.045f;
-    [SerializeField] private float lineSpacing = 0.12f;
+    [SerializeField] private float lineLength = 0.38f;
+    [SerializeField] private float lineThickness = 0.035f;
+    [SerializeField] private float lineSpacing = 0.1f;
     [SerializeField] private float startAlpha = 0.55f;
-    [SerializeField] private Color lineColor = new Color(0.45f, 0.95f, 1f, 0.55f);
-    [SerializeField] private int sortingOrderOffset = -1;
+    [SerializeField] private Color lineColor = new Color(0.4f, 0.9f, 1f, 0.55f);
 
-    [Header("Debug")]
-    [SerializeField] private bool showDebugLog = false;
+    [Header("Sorting")]
+    [SerializeField] private int sortingOrderOffset = -1;
 
     private float spawnTimer;
     private static Sprite lineSprite;
 
     private void Awake()
-    {
-        FindReferences();
-    }
-
-    private void Start()
     {
         FindReferences();
     }
@@ -52,7 +50,7 @@ public class PlayerSpeedTrailEffect : MonoBehaviour
         if (spawnTimer >= spawnInterval)
         {
             spawnTimer = 0f;
-            CreateWindTrail();
+            CreateTrail();
         }
     }
 
@@ -65,68 +63,27 @@ public class PlayerSpeedTrailEffect : MonoBehaviour
 
         if (playerSpriteRenderer == null)
         {
-            playerSpriteRenderer = GetComponentInChildren<SpriteRenderer>();
-        }
+            SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>(true);
 
-        if (playerMovement == null)
-        {
-            GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
-
-            if (playerObject != null)
+            for (int i = 0; i < renderers.Length; i++)
             {
-                playerMovement = playerObject.GetComponent<PlayerMovement>();
-            }
-        }
-
-        if (playerSpriteRenderer == null)
-        {
-            GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
-
-            if (playerObject != null)
-            {
-                playerSpriteRenderer = playerObject.GetComponentInChildren<SpriteRenderer>();
+                if (renderers[i] != null && renderers[i].sprite != null)
+                {
+                    playerSpriteRenderer = renderers[i];
+                    break;
+                }
             }
         }
     }
 
     private bool ShouldShowTrail()
     {
-        if (ChipSlotManager.Instance == null)
-        {
-            if (showDebugLog)
-            {
-                Debug.Log("SpeedTrail ¾È ³ª¿È: ChipSlotManager.Instance ¾øÀ½");
-            }
-
-            return false;
-        }
-
-        if (!ChipSlotManager.Instance.IsChipEquipped(ChipSlotManager.ChipType.MoveSpeed))
-        {
-            return false;
-        }
-
         if (playerMovement == null)
         {
-            if (showDebugLog)
-            {
-                Debug.Log("SpeedTrail ¾È ³ª¿È: PlayerMovement ¾øÀ½");
-            }
-
             return false;
         }
 
         if (playerSpriteRenderer == null)
-        {
-            if (showDebugLog)
-            {
-                Debug.Log("SpeedTrail ¾È ³ª¿È: Player SpriteRenderer ¾øÀ½");
-            }
-
-            return false;
-        }
-
-        if (playerMovement.MoveInput.sqrMagnitude <= 0.01f)
         {
             return false;
         }
@@ -136,10 +93,28 @@ public class PlayerSpeedTrailEffect : MonoBehaviour
             return false;
         }
 
+        if (playerMovement.MoveInput.sqrMagnitude <= 0.01f)
+        {
+            return false;
+        }
+
+        if (onlyWhenMoveSpeedChipEquipped)
+        {
+            if (ChipSlotManager.Instance == null)
+            {
+                return false;
+            }
+
+            if (!ChipSlotManager.Instance.IsChipEquipped(ChipSlotManager.ChipType.MoveSpeed))
+            {
+                return false;
+            }
+        }
+
         return true;
     }
 
-    private void CreateWindTrail()
+    private void CreateTrail()
     {
         Vector2 moveDirection = playerMovement.MoveInput.normalized;
 
@@ -151,46 +126,49 @@ public class PlayerSpeedTrailEffect : MonoBehaviour
         Vector2 backDirection = -moveDirection;
         Vector2 sideDirection = new Vector2(-moveDirection.y, moveDirection.x);
 
-        Vector3 centerPosition = playerSpriteRenderer.transform.position + (Vector3)(backDirection * backOffset);
+        Vector3 basePosition = playerSpriteRenderer.bounds.center;
+        basePosition += (Vector3)(backDirection * backOffset);
+        basePosition += new Vector3(0f, verticalOffset, 0f);
 
-        GameObject groupObject = new GameObject("Speed_Wind_Trail");
-        groupObject.transform.position = centerPosition;
+        GameObject groupObject = new GameObject("Lightning_Afterimage_Trail");
+        groupObject.transform.position = basePosition;
+
+        float angle = Mathf.Atan2(moveDirection.y, moveDirection.x) * Mathf.Rad2Deg;
 
         for (int i = 0; i < lineCount; i++)
         {
             float centerIndex = (lineCount - 1) * 0.5f;
             float sideOffset = (i - centerIndex) * lineSpacing;
 
-            Vector3 linePosition = centerPosition + (Vector3)(sideDirection * sideOffset);
-            linePosition += (Vector3)(backDirection * Random.Range(-0.05f, 0.08f));
+            Vector3 linePosition = basePosition;
+            linePosition += (Vector3)(sideDirection * sideOffset);
+            linePosition += (Vector3)(backDirection * Random.Range(-0.04f, 0.08f));
 
-            GameObject lineObject = new GameObject("Wind_Line");
+            GameObject lineObject = new GameObject("Lightning_Line");
             lineObject.transform.SetParent(groupObject.transform);
             lineObject.transform.position = linePosition;
-
-            float angle = Mathf.Atan2(moveDirection.y, moveDirection.x) * Mathf.Rad2Deg;
             lineObject.transform.rotation = Quaternion.Euler(0f, 0f, angle);
 
-            SpriteRenderer lineRenderer = lineObject.AddComponent<SpriteRenderer>();
-            lineRenderer.sprite = GetLineSprite();
+            SpriteRenderer sr = lineObject.AddComponent<SpriteRenderer>();
+            sr.sprite = GetLineSprite();
 
-            lineRenderer.sortingLayerID = playerSpriteRenderer.sortingLayerID;
-            lineRenderer.sortingOrder = playerSpriteRenderer.sortingOrder + sortingOrderOffset;
+            sr.sortingLayerID = playerSpriteRenderer.sortingLayerID;
+            sr.sortingOrder = playerSpriteRenderer.sortingOrder + sortingOrderOffset;
 
             Color color = lineColor;
             color.a = startAlpha * Random.Range(0.75f, 1f);
-            lineRenderer.color = color;
+            sr.color = color;
 
-            float randomLength = lineLength * Random.Range(0.75f, 1.15f);
-            float randomThickness = lineThickness * Random.Range(0.8f, 1.15f);
+            float randomLength = lineLength * Random.Range(0.75f, 1.2f);
+            float randomThickness = lineThickness * Random.Range(0.8f, 1.2f);
 
             lineObject.transform.localScale = new Vector3(randomLength, randomThickness, 1f);
         }
 
-        StartCoroutine(FadeAndDestroyWindTrail(groupObject));
+        StartCoroutine(FadeAndDestroy(groupObject));
     }
 
-    private IEnumerator FadeAndDestroyWindTrail(GameObject groupObject)
+    private IEnumerator FadeAndDestroy(GameObject groupObject)
     {
         float elapsed = 0f;
 

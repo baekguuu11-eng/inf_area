@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -17,12 +18,20 @@ public class HeartUI : MonoBehaviour
     [Header("Option")]
     [SerializeField] private bool sortByXPosition = true;
 
+    [Header("Heart Feedback Animation")]
+    [SerializeField] private float feedbackScale = 1.25f;
+    [SerializeField] private float feedbackDuration = 0.12f;
+    [SerializeField] private Color damageFeedbackColor = new Color(1f, 0.45f, 0.45f, 1f);
+    [SerializeField] private Color defenseFeedbackColor = new Color(0.45f, 0.8f, 1f, 1f);
+
     private int currentHealth;
     private int maxHealth;
     private int baseMaxHealth = 5;
 
     private bool bonusHeartMode;
     private bool[] bonusHeartVisible;
+
+    private Coroutine feedbackCoroutine;
 
     public int BonusHeartCount
     {
@@ -83,6 +92,22 @@ public class HeartUI : MonoBehaviour
         }
 
         DrawHearts();
+    }
+
+    public void PlayDamageFeedback(int healthBefore, int healthAfter)
+    {
+        int changedHeartIndex = Mathf.Clamp(healthAfter, 0, maxHealth - 1);
+        Image targetHeart = GetHeartImageByGlobalIndex(changedHeartIndex);
+
+        PlayFeedback(targetHeart, damageFeedbackColor);
+    }
+
+    public void PlayDefenseFeedback(int currentHealthValue)
+    {
+        int targetIndex = Mathf.Clamp(currentHealthValue - 1, 0, maxHealth - 1);
+        Image targetHeart = GetHeartImageByGlobalIndex(targetIndex);
+
+        PlayFeedback(targetHeart, defenseFeedbackColor);
     }
 
     public void PrepareBonusHeartAnimation(int bonusSlotCount)
@@ -240,6 +265,98 @@ public class HeartUI : MonoBehaviour
             int globalHeartIndex = baseMaxHealth + i;
             heart.sprite = currentHealth > globalHeartIndex ? fullHeart : emptyHeart;
         }
+    }
+
+    private Image GetHeartImageByGlobalIndex(int index)
+    {
+        if (index < baseMaxHealth)
+        {
+            if (hearts == null)
+            {
+                return null;
+            }
+
+            if (index < 0 || index >= hearts.Length)
+            {
+                return null;
+            }
+
+            return hearts[index];
+        }
+
+        int bonusIndex = index - baseMaxHealth;
+
+        if (bonusHearts == null)
+        {
+            return null;
+        }
+
+        if (bonusIndex < 0 || bonusIndex >= bonusHearts.Length)
+        {
+            return null;
+        }
+
+        return bonusHearts[bonusIndex];
+    }
+
+    private void PlayFeedback(Image targetHeart, Color feedbackColor)
+    {
+        if (targetHeart == null)
+        {
+            return;
+        }
+
+        if (!targetHeart.gameObject.activeInHierarchy)
+        {
+            return;
+        }
+
+        if (feedbackCoroutine != null)
+        {
+            StopCoroutine(feedbackCoroutine);
+        }
+
+        feedbackCoroutine = StartCoroutine(FeedbackRoutine(targetHeart, feedbackColor));
+    }
+
+    private IEnumerator FeedbackRoutine(Image targetHeart, Color feedbackColor)
+    {
+        RectTransform rectTransform = targetHeart.rectTransform;
+
+        Vector3 originalScale = rectTransform.localScale;
+        Color originalColor = targetHeart.color;
+
+        float halfDuration = feedbackDuration * 0.5f;
+        float elapsed = 0f;
+
+        targetHeart.color = feedbackColor;
+
+        while (elapsed < halfDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+
+            float t = Mathf.Clamp01(elapsed / halfDuration);
+            rectTransform.localScale = Vector3.Lerp(originalScale, originalScale * feedbackScale, t);
+
+            yield return null;
+        }
+
+        elapsed = 0f;
+
+        while (elapsed < halfDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+
+            float t = Mathf.Clamp01(elapsed / halfDuration);
+            rectTransform.localScale = Vector3.Lerp(originalScale * feedbackScale, originalScale, t);
+
+            yield return null;
+        }
+
+        rectTransform.localScale = originalScale;
+        targetHeart.color = originalColor;
+
+        feedbackCoroutine = null;
     }
 
     private void EnsureBonusVisibleArray()
