@@ -35,6 +35,9 @@ public class PlayerHealth : MonoBehaviour
     [SerializeField] private bool randomizeHurtPitch = true;
     [SerializeField] private Vector2 hurtPitchRange = new Vector2(0.92f, 1.08f);
 
+    [Header("Death Sequence")]
+    [SerializeField] private DeathSequenceUI deathSequenceUI;
+
     private bool isInvincible;
     private bool isDead;
 
@@ -73,6 +76,9 @@ public class PlayerHealth : MonoBehaviour
 
     private void Start()
     {
+        Time.timeScale = 1f;
+        GameInputState.IsLocked = false;
+
         baseMaxHealth = Mathf.Max(1, baseMaxHealth);
         maxHealth = baseMaxHealth;
 
@@ -380,6 +386,14 @@ public class PlayerHealth : MonoBehaviour
         isDead = true;
 
         Debug.Log("플레이어 사망!");
+
+        GameInputState.IsLocked = true;
+
+        if (deathSequenceUI != null)
+        {
+            deathSequenceUI.PlayDeathSequence(playerSpriteRenderer);
+            return;
+        }
 
         if (deathPanel != null)
         {
