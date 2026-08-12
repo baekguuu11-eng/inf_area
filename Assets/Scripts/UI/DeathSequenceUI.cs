@@ -321,7 +321,7 @@ public class DeathSequenceUI : MonoBehaviour
             if (breakFlash != null)
             {
                 Color color = breakFlash.color;
-                color.a = Mathf.Sin(t * Mathf.PI) * 0.65f;
+                color.a = Mathf.Sin(t * Mathf.PI) * 0.18f;
                 breakFlash.color = color;
             }
 
