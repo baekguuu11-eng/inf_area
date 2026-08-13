@@ -47,8 +47,8 @@ public class MenuTextButtonHover : MonoBehaviour,
     [SerializeField] private bool useAutoUnderlineWidth = true;
     [SerializeField] private float startUnderlineWidth = 200f;
     [SerializeField] private float settingsUnderlineWidth = 275f;
-    [SerializeField] private float helpUnderlineWidth = 170f;
     [SerializeField] private float makersUnderlineWidth = 240f;
+    [SerializeField] private float quitUnderlineWidth = 155f;
 
     [Header("Manual Underline Width")]
     [SerializeField] private float manualUnderlineFullWidth = 200f;
@@ -59,18 +59,29 @@ public class MenuTextButtonHover : MonoBehaviour,
 
     private RectTransform textRect;
     private RectTransform underlineRect;
-
-    private bool isHovering = false;
-    private bool isPressing = false;
+    private bool isHovering;
+    private bool isPressing;
     private bool hoverEnabled = true;
-
     private Coroutine animationCoroutine;
+
+    private static AudioSource globalUISoundSource;
+    private static float globalSfxVolume = 1f;
+
+    public static void SetGlobalSfxVolume(float volume)
+    {
+        globalSfxVolume = Mathf.Clamp01(volume);
+    }
+
+    public static float GetGlobalSfxVolume()
+    {
+        return globalSfxVolume;
+    }
 
     private void Reset()
     {
         labelText = GetComponentInChildren<TextMeshProUGUI>(true);
 
-        Transform underline = transform.Find("Underline");
+        Transform underline = FindUnderlineTransform();
         if (underline != null)
             underlineImage = underline.GetComponent<Image>();
 
@@ -84,7 +95,7 @@ public class MenuTextButtonHover : MonoBehaviour,
 
         if (underlineImage == null)
         {
-            Transform underline = transform.Find("Underline");
+            Transform underline = FindUnderlineTransform();
             if (underline != null)
                 underlineImage = underline.GetComponent<Image>();
         }
@@ -96,7 +107,11 @@ public class MenuTextButtonHover : MonoBehaviour,
         {
             textRect = labelText.GetComponent<RectTransform>();
             labelText.alignment = TextAlignmentOptions.Center;
-            textRect.pivot = new Vector2(0.5f, 0.5f);
+            labelText.textWrappingMode = TextWrappingModes.NoWrap;
+            labelText.overflowMode = TextOverflowModes.Overflow;
+
+            if (textRect != null)
+                textRect.pivot = new Vector2(0.5f, 0.5f);
         }
 
         if (underlineImage != null)
@@ -108,6 +123,26 @@ public class MenuTextButtonHover : MonoBehaviour,
         }
 
         ApplyInstantNormalState();
+    }
+
+    private Transform FindUnderlineTransform()
+    {
+        Transform direct = transform.Find("Underline");
+        if (direct != null)
+            return direct;
+
+        direct = transform.Find("UnderLine");
+        if (direct != null)
+            return direct;
+
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            Transform child = transform.GetChild(i);
+            if (child.name.Replace("_", "").ToLower().Contains("underline"))
+                return child;
+        }
+
+        return null;
     }
 
     private void OnEnable()
@@ -140,8 +175,12 @@ public class MenuTextButtonHover : MonoBehaviour,
             return;
 
         float pulse = (Mathf.Sin(Time.unscaledTime * hoverPulseSpeed) + 1f) * 0.5f;
-        Color pulseColor = Color.Lerp(hoverColor, Color.white, pulse * hoverPulseStrength);
-        labelText.color = pulseColor;
+
+        labelText.color = Color.Lerp(
+            hoverColor,
+            Color.white,
+            pulse * hoverPulseStrength
+        );
     }
 
     public void OnPointerEnter(PointerEventData eventData)
@@ -150,7 +189,6 @@ public class MenuTextButtonHover : MonoBehaviour,
             return;
 
         isHovering = true;
-
         PlayUISound(hoverSound, hoverVolume, playHoverSound);
 
         if (!isPressing)
@@ -164,7 +202,6 @@ public class MenuTextButtonHover : MonoBehaviour,
 
         isHovering = false;
         isPressing = false;
-
         AnimateToNormalState();
     }
 
@@ -174,9 +211,7 @@ public class MenuTextButtonHover : MonoBehaviour,
             return;
 
         isPressing = true;
-
         PlayUISound(clickSound, clickVolume, playClickSound);
-
         AnimateToClickState();
     }
 
@@ -207,18 +242,17 @@ public class MenuTextButtonHover : MonoBehaviour,
 
     private void PlayUISound(AudioClip clip, float volume, bool canPlay)
     {
-        if (!canPlay)
-            return;
-
-        if (clip == null)
+        if (!canPlay || clip == null)
             return;
 
         AudioSource source = GetGlobalUISoundSource();
-
         if (source == null)
             return;
 
-        source.PlayOneShot(clip, volume);
+        source.PlayOneShot(
+            clip,
+            Mathf.Clamp01(volume) * globalSfxVolume
+        );
     }
 
     private void AnimateToNormalState()
@@ -246,31 +280,40 @@ public class MenuTextButtonHover : MonoBehaviour,
         );
     }
 
-    private void StartAnimation(Color targetColor, Vector3 targetScale, float targetUnderlineWidth, float duration)
+    private void StartAnimation(
+        Color targetColor,
+        Vector3 targetScale,
+        float targetUnderlineWidth,
+        float duration)
     {
         if (animationCoroutine != null)
             StopCoroutine(animationCoroutine);
 
-        animationCoroutine = StartCoroutine(AnimateRoutine(targetColor, targetScale, targetUnderlineWidth, duration));
+        animationCoroutine = StartCoroutine(
+            AnimateRoutine(
+                targetColor,
+                targetScale,
+                targetUnderlineWidth,
+                duration
+            )
+        );
     }
 
-    private IEnumerator AnimateRoutine(Color targetColor, Vector3 targetScale, float targetUnderlineWidth, float duration)
+    private IEnumerator AnimateRoutine(
+        Color targetColor,
+        Vector3 targetScale,
+        float targetUnderlineWidth,
+        float duration)
     {
         if (labelText == null)
             yield break;
 
         Color startColor = labelText.color;
+        Vector3 startScale = textRect != null ? textRect.localScale : Vector3.one;
+        float startUnderlineWidth = underlineRect != null ? underlineRect.sizeDelta.x : 0f;
 
-        Vector3 startScale = textRect != null
-            ? textRect.localScale
-            : Vector3.one;
-
-        float startUnderlineWidth = underlineRect != null
-            ? underlineRect.sizeDelta.x
-            : 0f;
-
-        float safeDuration = Mathf.Max(0.01f, duration);
         float elapsed = 0f;
+        float safeDuration = Mathf.Max(0.01f, duration);
 
         while (elapsed < safeDuration)
         {
@@ -284,7 +327,15 @@ public class MenuTextButtonHover : MonoBehaviour,
                 textRect.localScale = Vector3.Lerp(startScale, targetScale, smoothT);
 
             if (underlineRect != null)
-                SetUnderlineWidth(Mathf.Lerp(startUnderlineWidth, targetUnderlineWidth, smoothT));
+            {
+                SetUnderlineWidth(
+                    Mathf.Lerp(
+                        startUnderlineWidth,
+                        targetUnderlineWidth,
+                        smoothT
+                    )
+                );
+            }
 
             yield return null;
         }
@@ -313,10 +364,7 @@ public class MenuTextButtonHover : MonoBehaviour,
 
     private float GetTargetUnderlineWidth()
     {
-        if (!useAutoUnderlineWidth)
-            return manualUnderlineFullWidth;
-
-        if (labelText == null)
+        if (!useAutoUnderlineWidth || labelText == null)
             return manualUnderlineFullWidth;
 
         string menuText = labelText.text.Trim().ToUpper();
@@ -330,11 +378,11 @@ public class MenuTextButtonHover : MonoBehaviour,
             case "SETTINGS":
                 return settingsUnderlineWidth;
 
-            case "HELP":
-                return helpUnderlineWidth;
-
             case "MAKERS":
                 return makersUnderlineWidth;
+
+            case "QUIT":
+                return quitUnderlineWidth;
 
             default:
                 return manualUnderlineFullWidth;
@@ -350,13 +398,16 @@ public class MenuTextButtonHover : MonoBehaviour,
         underlineImage.color = underlineColor;
 
         float finalWidth = Mathf.Max(0f, width);
-        underlineRect.sizeDelta = new Vector2(finalWidth, underlineHeight);
 
-        Color c = underlineImage.color;
-        c.a = finalWidth <= 0.01f ? 0f : underlineColor.a;
-        underlineImage.color = c;
+        underlineRect.sizeDelta = new Vector2(
+            finalWidth,
+            underlineHeight
+        );
+
+        Color color = underlineImage.color;
+        color.a = finalWidth <= 0.01f ? 0f : underlineColor.a;
+        underlineImage.color = color;
     }
-    private static AudioSource globalUISoundSource;
 
     private AudioSource GetGlobalUISoundSource()
     {
