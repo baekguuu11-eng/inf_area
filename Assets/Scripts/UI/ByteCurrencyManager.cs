@@ -31,6 +31,9 @@ public class ByteCurrencyManager : MonoBehaviour
 
     public int CurrentBytes => currentBytes;
 
+    // ShopManager 호환용
+    public int CurrentByte => currentBytes;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -42,26 +45,38 @@ public class ByteCurrencyManager : MonoBehaviour
         Instance = this;
 
         if (worldCamera == null)
+        {
             worldCamera = Camera.main;
+        }
 
         if (canvas == null)
+        {
             canvas = GetComponentInParent<Canvas>();
+        }
 
         if (audioSource == null)
+        {
             audioSource = GetComponent<AudioSource>();
+        }
 
         if (audioSource == null)
+        {
             audioSource = gameObject.AddComponent<AudioSource>();
+        }
 
         audioSource.playOnAwake = false;
         audioSource.spatialBlend = 0f;
         audioSource.volume = collectVolume;
 
         if (byteIcon != null)
+        {
             iconOriginalScale = byteIcon.localScale;
+        }
 
         if (collectSound == null)
+        {
             generatedRustleClip = CreateSoftRustleClip();
+        }
 
         RefreshUI();
     }
@@ -69,20 +84,60 @@ public class ByteCurrencyManager : MonoBehaviour
     public void AddBytes(int amount)
     {
         if (amount <= 0)
+        {
             return;
+        }
 
         currentBytes += amount;
         RefreshUI();
         PlayCollectFeedback();
     }
 
+    // 기존 코드 호환용
+    public void AddByte(int amount)
+    {
+        AddBytes(amount);
+    }
+
+    public bool CanSpend(int amount)
+    {
+        return currentBytes >= amount;
+    }
+
+    public bool SpendBytes(int amount)
+    {
+        if (amount <= 0)
+        {
+            return true;
+        }
+
+        if (currentBytes < amount)
+        {
+            return false;
+        }
+
+        currentBytes -= amount;
+        RefreshUI();
+        return true;
+    }
+
+    // 다른 코드 호환용
+    public bool SpendByte(int amount)
+    {
+        return SpendBytes(amount);
+    }
+
     public Vector3 GetByteIconWorldPosition()
     {
         if (worldCamera == null)
+        {
             worldCamera = Camera.main;
+        }
 
         if (byteIcon == null || worldCamera == null)
+        {
             return Vector3.zero;
+        }
 
         Vector3 screenPosition = RectTransformUtility.WorldToScreenPoint(null, byteIcon.position);
         float distanceFromCamera = Mathf.Abs(worldCamera.transform.position.z);
@@ -98,7 +153,9 @@ public class ByteCurrencyManager : MonoBehaviour
     private void RefreshUI()
     {
         if (byteText == null)
+        {
             return;
+        }
 
         byteText.text = prefixText + currentBytes.ToString();
     }
@@ -112,12 +169,16 @@ public class ByteCurrencyManager : MonoBehaviour
     private void PlayCollectSound()
     {
         if (audioSource == null)
+        {
             return;
+        }
 
         AudioClip clip = collectSound != null ? collectSound : generatedRustleClip;
 
         if (clip == null)
+        {
             return;
+        }
 
         audioSource.pitch = Random.Range(0.92f, 1.08f);
         audioSource.PlayOneShot(clip, collectVolume);
@@ -126,10 +187,14 @@ public class ByteCurrencyManager : MonoBehaviour
     private void PlayIconBounce()
     {
         if (byteIcon == null)
+        {
             return;
+        }
 
         if (bounceCoroutine != null)
+        {
             StopCoroutine(bounceCoroutine);
+        }
 
         bounceCoroutine = StartCoroutine(BounceIconRoutine());
     }
