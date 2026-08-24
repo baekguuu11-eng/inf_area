@@ -17,12 +17,22 @@ public class RoomController : MonoBehaviour
     [Header("Portal")]
     [SerializeField] private Transform portalSpawn;
 
+    [Header("Enemy Spawn Area")]
+    [Tooltip("적이 랜덤하게 스폰될 범위. 'EnemySpawnArea'라는 이름의 자식 오브젝트에 " +
+             "BoxCollider2D를 붙여두면 자동으로 인식됨 (Is Trigger 체크해서 실제 충돌엔 안 쓰이게 해도 됨, " +
+             "범위 표시 용도로만 사용되고 콜라이더 자체는 물리에 영향 안 줌)")]
+    [SerializeField] private BoxCollider2D enemySpawnArea;
+
     private readonly Dictionary<GateDirection, RoomController> connections = new();
 
     public int StageNumber => stageNumber;
     public int RoomNumber => roomNumber;
     public bool IsPortalRoom => isPortalRoom;
     public Transform PortalSpawn => portalSpawn;
+    public BoxCollider2D EnemySpawnArea => enemySpawnArea;
+
+    // 이 방에 이미 적을 스폰했는지 여부. MapManager가 재입장 시 중복 스폰을 막는 데 사용함.
+    public bool HasSpawnedEnemies { get; set; } = false;
 
     private void Awake()
     {
@@ -37,6 +47,8 @@ public class RoomController : MonoBehaviour
         isPortalRoom = portalRoom;
 
         gameObject.name = $"Room_{stageNumber}_{roomNumber}";
+
+        HasSpawnedEnemies = false;
 
         AutoFindReferences();
         ApplyPortalRoomState();
@@ -75,6 +87,14 @@ public class RoomController : MonoBehaviour
             default:
                 return null;
         }
+    }
+
+    // 이 방 안에 아직 살아있는 몬스터(EnemyHealth)가 있는지 확인.
+    // 적은 RoomEnemySpawner가 이 방(transform)을 부모로 스폰하므로, 자식만 훑으면 됨.
+    public bool HasLivingEnemies()
+    {
+        EnemyHealth[] enemies = GetComponentsInChildren<EnemyHealth>(false);
+        return enemies != null && enemies.Length > 0;
     }
 
     public void ApplyPortalRoomState()
@@ -139,5 +159,21 @@ public class RoomController : MonoBehaviour
 
         if (portalSpawn == null)
             portalSpawn = transform.Find("PortalSpawn");
+
+        if (enemySpawnArea == null)
+        {
+            Transform areaTransform = transform.Find("EnemySpawnArea");
+            if (areaTransform != null)
+                enemySpawnArea = areaTransform.GetComponent<BoxCollider2D>();
+        }
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (enemySpawnArea == null)
+            return;
+
+        Gizmos.color = new Color(1f, 0.4f, 0f, 0.7f);
+        Gizmos.DrawWireCube(enemySpawnArea.bounds.center, enemySpawnArea.bounds.size);
     }
 }
