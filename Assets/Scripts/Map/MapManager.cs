@@ -11,6 +11,7 @@ public class MapManager : MonoBehaviour
     [SerializeField] private RoomTransitionUI transitionUI;
     [SerializeField] private Camera mainCamera;
     [SerializeField] private GameObject portalPrefab;
+    [SerializeField] private RoomEnemySpawner enemySpawner;
 
     [Header("Transition Settings")]
     [SerializeField] private float gateCooldown = 0.15f;
@@ -52,6 +53,9 @@ public class MapManager : MonoBehaviour
 
         if (transitionUI == null)
             transitionUI = FindAnyObjectByType<RoomTransitionUI>();
+
+        if (enemySpawner == null)
+            enemySpawner = FindAnyObjectByType<RoomEnemySpawner>();
     }
 
     private IEnumerator Start()
@@ -69,6 +73,7 @@ public class MapManager : MonoBehaviour
         currentRoom = startRoom;
 
         ShowOnlyCurrentRoom();
+        TrySpawnEnemiesForCurrentRoom();
 
         if (transitionUI != null)
             yield return transitionUI.ShowRoomLabel(currentStage, currentRoom.RoomNumber);
@@ -92,6 +97,10 @@ public class MapManager : MonoBehaviour
             return;
 
         if (fromRoom.IsPortalRoom)
+            return;
+
+        // [신규] 방 안에 살아있는 몬스터가 남아있으면 이동 불가 (방을 클리어해야 다음으로 갈 수 있음)
+        if (fromRoom.HasLivingEnemies())
             return;
 
         if (fromRoom.TryGetConnection(exitDirection, out RoomController existingRoom))
@@ -174,6 +183,19 @@ public class MapManager : MonoBehaviour
         Instantiate(portalPrefab, spawnPosition, Quaternion.identity, room.transform);
     }
 
+    // 현재 방에 아직 적을 스폰한 적이 없고, 포탈방도 아니면 스포너를 호출함.
+    private void TrySpawnEnemiesForCurrentRoom()
+    {
+        if (enemySpawner == null || currentRoom == null)
+            return;
+
+        if (currentRoom.IsPortalRoom || currentRoom.HasSpawnedEnemies)
+            return;
+
+        enemySpawner.SpawnEnemiesForRoom(currentRoom, currentStage);
+        currentRoom.HasSpawnedEnemies = true;
+    }
+
     private IEnumerator TransitionToRoom(RoomController targetRoom, GateDirection entrySide, GateDirection exitDirection)
     {
         if (targetRoom == null)
@@ -192,6 +214,7 @@ public class MapManager : MonoBehaviour
 
         MovePlayerToSpawn(currentRoom, entrySide);
         ShowOnlyCurrentRoom();
+        TrySpawnEnemiesForCurrentRoom();
 
         if (mainCamera != null)
             mainCamera.transform.position = cameraRestPosition + DirectionToVector3(exitDirection) * (cameraSlideDistance * 0.35f);
@@ -233,6 +256,7 @@ public class MapManager : MonoBehaviour
 
         MovePlayerToStageStart(newStartRoom);
         ShowOnlyCurrentRoom();
+        TrySpawnEnemiesForCurrentRoom();
 
         if (mainCamera != null)
             mainCamera.transform.position = cameraRestPosition;
