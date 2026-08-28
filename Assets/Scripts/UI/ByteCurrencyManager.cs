@@ -1,7 +1,9 @@
+using System;
 using System.Collections;
 using TMPro;
 using UnityEngine;
 
+[DisallowMultipleComponent]
 public class ByteCurrencyManager : MonoBehaviour
 {
     public static ByteCurrencyManager Instance { get; private set; }
@@ -29,10 +31,9 @@ public class ByteCurrencyManager : MonoBehaviour
     private Coroutine bounceCoroutine;
     private AudioClip generatedRustleClip;
 
-    public int CurrentBytes => currentBytes;
-
-    // ShopManager 호환용
-    public int CurrentByte => currentBytes;
+    public int CurrentBytes { get { return currentBytes; } }
+    public int CurrentByte { get { return currentBytes; } }
+    public event Action<int> CurrencyChanged;
 
     private void Awake()
     {
@@ -43,225 +44,151 @@ public class ByteCurrencyManager : MonoBehaviour
         }
 
         Instance = this;
-
-        if (worldCamera == null)
-        {
-            worldCamera = Camera.main;
-        }
-
-        if (canvas == null)
-        {
-            canvas = GetComponentInParent<Canvas>();
-        }
-
-        if (audioSource == null)
-        {
-            audioSource = GetComponent<AudioSource>();
-        }
-
-        if (audioSource == null)
-        {
-            audioSource = gameObject.AddComponent<AudioSource>();
-        }
-
+        if (worldCamera == null) worldCamera = Camera.main;
+        if (canvas == null) canvas = GetComponentInParent<Canvas>();
+        if (audioSource == null) audioSource = GetComponent<AudioSource>();
+        if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
         audioSource.playOnAwake = false;
         audioSource.spatialBlend = 0f;
         audioSource.volume = collectVolume;
-
-        if (byteIcon != null)
-        {
-            iconOriginalScale = byteIcon.localScale;
-        }
-
-        if (collectSound == null)
-        {
-            generatedRustleClip = CreateSoftRustleClip();
-        }
-
+        if (byteIcon != null) iconOriginalScale = byteIcon.localScale;
+        if (collectSound == null) generatedRustleClip = CreateSoftRustleClip();
+        ConfigureByteText();
         RefreshUI();
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+        if (generatedRustleClip != null) Destroy(generatedRustleClip);
     }
 
     public void AddBytes(int amount)
     {
-        if (amount <= 0)
-        {
-            return;
-        }
-
-        currentBytes += amount;
-        RefreshUI();
-        PlayCollectFeedback();
+        if (amount <= 0) return;
+        SetBytes(currentBytes + amount, true);
     }
 
-    // 기존 코드 호환용
-    public void AddByte(int amount)
-    {
-        AddBytes(amount);
-    }
-
-    public bool CanSpend(int amount)
-    {
-        return currentBytes >= amount;
-    }
+    public void AddByte(int amount) { AddBytes(amount); }
+    public bool CanSpend(int amount) { return amount <= 0 || currentBytes >= amount; }
 
     public bool SpendBytes(int amount)
     {
-        if (amount <= 0)
-        {
-            return true;
-        }
-
-        if (currentBytes < amount)
-        {
-            return false;
-        }
-
-        currentBytes -= amount;
-        RefreshUI();
+        if (amount <= 0) return true;
+        if (!CanSpend(amount)) return false;
+        SetBytes(currentBytes - amount, false);
         return true;
     }
 
-    // 다른 코드 호환용
-    public bool SpendByte(int amount)
+    public bool SpendByte(int amount) { return SpendBytes(amount); }
+
+    public void ResetBytes(int value = 0)
     {
-        return SpendBytes(amount);
+        SetBytes(Mathf.Max(0, value), false);
+    }
+
+    private void SetBytes(int value, bool collectFeedback)
+    {
+        currentBytes = Mathf.Max(0, value);
+        RefreshUI();
+        CurrencyChanged?.Invoke(currentBytes);
+        if (collectFeedback) PlayCollectFeedback();
     }
 
     public Vector3 GetByteIconWorldPosition()
     {
-        if (worldCamera == null)
+        if (byteIcon == null) return transform.position;
+        if (canvas == null) canvas = byteIcon.GetComponentInParent<Canvas>();
+        if (worldCamera == null) worldCamera = Camera.main;
+
+        if (canvas != null && canvas.renderMode == RenderMode.ScreenSpaceOverlay)
         {
-            worldCamera = Camera.main;
+            Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(null, byteIcon.position);
+            if (worldCamera != null)
+            {
+                float distance = Mathf.Abs(worldCamera.transform.position.z);
+                Vector3 world = worldCamera.ScreenToWorldPoint(new Vector3(screenPoint.x, screenPoint.y, distance));
+                world.z = 0f;
+                return world;
+            }
         }
 
-        if (byteIcon == null || worldCamera == null)
-        {
-            return Vector3.zero;
-        }
-
-        Vector3 screenPosition = RectTransformUtility.WorldToScreenPoint(null, byteIcon.position);
-        float distanceFromCamera = Mathf.Abs(worldCamera.transform.position.z);
-
-        Vector3 worldPosition = worldCamera.ScreenToWorldPoint(
-            new Vector3(screenPosition.x, screenPosition.y, distanceFromCamera)
-        );
-
-        worldPosition.z = 0f;
-        return worldPosition;
+        return byteIcon.position;
     }
 
     private void RefreshUI()
     {
         if (byteText == null)
-        {
             return;
-        }
 
-        byteText.text = prefixText + currentBytes.ToString();
+        ConfigureByteText();
+        byteText.text = prefixText + currentBytes.ToString("N0");
+    }
+
+    private void ConfigureByteText()
+    {
+        if (byteText == null)
+            return;
+
+        byteText.textWrappingMode = TextWrappingModes.NoWrap;
+        byteText.overflowMode = TextOverflowModes.Overflow;
+        byteText.enableAutoSizing = false;
+
+        RectTransform rect = byteText.rectTransform;
+        if (rect != null && rect.rect.width < 220f)
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 220f);
     }
 
     private void PlayCollectFeedback()
     {
-        PlayCollectSound();
-        PlayIconBounce();
+        if (audioSource != null)
+        {
+            AudioClip clip = collectSound != null ? collectSound : generatedRustleClip;
+            if (clip != null) audioSource.PlayOneShot(clip, collectVolume);
+        }
+
+        if (byteIcon != null)
+        {
+            if (bounceCoroutine != null) StopCoroutine(bounceCoroutine);
+            bounceCoroutine = StartCoroutine(BounceIcon());
+        }
     }
 
-    private void PlayCollectSound()
+    private IEnumerator BounceIcon()
     {
-        if (audioSource == null)
-        {
-            return;
-        }
-
-        AudioClip clip = collectSound != null ? collectSound : generatedRustleClip;
-
-        if (clip == null)
-        {
-            return;
-        }
-
-        audioSource.pitch = Random.Range(0.92f, 1.08f);
-        audioSource.PlayOneShot(clip, collectVolume);
-    }
-
-    private void PlayIconBounce()
-    {
-        if (byteIcon == null)
-        {
-            return;
-        }
-
-        if (bounceCoroutine != null)
-        {
-            StopCoroutine(bounceCoroutine);
-        }
-
-        bounceCoroutine = StartCoroutine(BounceIconRoutine());
-    }
-
-    private IEnumerator BounceIconRoutine()
-    {
-        float halfDuration = bounceDuration * 0.5f;
+        float half = Mathf.Max(0.02f, bounceDuration * 0.5f);
         float elapsed = 0f;
-
-        Vector3 targetScale = iconOriginalScale * bounceScale;
-
-        while (elapsed < halfDuration)
+        while (elapsed < half)
         {
             elapsed += Time.unscaledDeltaTime;
-            float t = Mathf.Clamp01(elapsed / halfDuration);
-            byteIcon.localScale = Vector3.Lerp(iconOriginalScale, targetScale, EaseOutBack(t));
+            byteIcon.localScale = Vector3.Lerp(iconOriginalScale, iconOriginalScale * bounceScale, Mathf.Clamp01(elapsed / half));
             yield return null;
         }
-
         elapsed = 0f;
-
-        while (elapsed < halfDuration)
+        while (elapsed < half)
         {
             elapsed += Time.unscaledDeltaTime;
-            float t = Mathf.Clamp01(elapsed / halfDuration);
-            byteIcon.localScale = Vector3.Lerp(targetScale, iconOriginalScale, EaseOutBack(t));
+            byteIcon.localScale = Vector3.Lerp(iconOriginalScale * bounceScale, iconOriginalScale, Mathf.Clamp01(elapsed / half));
             yield return null;
         }
-
         byteIcon.localScale = iconOriginalScale;
         bounceCoroutine = null;
     }
 
-    private float EaseOutBack(float t)
-    {
-        float c1 = 1.70158f;
-        float c3 = c1 + 1f;
-        return 1f + c3 * Mathf.Pow(t - 1f, 3f) + c1 * Mathf.Pow(t - 1f, 2f);
-    }
-
     private AudioClip CreateSoftRustleClip()
     {
-        int sampleRate = 44100;
-        float length = 0.18f;
-        int sampleCount = Mathf.RoundToInt(sampleRate * length);
-        float[] samples = new float[sampleCount];
-
-        System.Random random = new System.Random();
-        float lowFrequency = 95f;
-
-        for (int i = 0; i < sampleCount; i++)
+        const int sampleRate = 22050;
+        const float duration = 0.08f;
+        int count = Mathf.CeilToInt(sampleRate * duration);
+        float[] data = new float[count];
+        for (int i = 0; i < count; i++)
         {
-            float time = i / (float)sampleRate;
-            float normalized = i / (float)(sampleCount - 1);
-
-            float attack = Mathf.Clamp01(normalized / 0.12f);
-            float release = Mathf.Clamp01((1f - normalized) / 0.55f);
-            float envelope = attack * release;
-
-            float noise = (float)(random.NextDouble() * 2.0 - 1.0);
-            float low = Mathf.Sin(2f * Mathf.PI * lowFrequency * time) * 0.18f;
-
-            samples[i] = (noise * 0.16f + low) * envelope * 0.35f;
+            float t = i / (float)count;
+            float envelope = Mathf.Sin(t * Mathf.PI) * (1f - t);
+            data[i] = UnityEngine.Random.Range(-1f, 1f) * envelope * 0.08f;
         }
-
-        AudioClip clip = AudioClip.Create("Generated_Byte_SoftRustle", sampleCount, 1, sampleRate, false);
-        clip.SetData(samples, 0);
+        AudioClip clip = AudioClip.Create("ByteCollect_Runtime", count, 1, sampleRate, false);
+        clip.SetData(data, 0);
         return clip;
     }
 }

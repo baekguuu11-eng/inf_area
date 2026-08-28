@@ -1,24 +1,14 @@
 using UnityEngine;
-
 public class EnemyDamage : MonoBehaviour
 {
-    public int damage = 1;
-
-    private void OnCollisionEnter2D(Collision2D collision)
+    [SerializeField] private int damage=1;
+    [SerializeField] private bool enableContactDamage=false;
+    [SerializeField] private float contactCooldown=.9f;
+    private float next;
+    private void OnCollisionStay2D(Collision2D collision)
     {
-        Debug.Log("무언가 충돌함");
-
-        if (collision.gameObject.CompareTag("Player"))
-        {
-            Debug.Log("플레이어 충돌!");
-
-            PlayerHealth playerHealth =
-                collision.gameObject.GetComponent<PlayerHealth>();
-
-            if (playerHealth != null)
-            {
-                playerHealth.TakeDamage(damage);
-            }
-        }
+        if(!enableContactDamage||Time.time<next)return;
+        PlayerHealth h=collision.collider.GetComponentInParent<PlayerHealth>();if(h==null||!PlayerDamageQuery.IsBodyHit(h,collision.collider))return;
+        next=Time.time+Mathf.Max(.1f,contactCooldown);h.TakeDamage(Mathf.Max(1,damage));
     }
 }

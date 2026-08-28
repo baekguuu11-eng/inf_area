@@ -11,17 +11,17 @@ public class ChipSlotManager : MonoBehaviour
     {
         None,
 
-        MeleeDamage,        // 1¹ø
-        MeleeAttackSpeed,   // 2¹ø
-        MeleeRange,         // 3¹ø
+        MeleeDamage,        // 1ë²ˆ
+        MeleeAttackSpeed,   // 2ë²ˆ
+        MeleeRange,         // 3ë²ˆ
 
-        RangedDamage,       // 4¹ø
-        RangedAttackSpeed,  // 5¹ø
-        RangedPierce,       // 6¹ø
+        RangedDamage,       // 4ë²ˆ
+        RangedAttackSpeed,  // 5ë²ˆ
+        RangedPierce,       // 6ë²ˆ
 
-        Defense,            // 7¹ø
-        MaxHealth,          // 8¹ø
-        MoveSpeed           // 9¹ø
+        Defense,            // 7ë²ˆ
+        MaxHealth,          // 8ë²ˆ
+        MoveSpeed           // 9ë²ˆ
     }
 
     [Header("UI Slots")]
@@ -326,7 +326,7 @@ public class ChipSlotManager : MonoBehaviour
     {
         if (overclockObject == null)
         {
-            Debug.LogWarning("ChipSlotManager: Overclock Object°¡ ¿¬°áµÇÁö ¾Ê¾Ò½À´Ï´Ù.");
+            Debug.LogWarning("ChipSlotManager: Overclock Objectê°€ ì—°ê²°ë˜ì§€ ì•Šì•˜ìŠµë‹ˆë‹¤.");
             return;
         }
 

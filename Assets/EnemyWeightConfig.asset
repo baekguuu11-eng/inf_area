@@ -14,14 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemyWeightConfig
   enemies:
   - type: 0
-    prefab: {fileID: 4594421942286104195, guid: 76f171247b484bc46b1c36a5760318c6, type: 3}
+    prefab: {fileID: 3784171233391283871, guid: 428e43e473bf4f5faa34292ceff2e6b8, type: 3}
     weightCost: 1
   - type: 1
-    prefab: {fileID: 98281812514411463, guid: 3cc3b3471f8ffc543b4b5b9d82579ed5, type: 3}
+    prefab: {fileID: 98281812514411463, guid: 277fd06f85bf4ae4bdd2db6f863b3377, type: 3}
     weightCost: 2
   - type: 2
-    prefab: {fileID: 6510211663715359000, guid: b24b02fe9361e4d42a025b6eb1a40fc8, type: 3}
+    prefab: {fileID: 6510211663715359000, guid: 659a39324e094e6abd2b5997e6c45627, type: 3}
     weightCost: 3
   - type: 3
-    prefab: {fileID: 6642877629300307458, guid: 570a717f4e7e61e42a367b6ce56f0245, type: 3}
+    prefab: {fileID: 6642877629300307458, guid: 3d74321fc585432196f51158ae891e24, type: 3}
     weightCost: 2

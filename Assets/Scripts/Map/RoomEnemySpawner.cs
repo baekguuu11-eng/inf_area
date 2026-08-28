@@ -1,229 +1,382 @@
+// TARGET: Assets/Scripts/Map/RoomEnemySpawner.cs
 using System.Collections.Generic;
 using UnityEngine;
 
+[DisallowMultipleComponent]
 public class RoomEnemySpawner : MonoBehaviour
 {
-    [Header("Weight Config")]
-    [Tooltip("적 타입별 가중치 비용/프리팹이 정의된 설정 (별도 스크립트: EnemyWeightConfig)")]
+    [Header("Enemy Config")]
     [SerializeField] private EnemyWeightConfig weightConfig;
 
-    [Header("Room Weight Range (방의 가중치 예산 범위)")]
+    [Header("Legacy Weight Fields - compatibility")]
     [SerializeField] private float baseMinWeight = 3f;
     [SerializeField] private float baseMaxWeight = 6f;
-
-    [Header("난이도 증가치 (조정 가능)")]
     [SerializeField] private float proximityIncreasePerRoom = 1f;
     [SerializeField] private float stageIncreasePerStage = 2f;
+    [SerializeField] private List<StageSpawnRates> stageSpawnRates = new List<StageSpawnRates>();
 
-    [Header("스테이지별 등장 확률")]
-    [SerializeField]
-    private List<StageSpawnRates> stageSpawnRates = new List<StageSpawnRates>
-    {
-        new StageSpawnRates
-        {
-            stageNumber = 1,
-            meleeChance = 60f,
-            rangedChance = 25f,
-            tankChance = 10f,
-            bomberChance = 5f,
-        }
-    };
-
-    [Header("시작 방 예외")]
-    [Tooltip("체크하면 각 스테이지의 1번 방(플레이어가 그 스테이지에 처음 들어서는 방)에는 적을 스폰하지 않음")]
+    [Header("Room Rules")]
     [SerializeField] private bool skipEnemySpawnInStartRoom = true;
+    [SerializeField] private int earlyMinEnemies = 3;
+    [SerializeField] private int earlyMaxEnemies = 4;
+    [SerializeField] private int midMinEnemies = 4;
+    [SerializeField] private int midMaxEnemies = 6;
+    [SerializeField] private int lateMinEnemies = 5;
+    [SerializeField] private int lateMaxEnemies = 7;
 
-    [Header("반복 등장 억제")]
-    [SerializeField, Range(0.05f, 1f)] private float repeatPenaltyMultiplier = 0.5f;
+    [Header("Mandatory Melee")]
+    [SerializeField] private int meleeMinimumSmallRoom = 1;
+    [SerializeField] private int meleeMinimumMediumRoom = 2;
+    [SerializeField] private int meleeMinimumLargeRoom = 3;
 
-    [Header("스폰 위치 (범위 안에서 랜덤)")]
-    [Tooltip("스폰 지점이 벽 등 장애물과 겹치지 않는 자리를 찾기 위한 재시도 횟수")]
-    [SerializeField] private int placementRetryCount = 10;
-    [Tooltip("스폰 지점 주변에 이 반경 안에 장애물이 있으면 그 자리를 피함")]
-    [SerializeField] private float placementCheckRadius = 0.2f;
+    [Header("Special Enemy Limits")]
+    [SerializeField] private int maxTanksPerWave = 1;
+    [SerializeField] private int maxBombersPerWave = 2;
+    [SerializeField, Range(0.1f, 0.8f)] private float maxRangedRatio = 0.4f;
+    [SerializeField] private bool excludeTankFromFirstCombat = true;
+    [SerializeField] private bool excludeBomberFromFirstCombat = true;
 
-    [Header("Safety")]
-    [SerializeField] private int maxSpawnAttempts = 100;
+    [Header("Natural Spawn Entrance")]
+    [SerializeField] private bool useSpawnEntrance = true;
+    [SerializeField, Min(0.05f)] private float spawnEntranceDuration = 0.48f;
+    [SerializeField, Min(0f)] private float spawnEntranceStagger = 0.075f;
 
-    private EnemyType? lastSpawnedType = null;
-    private int consecutiveStreak = 0;
+    [Header("Placement")]
+    [SerializeField] private int placementRetryCount = 24;
+    [SerializeField] private float placementCheckRadius = 0.42f;
+    [SerializeField] private float minimumPlayerDistance = 3.25f;
+    [SerializeField] private float minimumGateDistance = 1.5f;
+    [SerializeField] private float minimumEnemySpacing = 0.95f;
 
-    private void Awake()
-    {
-        if (weightConfig == null)
-            Debug.LogWarning($"[{name}] Enemy Weight Config가 연결되어 있지 않습니다. 적이 스폰되지 않습니다.");
-
-        if (baseMinWeight > baseMaxWeight)
-            Debug.LogWarning($"[{name}] Base Min Weight({baseMinWeight})가 Base Max Weight({baseMaxWeight})보다 큽니다.");
-    }
+    private readonly List<Vector2> plannedPositions = new List<Vector2>();
+    private EnemyType? lastPickedType;
 
     public void SpawnEnemiesForRoom(RoomController room, int stageNumber)
     {
-        if (room == null || weightConfig == null)
+        if (room == null)
             return;
-
         if (room.IsPortalRoom)
             return;
-
-        if (skipEnemySpawnInStartRoom && room.RoomNumber == 1)
+        // Only the very first room (Stage 1, Room 1) is safe. Stage 2-1, 3-1, ... are combat rooms.
+        if (skipEnemySpawnInStartRoom && stageNumber == 1 && room.RoomNumber == 1)
             return;
+        EnemyType fallbackType;
+        if (!TryGetAvailableFallback(out fallbackType))
+        {
+            Debug.LogError("[RoomEnemySpawner] Resources/Enemies의 v6.1.1 적 프리팹까지 찾지 못해 방 생성을 중단했습니다.", this);
+            return;
+        }
+        if (ResolvePrefab(EnemyType.Melee) == null)
+        {
+            Debug.LogWarning("[RoomEnemySpawner] Melee 프리팹이 누락되어 " + fallbackType + " 프리팹으로 안전 대체합니다.", this);
+        }
 
         BoxCollider2D spawnArea = room.EnemySpawnArea;
         if (spawnArea == null)
         {
-            Debug.LogWarning($"[{room.name}] Enemy Spawn Area가 설정되어 있지 않아 적을 스폰할 수 없습니다.");
+            Debug.LogError("[RoomEnemySpawner] " + room.name + "에 EnemySpawnArea가 없어 적 생성을 중단했습니다.", room);
             return;
         }
 
-        float weightBudget = CalculateRoomWeightBudget(stageNumber, room.RoomNumber);
-        StageSpawnRates rates = GetSpawnRatesForStage(stageNumber);
+        float progress = CalculateProgress(stageNumber, room.RoomNumber);
+        int targetCount = DetermineTargetCount(progress);
+        List<EnemyType> spawnPlan = BuildSpawnPlan(targetCount, progress, stageNumber, room.RoomNumber);
+        if (spawnPlan.Count == 0)
+            return;
 
-        lastSpawnedType = null;
-        consecutiveStreak = 0;
-
-        List<EnemyType> spawnPlan = BuildSpawnPlan(weightBudget, rates);
-
-        int obstacleMask = 1 << LayerMask.NameToLayer("Obstacle");
+        Transform player = FindPlayer();
+        Transform[] gates = CollectGateTransforms(room);
+        int blockedMask = LayerMask.GetMask("Wall", "Obstacle", "RoomBoundary", "Enemy");
+        plannedPositions.Clear();
 
         for (int i = 0; i < spawnPlan.Count; i++)
         {
-            GameObject prefab = weightConfig.GetPrefab(spawnPlan[i]);
+            EnemyType type = spawnPlan[i];
+            GameObject prefab = ResolvePrefab(type);
             if (prefab == null)
-                continue;
+            {
+                EnemyType availableFallbackType;
+                if (!TryGetAvailableFallback(out availableFallbackType))
+                    continue;
+                prefab = ResolvePrefab(availableFallbackType);
+                Debug.LogWarning("[RoomEnemySpawner] " + type + " 프리팹이 누락되어 " + availableFallbackType + " 적으로 대체합니다.", this);
+            }
 
-            Vector2 spawnPos = GetRandomPointInArea(spawnArea, obstacleMask);
-            Instantiate(prefab, spawnPos, Quaternion.identity, room.transform);
+            Vector2 position;
+            if (!TryFindSafePosition(spawnArea, player, gates, blockedMask, out position))
+            {
+                Debug.LogWarning("[RoomEnemySpawner] 안전한 스폰 위치를 충분히 찾지 못해 가장 안전한 격자 위치를 사용합니다: " + room.name, room);
+                position = FindBestGridPosition(spawnArea, player, gates, blockedMask);
+            }
+
+            plannedPositions.Add(position);
+            GameObject instance = Instantiate(prefab, position, Quaternion.identity, room.transform);
+            if (useSpawnEntrance && instance != null)
+            {
+                EnemySpawnEntrance entrance = instance.GetComponent<EnemySpawnEntrance>();
+                if (entrance == null)
+                    entrance = instance.AddComponent<EnemySpawnEntrance>();
+                entrance.Configure(i * spawnEntranceStagger, spawnEntranceDuration, room);
+            }
         }
     }
 
-    // 스폰 범위 안에서 랜덤 좌표를 뽑되, 벽(Obstacle) 위에 겹치면 다른 자리를 재시도함.
-    // 계속 실패하면 그냥 범위 중심에 스폰함 (완전히 실패하지는 않게 하는 안전장치).
-    private Vector2 GetRandomPointInArea(BoxCollider2D area, int obstacleMask)
+    private List<EnemyType> BuildSpawnPlan(int targetCount, float progress, int stageNumber, int roomNumber)
     {
-        Bounds bounds = area.bounds;
+        List<EnemyType> plan = new List<EnemyType>(targetCount);
+        int mandatoryMelee = targetCount <= 3
+            ? meleeMinimumSmallRoom
+            : targetCount <= 6 ? meleeMinimumMediumRoom : meleeMinimumLargeRoom;
+        mandatoryMelee = Mathf.Clamp(mandatoryMelee, 1, targetCount);
 
-        for (int attempt = 0; attempt < placementRetryCount; attempt++)
+        EnemyType mandatoryType = ResolvePrefab(EnemyType.Melee) != null
+            ? EnemyType.Melee
+            : ResolveFallbackType();
+        for (int i = 0; i < mandatoryMelee; i++)
+            plan.Add(mandatoryType);
+
+        int tankCount = 0;
+        int bomberCount = 0;
+        int rangedCount = 0;
+        lastPickedType = EnemyType.Melee;
+        bool firstCombat = stageNumber == 1 && roomNumber == 2;
+
+        while (plan.Count < targetCount)
         {
-            float x = Random.Range(bounds.min.x, bounds.max.x);
-            float y = Random.Range(bounds.min.y, bounds.max.y);
-            Vector2 point = new Vector2(x, y);
+            EnemyType picked = PickType(progress, firstCombat, plan.Count, targetCount, tankCount, bomberCount, rangedCount);
+            GameObject prefab = ResolvePrefab(picked);
+            if (prefab == null)
+            {
+                picked = ResolveFallbackType();
+                prefab = ResolvePrefab(picked);
+                if (prefab == null)
+                    break;
+            }
 
-            Collider2D hit = Physics2D.OverlapCircle(point, placementCheckRadius, obstacleMask);
-            if (hit == null)
-                return point;
+            plan.Add(picked);
+            if (picked == EnemyType.Tank) tankCount++;
+            if (picked == EnemyType.Bomber) bomberCount++;
+            if (picked == EnemyType.Ranged) rangedCount++;
+            lastPickedType = picked;
         }
 
-        return bounds.center;
-    }
-
-    private float CalculateRoomWeightBudget(int stageNumber, int roomNumber)
-    {
-        float stageBonus = Mathf.Max(0, stageNumber - 1) * stageIncreasePerStage;
-        float proximityBonus = Mathf.Max(0, roomNumber - 1) * proximityIncreasePerRoom;
-
-        float min = baseMinWeight + stageBonus + proximityBonus;
-        float max = baseMaxWeight;
-
-        if (min > max)
-            max = min;
-
-        return Random.Range(min, max);
-    }
-
-    private StageSpawnRates GetSpawnRatesForStage(int stageNumber)
-    {
-        StageSpawnRates best = null;
-
-        for (int i = 0; i < stageSpawnRates.Count; i++)
-        {
-            StageSpawnRates entry = stageSpawnRates[i];
-
-            if (entry.stageNumber == stageNumber)
-                return entry;
-
-            if (entry.stageNumber < stageNumber && (best == null || entry.stageNumber > best.stageNumber))
-                best = entry;
-        }
-
-        if (best != null)
-            return best;
-
-        return stageSpawnRates.Count > 0 ? stageSpawnRates[0] : new StageSpawnRates();
-    }
-
-    private List<EnemyType> BuildSpawnPlan(float weightBudget, StageSpawnRates rates)
-    {
-        List<EnemyType> plan = new List<EnemyType>();
-        float remainingBudget = weightBudget;
-        int attempts = 0;
-
-        while (remainingBudget > 0f && attempts < maxSpawnAttempts)
-        {
-            attempts++;
-
-            EnemyType? picked = PickWeightedType(rates, remainingBudget);
-            if (picked == null)
-                break;
-
-            plan.Add(picked.Value);
-            remainingBudget -= weightConfig.GetWeightCost(picked.Value);
-
-            if (lastSpawnedType.HasValue && picked.Value == lastSpawnedType.Value)
-                consecutiveStreak++;
-            else
-                consecutiveStreak = 1;
-
-            lastSpawnedType = picked.Value;
-        }
-
+        Shuffle(plan);
         return plan;
     }
 
-    private EnemyType? PickWeightedType(StageSpawnRates rates, float remainingBudget)
+    private EnemyType PickType(float progress, bool firstCombat, int currentCount, int targetCount, int tankCount, int bomberCount, int rangedCount)
     {
-        List<EnemyType> candidateTypes = new List<EnemyType>();
-        List<float> candidateWeights = new List<float>();
+        float meleeWeight;
+        float rangedWeight;
+        float tankWeight;
+        float bomberWeight;
 
-        System.Array enemyTypes = System.Enum.GetValues(typeof(EnemyType));
-        foreach (EnemyType type in enemyTypes)
+        if (progress < 0.25f)
         {
-            float baseChance = rates.GetChance(type);
-            if (baseChance <= 0f)
-                continue;
-
-            float cost = weightConfig.GetWeightCost(type);
-            if (cost > remainingBudget)
-                continue;
-
-            float finalChance = baseChance;
-
-            if (lastSpawnedType.HasValue && lastSpawnedType.Value == type)
-                finalChance *= Mathf.Pow(repeatPenaltyMultiplier, consecutiveStreak);
-
-            candidateTypes.Add(type);
-            candidateWeights.Add(finalChance);
+            meleeWeight = 65f;
+            rangedWeight = 25f;
+            tankWeight = 0f;
+            bomberWeight = 10f;
+        }
+        else if (progress < 0.65f)
+        {
+            meleeWeight = 45f;
+            rangedWeight = 25f;
+            tankWeight = 15f;
+            bomberWeight = 15f;
+        }
+        else
+        {
+            meleeWeight = 35f;
+            rangedWeight = 25f;
+            tankWeight = 20f;
+            bomberWeight = 20f;
         }
 
-        if (candidateTypes.Count == 0)
-            return null;
+        if (firstCombat && excludeTankFromFirstCombat) tankWeight = 0f;
+        if (firstCombat && excludeBomberFromFirstCombat) bomberWeight = 0f;
+        if (tankCount >= maxTanksPerWave) tankWeight = 0f;
+        if (bomberCount >= maxBombersPerWave) bomberWeight = 0f;
+        if (rangedCount >= Mathf.FloorToInt(targetCount * maxRangedRatio)) rangedWeight = 0f;
 
-        float totalWeight = 0f;
-        for (int i = 0; i < candidateWeights.Count; i++)
-            totalWeight += candidateWeights[i];
-
-        if (totalWeight <= 0f)
-            return null;
-
-        float roll = Random.Range(0f, totalWeight);
-        float cumulative = 0f;
-
-        for (int i = 0; i < candidateTypes.Count; i++)
+        if (lastPickedType.HasValue)
         {
-            cumulative += candidateWeights[i];
-            if (roll <= cumulative)
-                return candidateTypes[i];
+            if (lastPickedType.Value == EnemyType.Ranged) rangedWeight *= 0.45f;
+            if (lastPickedType.Value == EnemyType.Tank) tankWeight *= 0.25f;
+            if (lastPickedType.Value == EnemyType.Bomber) bomberWeight *= 0.35f;
         }
 
-        return candidateTypes[candidateTypes.Count - 1];
+        if (ResolvePrefab(EnemyType.Ranged) == null) rangedWeight = 0f;
+        if (ResolvePrefab(EnemyType.Tank) == null) tankWeight = 0f;
+        if (ResolvePrefab(EnemyType.Bomber) == null) bomberWeight = 0f;
+
+        float total = meleeWeight + rangedWeight + tankWeight + bomberWeight;
+        if (total <= 0f)
+            return EnemyType.Melee;
+
+        float roll = Random.Range(0f, total);
+        if ((roll -= meleeWeight) <= 0f) return EnemyType.Melee;
+        if ((roll -= rangedWeight) <= 0f) return EnemyType.Ranged;
+        if ((roll -= tankWeight) <= 0f) return EnemyType.Tank;
+        return EnemyType.Bomber;
+    }
+
+    private float CalculateProgress(int stageNumber, int roomNumber)
+    {
+        float stageProgress = Mathf.Max(0, stageNumber - 1) * 3f;
+        float roomProgress = Mathf.Max(0, roomNumber - 2);
+        return Mathf.Clamp01((stageProgress + roomProgress) / 9f);
+    }
+
+    private int DetermineTargetCount(float progress)
+    {
+        if (progress < 0.25f)
+            return Random.Range(Mathf.Max(1, earlyMinEnemies), Mathf.Max(earlyMinEnemies, earlyMaxEnemies) + 1);
+        if (progress < 0.65f)
+            return Random.Range(Mathf.Max(1, midMinEnemies), Mathf.Max(midMinEnemies, midMaxEnemies) + 1);
+        return Random.Range(Mathf.Max(1, lateMinEnemies), Mathf.Max(lateMinEnemies, lateMaxEnemies) + 1);
+    }
+
+    private bool TryFindSafePosition(BoxCollider2D area, Transform player, Transform[] gates, int blockedMask, out Vector2 position)
+    {
+        Bounds bounds = area.bounds;
+        for (int attempt = 0; attempt < Mathf.Max(1, placementRetryCount); attempt++)
+        {
+            Vector2 candidate = new Vector2(Random.Range(bounds.min.x, bounds.max.x), Random.Range(bounds.min.y, bounds.max.y));
+            if (IsSafe(candidate, player, gates, blockedMask))
+            {
+                position = candidate;
+                return true;
+            }
+        }
+        position = bounds.center;
+        return false;
+    }
+
+    private Vector2 FindBestGridPosition(BoxCollider2D area, Transform player, Transform[] gates, int blockedMask)
+    {
+        Bounds bounds = area.bounds;
+        Vector2 best = bounds.center;
+        float bestScore = float.MinValue;
+        const int grid = 7;
+        for (int x = 0; x < grid; x++)
+        {
+            for (int y = 0; y < grid; y++)
+            {
+                Vector2 candidate = new Vector2(
+                    Mathf.Lerp(bounds.min.x, bounds.max.x, (x + 0.5f) / grid),
+                    Mathf.Lerp(bounds.min.y, bounds.max.y, (y + 0.5f) / grid));
+                if (Physics2D.OverlapCircle(candidate, placementCheckRadius, blockedMask) != null)
+                    continue;
+
+                float score = player != null ? Vector2.Distance(candidate, player.position) : 0f;
+                for (int i = 0; i < plannedPositions.Count; i++)
+                    score += Mathf.Min(2f, Vector2.Distance(candidate, plannedPositions[i]));
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    best = candidate;
+                }
+            }
+        }
+        return best;
+    }
+
+    private bool IsSafe(Vector2 candidate, Transform player, Transform[] gates, int blockedMask)
+    {
+        if (player != null && Vector2.Distance(candidate, player.position) < minimumPlayerDistance)
+            return false;
+        for (int i = 0; i < gates.Length; i++)
+            if (gates[i] != null && Vector2.Distance(candidate, gates[i].position) < minimumGateDistance)
+                return false;
+        for (int i = 0; i < plannedPositions.Count; i++)
+            if (Vector2.Distance(candidate, plannedPositions[i]) < minimumEnemySpacing)
+                return false;
+        return Physics2D.OverlapCircle(candidate, placementCheckRadius, blockedMask) == null;
+    }
+
+    private Transform FindPlayer()
+    {
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        return playerObject != null ? playerObject.transform : null;
+    }
+
+    private Transform[] CollectGateTransforms(RoomController room)
+    {
+        GateTrigger[] triggers = room.GetComponentsInChildren<GateTrigger>(true);
+        Transform[] result = new Transform[triggers.Length];
+        for (int i = 0; i < triggers.Length; i++)
+            result[i] = triggers[i] != null ? triggers[i].transform : null;
+        return result;
+    }
+
+
+    private GameObject ResolvePrefab(EnemyType type)
+    {
+        if (weightConfig != null)
+        {
+            GameObject configured = weightConfig.GetPrefab(type);
+            if (configured != null)
+                return configured;
+        }
+
+        string resourceName;
+        switch (type)
+        {
+            case EnemyType.Ranged:
+                resourceName = "EnemyV611_Ranged";
+                break;
+            case EnemyType.Tank:
+                resourceName = "EnemyV611_Tank";
+                break;
+            case EnemyType.Bomber:
+                resourceName = "EnemyV611_Bomber";
+                break;
+            default:
+                resourceName = "EnemyV611_Melee";
+                break;
+        }
+
+        return Resources.Load<GameObject>("Enemies/" + resourceName);
+    }
+
+    private bool TryGetAvailableFallback(out EnemyType type)
+    {
+        EnemyType[] priority =
+        {
+            EnemyType.Melee,
+            EnemyType.Ranged,
+            EnemyType.Bomber,
+            EnemyType.Tank
+        };
+
+        for (int i = 0; i < priority.Length; i++)
+        {
+            if (ResolvePrefab(priority[i]) != null)
+            {
+                type = priority[i];
+                return true;
+            }
+        }
+
+        type = EnemyType.Melee;
+        return false;
+    }
+
+    private EnemyType ResolveFallbackType()
+    {
+        EnemyType type;
+        return TryGetAvailableFallback(out type) ? type : EnemyType.Melee;
+    }
+
+    private static void Shuffle(List<EnemyType> list)
+    {
+        for (int i = list.Count - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            EnemyType temp = list[i];
+            list[i] = list[j];
+            list[j] = temp;
+        }
     }
 }

@@ -1,173 +1,32 @@
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
-[RequireComponent(typeof(Rigidbody2D))]
-public class EnemyBomberAI : MonoBehaviour
+[RequireComponent(typeof(Rigidbody2D)), RequireComponent(typeof(EnemyPerception)), RequireComponent(typeof(EnemyMotor))]
+[DisallowMultipleComponent]
+public sealed class EnemyBomberAI : MonoBehaviour, IEnemyDeathOverride
 {
-    private enum AIState { Idle, Chase }
-
-    [Header("Detection")]
-    [SerializeField] private float detectRange = 5f;
-
-    [Header("Movement")]
-    [Tooltip("기본적으로 다른 적보다 빠르게 잡는 걸 추천 (예: 근거리 적 2.5보다 높게)")]
-    [SerializeField] private float moveSpeed = 3.5f;
-
-    [Header("Explosion")]
-    [SerializeField] private float explosionRadius = 1.2f;
-    [SerializeField] private int explosionDamage = 2;
-
-    [Header("Optional Visual Hook")]
-    [Tooltip("있으면 폭발 시 파편 스폰 + 히트스탑/카메라 흔들림을 같이 재생함")]
-    [SerializeField] private EnemyDeathEffect deathEffect;
-
-    private Rigidbody2D rb;
-    private Transform player;
-    private AIState state = AIState.Idle;
-    private bool hasExploded = false;
-
-    private const float MinDirectionSqrMagnitude = 0.0001f;
-
-    private void Awake()
-    {
-        rb = GetComponent<Rigidbody2D>();
-
-        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-        if (playerObj != null)
-            player = playerObj.transform;
-
-        if (deathEffect == null)
-            deathEffect = GetComponentInChildren<EnemyDeathEffect>(true);
-
-        ValidateColliderOffset();
-    }
-
-    private void ValidateColliderOffset()
-    {
-        Collider2D col = GetComponent<Collider2D>();
-        if (col == null)
-        {
-            Debug.LogWarning($"[{name}] Collider2D가 없습니다. 벽 충돌/접촉 폭발 판정이 제대로 동작하지 않습니다.");
-            return;
-        }
-
-        float offsetMagnitude = col.offset.magnitude;
-        float sizeReference = Mathf.Max(col.bounds.extents.x, col.bounds.extents.y, 0.5f);
-
-        if (offsetMagnitude > sizeReference * 2f)
-        {
-            Debug.LogWarning(
-                $"[{name}] Collider2D의 Offset({col.offset})이 비정상적으로 큽니다. " +
-                "Offset을 0,0에 가깝게 재설정하세요."
-            );
-        }
-    }
-
-    private void Update()
-    {
-        if (player == null || hasExploded)
-            return;
-
-        if (GameInputState.IsLocked)
-        {
-            state = AIState.Idle;
-            return;
-        }
-
-        float distance = Vector2.Distance(transform.position, player.position);
-        state = distance <= detectRange ? AIState.Chase : AIState.Idle;
-    }
-
-    private void FixedUpdate()
-    {
-        if (player == null || GameInputState.IsLocked || hasExploded || state != AIState.Chase)
-        {
-            if (rb != null)
-                rb.linearVelocity = Vector2.zero;
-            return;
-        }
-
-        Vector2 toPlayer = (Vector2)player.position - rb.position;
-
-        if (toPlayer.sqrMagnitude <= MinDirectionSqrMagnitude)
-        {
-            rb.linearVelocity = Vector2.zero;
-            return;
-        }
-
-        Vector2 direction = toPlayer.normalized;
-        rb.MovePosition(rb.position + direction * moveSpeed * Time.fixedDeltaTime);
-        rb.linearVelocity = Vector2.zero;
-    }
-
-    private void OnCollisionEnter2D(Collision2D collision)
-    {
-        TryExplodeOnPlayerContact(collision.gameObject);
-    }
-
-    private void OnTriggerEnter2D(Collider2D collision)
-    {
-        TryExplodeOnPlayerContact(collision.gameObject);
-    }
-
-    private void TryExplodeOnPlayerContact(GameObject other)
-    {
-        if (hasExploded)
-            return;
-
-        if (!other.CompareTag("Player"))
-            return;
-
-        Explode();
-    }
-
-    private void Explode()
-    {
-        hasExploded = true;
-
-        if (rb != null)
-            rb.linearVelocity = Vector2.zero;
-
-        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, explosionRadius);
-        foreach (Collider2D hit in hits)
-        {
-            if (!hit.CompareTag("Player"))
-                continue;
-
-            PlayerHealth playerHealth = hit.GetComponent<PlayerHealth>();
-            if (playerHealth == null)
-                playerHealth = hit.GetComponentInParent<PlayerHealth>();
-            if (playerHealth == null)
-                playerHealth = hit.GetComponentInChildren<PlayerHealth>();
-
-            if (playerHealth != null)
-                playerHealth.TakeDamage(explosionDamage);
-        }
-
-        if (GameFeelManager.Instance != null)
-        {
-            GameFeelManager.Instance.DoHitStop(0.05f);
-            GameFeelManager.Instance.Shake(0.15f, 0.12f);
-        }
-
-        if (deathEffect != null)
-            deathEffect.PlayDeath(transform.position, Vector2.zero);
-
-        Destroy(gameObject);
-    }
-
-    private void OnDrawGizmosSelected()
-    {
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, detectRange);
-
-        Gizmos.color = new Color(1f, 0.3f, 0f);
-        Gizmos.DrawWireSphere(transform.position, explosionRadius);
-
-        Collider2D col = GetComponent<Collider2D>();
-        if (col != null)
-        {
-            Gizmos.color = Color.magenta;
-            Gizmos.DrawWireCube(col.bounds.center, col.bounds.size);
-        }
-    }
+    private enum State { Observe, Chase, WaitingForArmingSlot, Arming, Exploding }
+    [Header("감지 및 이동")]
+    [SerializeField] private float detectRange=7f, armingDistance=1.42f, moveSpeed=2.85f, waitingOrbitSpeed=2.15f, armingMoveMultiplier=.38f;
+    [Header("폭발")]
+    [SerializeField] private float armingDuration=.95f, explosionRadius=1.48f;
+    [SerializeField] private int playerDamage=2, enemyDamage=2;
+    [SerializeField,Range(0f,1f)] private float normalEnemyDamageMultiplier=.70f, tankDamageMultiplier=.35f;
+    [Header("처치 시 약화 폭발")]
+    [SerializeField] private float deathExplosionDelay=.24f, deathExplosionRadiusMultiplier=.82f, deathExplosionDamageMultiplier=.65f;
+    [Header("참조")]
+    [SerializeField] private EnemyPerception perception; [SerializeField] private EnemyMotor motor; [SerializeField] private EnemyVisualMotion visualMotion;
+    [SerializeField] private EnemyTelegraph telegraph; [SerializeField] private EnemyHealth health; [SerializeField] private EnemyRole role; [SerializeField] private EnemyAttackContract attackContract;
+    private Rigidbody2D body; private Collider2D bodyCollider; private EnemyAttackCoordinator coordinator; private State state; private Coroutine armingRoutine;
+    private bool ownsArmingToken, explosionResolved; private int orbitSign;
+    private void Awake(){body=GetComponent<Rigidbody2D>();bodyCollider=GetComponent<Collider2D>();perception=perception??GetComponent<EnemyPerception>();motor=motor??GetComponent<EnemyMotor>();visualMotion=visualMotion??GetComponent<EnemyVisualMotion>();telegraph=telegraph??GetComponentInChildren<EnemyTelegraph>(true);health=health??GetComponent<EnemyHealth>();role=role??GetComponent<EnemyRole>();attackContract=attackContract??(GetComponent<EnemyAttackContract>()??gameObject.AddComponent<EnemyAttackContract>());coordinator=EnemyAttackCoordinator.EnsureInstance();orbitSign=Random.value<.5f?-1:1;}
+    private void OnEnable(){coordinator=EnemyAttackCoordinator.EnsureInstance();}
+    private void Update(){if(explosionResolved||state==State.Exploding||(health!=null&&health.IsDead))return;if(GameInputState.IsLocked){motor.StopIntent();return;}if(motor.IsKnockedBack)return;perception.RefreshNow();if(!perception.HasPlayer||perception.DistanceToPlayer>detectRange){state=State.Observe;motor.StopIntent();return;}if(armingRoutine!=null)return;float d=perception.DistanceToPlayer;if(d<=armingDistance){if(coordinator.TryAcquire(this,EnemyAttackCoordinator.AttackChannel.Bomber,armingDuration+2f)){ownsArmingToken=true;armingRoutine=StartCoroutine(ArmAndExplodeRoutine());return;}state=State.WaitingForArmingSlot;Vector2 to=perception.PlayerPosition-body.position;Vector2 desired=(EnemyAIUtility.Perpendicular(to,orbitSign)-to.normalized*.35f).normalized;motor.SetMoveIntent(desired,waitingOrbitSpeed);visualMotion.SetAction(EnemyVisualMotion.ActionState.None,desired);return;}state=State.Chase;Vector2 dir=perception.DirectionToPlayer;motor.SetMoveIntent(dir,moveSpeed);visualMotion.SetAction(EnemyVisualMotion.ActionState.None,dir);}
+    private IEnumerator ArmAndExplodeRoutine(){state=State.Arming;attackContract.BeginTelegraph(telegraph);float e=0f;while(e<armingDuration){if(GameInputState.IsLocked){yield return null;continue;}if(health!=null&&health.IsDead)yield break;e+=Time.deltaTime;float p=Mathf.Clamp01(e/Mathf.Max(.01f,armingDuration));telegraph?.ShowCircle(explosionRadius*1.07f);telegraph?.SetProgress(p);visualMotion?.SetArming01(p);Vector2 d=perception.HasPlayer?perception.DirectionToPlayer:Vector2.down;motor.SetMoveIntent(d,moveSpeed*armingMoveMultiplier*Mathf.Lerp(1f,.35f,p));yield return null;}attackContract.BeginActive(telegraph);ResolveExplosion(explosionRadius,1f,true,perception.DirectionToPlayer);}
+    public bool HandleRequestedDeath(EnemyHealth requestedHealth,Vector2 hitDirection,EnemyHitKind hitKind){if(explosionResolved||state==State.Exploding)return false;if(armingRoutine!=null)StopCoroutine(armingRoutine);armingRoutine=StartCoroutine(DeathExplosionRoutine(hitDirection));return true;}
+    private IEnumerator DeathExplosionRoutine(Vector2 hitDirection){state=State.Exploding;motor.SetMovementEnabled(false,true);if(bodyCollider!=null)bodyCollider.enabled=false;float r=explosionRadius*deathExplosionRadiusMultiplier;attackContract.BeginTelegraph(telegraph);float e=0f;while(e<deathExplosionDelay){e+=Time.unscaledDeltaTime;float p=Mathf.Clamp01(e/Mathf.Max(.01f,deathExplosionDelay));telegraph?.ShowCircle(r*1.08f);telegraph?.SetProgress(p);visualMotion?.SetArming01(p);yield return null;}attackContract.BeginActive(telegraph);ResolveExplosion(r,deathExplosionDamageMultiplier,false,hitDirection);}
+    private void ResolveExplosion(float radius,float damageMultiplier,bool fullStrength,Vector2 deathDirection){if(explosionResolved)return;explosionResolved=true;state=State.Exploding;motor.SetMovementEnabled(false,true);if(bodyCollider!=null)bodyCollider.enabled=false;attackContract.TryDamageCircle(body.position,radius,Mathf.Max(1,Mathf.RoundToInt(playerDamage*damageMultiplier)));HashSet<EnemyHealth> damaged=new HashSet<EnemyHealth>();Collider2D[] hits=Physics2D.OverlapCircleAll(body.position,radius);foreach(Collider2D hit in hits){EnemyHealth eh=hit!=null?hit.GetComponentInParent<EnemyHealth>():null;if(eh==null||eh==health||eh.IsDead||!damaged.Add(eh))continue;EnemyRole er=eh.GetComponent<EnemyRole>();float m=er!=null&&er.CurrentRole==EnemyRole.Role.Tank?tankDamageMultiplier:normalEnemyDamageMultiplier;int d=Mathf.Max(1,Mathf.RoundToInt(enemyDamage*damageMultiplier*m));Vector2 dir=((Vector2)eh.transform.position-body.position).normalized;eh.TakeDamage(new DamageContext(d,dir,hit.ClosestPoint(body.position),EnemyHitKind.Explosion,.22f));}CameraFeedbackController f=CameraFeedbackController.Instance;if(f!=null)f.Shake(.14f,.12f,deathDirection);attackContract.BeginRecovery(telegraph);ReleaseToken();if(health!=null)health.CompleteDeferredDeath(deathDirection);else Destroy(gameObject);}
+    private void ReleaseToken(){if(!ownsArmingToken)return;ownsArmingToken=false;coordinator?.Release(this,EnemyAttackCoordinator.AttackChannel.Bomber);}
+    private void OnDisable(){attackContract?.CancelAttack(telegraph);ReleaseToken();coordinator?.ReleaseAll(this);}
 }

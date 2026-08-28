@@ -13,7 +13,8 @@ GameObject:
   - component: {fileID: 7302128020290080544}
   - component: {fileID: 3731719187705744668}
   - component: {fileID: 4558140986330473940}
-  m_Layer: 0
+  - component: {fileID: 472200432556130405}
+  m_Layer: 13
   m_Name: Bullet
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -30,7 +31,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
+  m_LocalScale: {x: 0.55, y: 0.55, z: 0.55}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -117,10 +118,10 @@ Rigidbody2D:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_Interpolate: 0
+  m_Interpolate: 1
   m_SleepingMode: 1
   m_CollisionDetection: 1
-  m_Constraints: 0
+  m_Constraints: 4
 --- !u!61 &3731719187705744668
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -179,6 +180,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b69826ca5186d5346810f692c7211e55, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerProjectile
-  wallImpactShardPrefab: {fileID: 0}
-  wallImpactShardCount: 4
-  wallImpactSpawnRadius: 0.05
+  lifetime: 3
+--- !u!114 &472200432556130405
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2776861096513097121}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4b31967fedc4464b8b42865ad61e3e3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProjectileVisualController

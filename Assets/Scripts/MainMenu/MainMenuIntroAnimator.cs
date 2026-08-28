@@ -1,8 +1,16 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 public class MainMenuIntroAnimator : MonoBehaviour
 {
+    private static bool forceImmediateMenuOnNextLoad;
+
+    public static void PrepareForReturnFromGameplay()
+    {
+        forceImmediateMenuOnNextLoad = true;
+    }
     [Header("References")]
     [SerializeField] private CanvasGroup menuGroupCanvasGroup;
     [SerializeField] private RectTransform backgroundRect;
@@ -36,9 +44,20 @@ public class MainMenuIntroAnimator : MonoBehaviour
     private MenuTextButtonHover[] hoverScripts;
 
     private bool isStarting = false;
+    private bool introStarted = false;
+    private bool forceImmediateThisLoad;
+    private Coroutine interactionSafetyCoroutine;
 
     private void Awake()
     {
+        forceImmediateThisLoad = forceImmediateMenuOnNextLoad;
+        forceImmediateMenuOnNextLoad = false;
+
+        Time.timeScale = 1f;
+        AudioListener.pause = false;
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
         if (menuGroupCanvasGroup == null)
             menuGroupCanvasGroup = GetComponent<CanvasGroup>();
 
@@ -48,11 +67,42 @@ public class MainMenuIntroAnimator : MonoBehaviour
         CacheBackground();
         CacheItems();
         CacheAudioSpectrum();
-        PrepareIntroState();
+
+        if (forceImmediateThisLoad)
+        {
+            introStarted = true;
+            ShowAllInstantly();
+        }
+        else
+        {
+            PrepareIntroState();
+        }
+
+        interactionSafetyCoroutine = StartCoroutine(InteractionSafetyRoutine());
     }
 
     private void Start()
     {
+        if (forceImmediateThisLoad)
+            return;
+
+        if (KODBBootSplashController.ShouldDelayMainMenuIntro)
+            return;
+
+        BeginIntro();
+    }
+
+    public void BeginIntroAfterSplash()
+    {
+        BeginIntro();
+    }
+
+    private void BeginIntro()
+    {
+        if (introStarted)
+            return;
+
+        introStarted = true;
         if (playIntroOnStart)
             StartCoroutine(PlayIntroRoutine());
         else
@@ -222,15 +272,28 @@ public class MainMenuIntroAnimator : MonoBehaviour
 
     private void EnableMenuInteraction()
     {
+        if (menuGroupCanvasGroup == null)
+            return;
+
         menuGroupCanvasGroup.alpha = 1f;
         menuGroupCanvasGroup.interactable = true;
         menuGroupCanvasGroup.blocksRaycasts = true;
+
+        Button[] buttons = GetComponentsInChildren<Button>(true);
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            if (buttons[i] != null)
+                buttons[i].interactable = true;
+        }
 
         for (int i = 0; i < hoverScripts.Length; i++)
         {
             if (hoverScripts[i] != null)
                 hoverScripts[i].SetHoverEnabled(true);
         }
+
+        if (EventSystem.current != null)
+            EventSystem.current.SetSelectedGameObject(null);
     }
 
     private void EnableMenuEffects()
@@ -253,12 +316,17 @@ public class MainMenuIntroAnimator : MonoBehaviour
 
     private void ShowAllInstantly()
     {
+        isStarting = false;
+
         if (backgroundRect != null)
             backgroundRect.anchoredPosition = backgroundOriginalPosition;
 
-        menuGroupCanvasGroup.alpha = 1f;
-        menuGroupCanvasGroup.interactable = true;
-        menuGroupCanvasGroup.blocksRaycasts = true;
+        if (menuGroupCanvasGroup != null)
+        {
+            menuGroupCanvasGroup.alpha = 1f;
+            menuGroupCanvasGroup.interactable = true;
+            menuGroupCanvasGroup.blocksRaycasts = true;
+        }
 
         for (int i = 0; i < menuItems.Length; i++)
         {
@@ -275,7 +343,33 @@ public class MainMenuIntroAnimator : MonoBehaviour
         if (audioSpectrum != null)
             audioSpectrum.ShowInstant();
 
+        EnableMenuInteraction();
         EnableMenuEffects();
+    }
+
+    public void RestoreMenuInteractionNow()
+    {
+        StopAllCoroutines();
+        introStarted = true;
+        ShowAllInstantly();
+
+        interactionSafetyCoroutine = StartCoroutine(InteractionSafetyRoutine());
+    }
+
+    private IEnumerator InteractionSafetyRoutine()
+    {
+        // 부트 로고 + 메뉴 인트로가 정상이라면 약 4초 이내에 끝납니다.
+        // 씬 복귀 과정에서 어떤 코루틴이 중단되더라도 5초 후에는 반드시 메뉴를 복구합니다.
+        yield return new WaitForSecondsRealtime(5f);
+
+        if (menuGroupCanvasGroup == null ||
+            !menuGroupCanvasGroup.interactable ||
+            !menuGroupCanvasGroup.blocksRaycasts)
+        {
+            ShowAllInstantly();
+        }
+
+        interactionSafetyCoroutine = null;
     }
 
     public void StartGameWithMenuFade()

@@ -1,108 +1,269 @@
+// TARGET: Assets/Scripts/Enemy/EnemyHealth.cs
+using System;
 using UnityEngine;
 
+public interface IEnemyDeathOverride
+{
+    bool HandleRequestedDeath(EnemyHealth health, Vector2 hitDirection, EnemyHitKind hitKind);
+}
+
+[Serializable]
+public struct DamageContext
+{
+    public int Damage;
+    public Vector2 Direction;
+    public Vector2 HitPoint;
+    public EnemyHitKind HitKind;
+    public float KnockbackBonus;
+
+    public DamageContext(int damage, Vector2 direction, Vector2 hitPoint, EnemyHitKind hitKind, float knockbackBonus = 0f)
+    {
+        Damage = damage;
+        Direction = direction;
+        HitPoint = hitPoint;
+        HitKind = hitKind;
+        KnockbackBonus = knockbackBonus;
+    }
+
+    public static DamageContext Simple(int damage, Vector2 direction, EnemyHitKind hitKind, Vector2 fallbackPoint)
+    {
+        return new DamageContext(damage, direction, fallbackPoint, hitKind, 0f);
+    }
+}
+
+[DisallowMultipleComponent]
 public class EnemyHealth : MonoBehaviour
 {
     [Header("Health")]
     [SerializeField] private int maxHealth = 3;
 
     [Header("Linked Effects")]
-    [SerializeField] private EnemyHitEffect hitEffect;
+    [SerializeField] private EnemyCombatFeedback combatFeedback;
     [SerializeField] private EnemyDeathEffect deathEffect;
 
-    [Header("Root Override (선택사항)")]
-    [Tooltip("이 적의 비주얼+로직 전체를 감싸는 별도의 상위 래퍼 오브젝트가 있는 특수한 구조일 때만 지정. " +
-             "비워두면 이 오브젝트 자기 자신을 기준으로 삼음 (대부분의 평범한 적 프리팹은 이게 맞음)")]
+    [Header("Root Override")]
     [SerializeField] private Transform rootOverride;
 
     [Header("Optional Animator Hook")]
     [SerializeField] private Animator animator;
     [SerializeField] private string deathTriggerName = "Death";
-
-    [Tooltip("사망 애니메이션을 재생할 시간을 주고 싶으면 0보다 큰 값으로 설정 (기본 0 = 즉시 삭제)")]
     [SerializeField] private float deathDestroyDelay = 0f;
 
     private int currentHealth;
-    private bool isDead = false;
-    private Vector2 lastHitDirection = Vector2.down;
+    private bool isDead;
+    private bool deathPending;
+    private DamageContext lastDamageContext;
     private Transform rootTransform;
+    private ByteDropper byteDropper;
 
     public int CurrentHealth => currentHealth;
-    public bool IsDead => isDead;
+    public int MaxHealth => maxHealth;
+    public bool IsDead => isDead || deathPending;
+    public float NormalizedHealth => maxHealth > 0 ? currentHealth / (float)maxHealth : 0f;
+    public DamageContext LastDamageContext => lastDamageContext;
+
+    public event Action<EnemyHealth, int, Vector2> Damaged;
+    public event Action<EnemyHealth> Died;
 
     private void Awake()
     {
-        currentHealth = maxHealth;
+        ResolveReferences();
+        ResetHealth();
+    }
 
+    private void ResolveReferences()
+    {
         rootTransform = rootOverride != null ? rootOverride : transform;
-
-        // [안전장치] 절대로 RoomController(방)를 파괴 대상으로 잡으면 안 됨.
-        // 혹시라도 잘못 설정되어 있으면 강제로 자기 자신으로 되돌리고 크게 경고함.
-        // (이 체크 덕분에 설정 실수가 있어도 최소한 방 전체가 파괴되는 참사는 절대 발생하지 않음)
         if (rootTransform.GetComponent<RoomController>() != null)
         {
-            Debug.LogError(
-                $"[{name}] rootTransform이 RoomController(방)를 가리키고 있어 강제로 자기 자신으로 재설정했습니다. " +
-                "Root Override 필드나 부모 구조를 확인하세요."
-            );
+            Debug.LogError("[EnemyHealth] Root Override가 방을 가리켜 자기 자신으로 복구했습니다: " + name);
             rootTransform = transform;
         }
 
-        if (hitEffect == null)
-            hitEffect = rootTransform.GetComponentInChildren<EnemyHitEffect>(true);
-
+        if (combatFeedback == null)
+            combatFeedback = rootTransform.GetComponentInChildren<EnemyCombatFeedback>(true);
         if (deathEffect == null)
             deathEffect = rootTransform.GetComponentInChildren<EnemyDeathEffect>(true);
-
         if (animator == null)
-            animator = GetComponent<Animator>();
+            animator = rootTransform.GetComponentInChildren<Animator>(true);
+        byteDropper = rootTransform.GetComponentInChildren<ByteDropper>(true);
+    }
+
+    public void ResetHealth()
+    {
+        maxHealth = Mathf.Max(1, maxHealth);
+        currentHealth = maxHealth;
+        isDead = false;
+        deathPending = false;
+        lastDamageContext = DamageContext.Simple(0, Vector2.down, EnemyHitKind.Environment, (Vector2)transform.position);
+    }
+
+    public void SetMaxHealth(int value, bool healToFull = true)
+    {
+        maxHealth = Mathf.Max(1, value);
+        currentHealth = healToFull ? maxHealth : Mathf.Clamp(currentHealth, 0, maxHealth);
     }
 
     public void TakeDamage(int damage)
     {
-        TakeDamage(damage, Vector2.zero);
+        TakeDamage(DamageContext.Simple(damage, Vector2.zero, EnemyHitKind.Melee, (Vector2)transform.position));
     }
 
     public void TakeDamage(int damage, Vector2 hitDirection)
     {
+        TakeDamage(DamageContext.Simple(damage, hitDirection, EnemyHitKind.Melee, (Vector2)transform.position));
+    }
+
+    public void TakeDamage(int damage, Vector2 hitDirection, EnemyHitKind hitKind)
+    {
+        TakeDamage(DamageContext.Simple(damage, hitDirection, hitKind, (Vector2)transform.position));
+    }
+
+    public void TakeDamage(DamageContext context)
+    {
+        if (isDead || deathPending || context.Damage <= 0)
+            return;
+
+        if (context.Direction.sqrMagnitude <= 0.0001f)
+            context.Direction = Vector2.down;
+        else
+            context.Direction.Normalize();
+        if (context.HitPoint == Vector2.zero)
+            context.HitPoint = transform.position;
+
+        lastDamageContext = context;
+        int appliedDamage = Mathf.Min(context.Damage, currentHealth);
+        currentHealth -= appliedDamage;
+        Damaged?.Invoke(this, appliedDamage, context.Direction);
+
+        bool lethal = currentHealth <= 0;
+        if (combatFeedback == null)
+            combatFeedback = rootTransform.GetComponentInChildren<EnemyCombatFeedback>(true);
+        if (combatFeedback != null)
+            combatFeedback.PlayHit(context, lethal);
+
+        CombatPostProcessV61.PulseImpact(context.HitKind, lethal);
+
+        if (lethal)
+            RequestDeath();
+    }
+
+    private void RequestDeath()
+    {
+        if (isDead || deathPending)
+            return;
+
+        MonoBehaviour[] behaviours = rootTransform.GetComponentsInChildren<MonoBehaviour>(true);
+        for (int i = 0; i < behaviours.Length; i++)
+        {
+            IEnemyDeathOverride deathOverride = behaviours[i] as IEnemyDeathOverride;
+            if (deathOverride != null && deathOverride.HandleRequestedDeath(this, lastDamageContext.Direction, lastDamageContext.HitKind))
+            {
+                deathPending = true;
+                return;
+            }
+        }
+
+        CompleteDeath(lastDamageContext);
+    }
+
+    public void ForceDeath(Vector2 hitDirection)
+    {
+        if (isDead)
+            return;
+        DamageContext context = lastDamageContext;
+        context.Damage = Mathf.Max(1, currentHealth);
+        context.Direction = hitDirection.sqrMagnitude > 0.0001f ? hitDirection.normalized : lastDamageContext.Direction;
+        context.HitPoint = transform.position;
+        currentHealth = 0;
+        deathPending = false;
+        CompleteDeath(context);
+    }
+
+    public void CompleteDeferredDeath(Vector2 hitDirection)
+    {
+        if (isDead)
+            return;
+        DamageContext context = lastDamageContext;
+        if (hitDirection.sqrMagnitude > 0.0001f)
+            context.Direction = hitDirection.normalized;
+        context.HitPoint = transform.position;
+        currentHealth = 0;
+        deathPending = false;
+        CompleteDeath(context);
+    }
+
+    private void CompleteDeath(DamageContext context)
+    {
         if (isDead)
             return;
 
-        if (hitDirection != Vector2.zero)
-            lastHitDirection = hitDirection.normalized;
-
-        currentHealth -= damage;
-
-        if (currentHealth <= 0)
-        {
-            Die();
-            return;
-        }
-
-        if (hitEffect != null)
-            hitEffect.PlayHit();
-    }
-
-    private void Die()
-    {
         isDead = true;
+        deathPending = false;
+        DisableCombatComponents(true);
 
-        Collider2D[] colliders = rootTransform.GetComponentsInChildren<Collider2D>(true);
-        for (int i = 0; i < colliders.Length; i++)
-            colliders[i].enabled = false;
-
-        Rigidbody2D[] rigidbodies = rootTransform.GetComponentsInChildren<Rigidbody2D>(true);
-        for (int i = 0; i < rigidbodies.Length; i++)
-            rigidbodies[i].linearVelocity = Vector2.zero;
-
+        if (byteDropper != null)
+            byteDropper.DropBytes(rootTransform.position);
+        if (deathEffect == null)
+            deathEffect = rootTransform.GetComponentInChildren<EnemyDeathEffect>(true);
         if (deathEffect != null)
-            deathEffect.PlayDeath(rootTransform.position, lastHitDirection);
-
-        if (animator != null && !string.IsNullOrEmpty(deathTriggerName))
+            deathEffect.PlayDeath(rootTransform.position, context);
+        if (HasAnimatorTrigger(animator, deathTriggerName))
             animator.SetTrigger(deathTriggerName);
+
+        Died?.Invoke(this);
 
         if (deathDestroyDelay > 0f)
             Destroy(rootTransform.gameObject, deathDestroyDelay);
         else
             Destroy(rootTransform.gameObject);
+    }
+
+    private static bool HasAnimatorTrigger(Animator targetAnimator, string parameterName)
+    {
+        if (targetAnimator == null || string.IsNullOrWhiteSpace(parameterName) || targetAnimator.runtimeAnimatorController == null)
+            return false;
+
+        AnimatorControllerParameter[] parameters = targetAnimator.parameters;
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            AnimatorControllerParameter parameter = parameters[i];
+            if (parameter.type == AnimatorControllerParameterType.Trigger && parameter.name == parameterName)
+                return true;
+        }
+        return false;
+    }
+
+    private void DisableCombatComponents(bool disableColliders)
+    {
+        if (disableColliders)
+        {
+            Collider2D[] colliders = rootTransform.GetComponentsInChildren<Collider2D>(true);
+            for (int i = 0; i < colliders.Length; i++)
+                colliders[i].enabled = false;
+        }
+
+        Rigidbody2D[] rigidbodies = rootTransform.GetComponentsInChildren<Rigidbody2D>(true);
+        for (int i = 0; i < rigidbodies.Length; i++)
+        {
+            rigidbodies[i].linearVelocity = Vector2.zero;
+            rigidbodies[i].angularVelocity = 0f;
+        }
+
+        EnemyAttackCoordinator coordinator = EnemyAttackCoordinator.Instance;
+        MonoBehaviour[] behaviours = rootTransform.GetComponentsInChildren<MonoBehaviour>(true);
+        for (int i = 0; i < behaviours.Length; i++)
+        {
+            MonoBehaviour behaviour = behaviours[i];
+            if (behaviour == null || behaviour == this || behaviour is EnemyDeathEffect || behaviour is EnemyCombatFeedback || behaviour is EnemyVisualMotion)
+                continue;
+
+            if (coordinator != null)
+                coordinator.ReleaseAll(behaviour);
+
+            string typeName = behaviour.GetType().Name;
+            if (typeName.EndsWith("AI", StringComparison.Ordinal) || typeName == "EnemyDamage" || typeName == "EnemyMotor" || typeName == "EnemyPerception")
+                behaviour.enabled = false;
+        }
     }
 }

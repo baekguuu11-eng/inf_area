@@ -20,6 +20,12 @@ public class DeathManager : MonoBehaviour
     public void GoToMenu()
     {
         Time.timeScale = 1f;
+        AudioListener.pause = false;
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
+        KODBBootSplashController.SkipSplashForMenuReturn();
+        MainMenuIntroAnimator.PrepareForReturnFromGameplay();
         SceneManager.LoadScene("MainMenu");
     }
 }

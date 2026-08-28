@@ -26,7 +26,7 @@ public class MainMenuManager : MonoBehaviour
     [System.Serializable]
     public class LoadingTip
     {
-        [TextArea] public string message = "°¨¿°µÈ ±¸¿ª¿¡ ÁøÀÔÇÏ´Â Áß...";
+        [TextArea] public string message = "ê°ì—¼ëœ êµ¬ì—­ì— ì§„ì…í•˜ëŠ” ì¤‘...";
         [Min(0.1f)] public float displayTime = 2f;
     }
 
@@ -62,7 +62,7 @@ public class MainMenuManager : MonoBehaviour
     [SerializeField] private float completeWaitTime = 0.7f;
 
     [Header("Final Message")]
-    [SerializeField] private string finalLoadingMessage = "ÄÆ½Å µ¥ÀÌÅÍ¸¦ ºÒ·¯¿À´Â Áß...";
+    [SerializeField] private string finalLoadingMessage = "ì»·ì‹  ë°ì´í„°ë¥¼ ë¶ˆëŸ¬ì˜¤ëŠ” ì¤‘...";
 
     [Header("Random Loading Patterns")]
     [SerializeField] private List<LoadingPattern> loadingPatterns = new List<LoadingPattern>();
@@ -173,7 +173,7 @@ public class MainMenuManager : MonoBehaviour
         if (startButton != null)
             startButton.interactable = false;
 
-        // ¸Ş´º ¹öÆ°¸¸ ¼û±è. ¹è°æÀº °Çµå¸®Áö ¾ÊÀ½.
+        // ë©”ë‰´ ë²„íŠ¼ë§Œ ìˆ¨ê¹€. ë°°ê²½ì€ ê±´ë“œë¦¬ì§€ ì•ŠìŒ.
         if (menuGroup != null)
             menuGroup.SetActive(false);
 
@@ -201,8 +201,8 @@ public class MainMenuManager : MonoBehaviour
 
         if (sceneLoadOperation == null)
         {
-            Debug.LogError("[MainMenuManager] ¾À ·Îµù ½ÇÆĞ: " + sceneNameAfterLoading +
-                           "\nBuild Profiles / Build Settings¿¡ ÀÌ ¾ÀÀÌ µî·ÏµÇ¾î ÀÖ´ÂÁö È®ÀÎÇÏ¼¼¿ä.");
+            Debug.LogError("[MainMenuManager] ì”¬ ë¡œë”© ì‹¤íŒ¨: " + sceneNameAfterLoading +
+                           "\nBuild Profiles / Build Settingsì— ì´ ì”¬ì´ ë“±ë¡ë˜ì–´ ìˆëŠ”ì§€ í™•ì¸í•˜ì„¸ìš”.");
 
             if (tipCoroutine != null)
                 StopCoroutine(tipCoroutine);
@@ -211,7 +211,7 @@ public class MainMenuManager : MonoBehaviour
                 StopCoroutine(typingCoroutine);
 
             if (loadingTipText != null)
-                loadingTipText.text = "¾À ·Îµù ½ÇÆĞ: Build Settings È®ÀÎ ÇÊ¿ä";
+                loadingTipText.text = "ì”¬ ë¡œë”© ì‹¤íŒ¨: Build Settings í™•ì¸ í•„ìš”";
 
             if (startButton != null)
                 startButton.interactable = true;
@@ -280,9 +280,9 @@ public class MainMenuManager : MonoBehaviour
         if (loadingTipText != null)
         {
             if (useLoadingTipTypewriter)
-                yield return TypeLoadingText(string.IsNullOrWhiteSpace(finalLoadingMessage) ? "ÄÆ½Å µ¥ÀÌÅÍ¸¦ ºÒ·¯¿À´Â Áß..." : finalLoadingMessage);
+                yield return TypeLoadingText(string.IsNullOrWhiteSpace(finalLoadingMessage) ? "ì»·ì‹  ë°ì´í„°ë¥¼ ë¶ˆëŸ¬ì˜¤ëŠ” ì¤‘..." : finalLoadingMessage);
             else
-                loadingTipText.text = string.IsNullOrWhiteSpace(finalLoadingMessage) ? "ÄÆ½Å µ¥ÀÌÅÍ¸¦ ºÒ·¯¿À´Â Áß..." : finalLoadingMessage;
+                loadingTipText.text = string.IsNullOrWhiteSpace(finalLoadingMessage) ? "ì»·ì‹  ë°ì´í„°ë¥¼ ë¶ˆëŸ¬ì˜¤ëŠ” ì¤‘..." : finalLoadingMessage;
         }
 
         if (loadingPercentText != null)
@@ -359,7 +359,7 @@ public class MainMenuManager : MonoBehaviour
         {
             return new LoadingTip
             {
-                message = "°¨¿°µÈ ±¸¿ª¿¡ ÁøÀÔÇÏ´Â Áß...",
+                message = "ê°ì—¼ëœ êµ¬ì—­ì— ì§„ì…í•˜ëŠ” ì¤‘...",
                 displayTime = 2f
             };
         }
@@ -486,12 +486,12 @@ public class MainMenuManager : MonoBehaviour
     {
         loadingTips = new List<LoadingTip>
         {
-            new LoadingTip { message = "°¨¿°µÈ ±¸¿ª¿¡ ÁøÀÔÇÏ´Â Áß...", displayTime = 2f },
-            new LoadingTip { message = "¹æÈ­º® ¿ìÈ¸ °æ·Î¸¦ °è»êÇÏ´Â Áß...", displayTime = 2f },
-            new LoadingTip { message = "¶óÆÄ¿¤ ¹é½Å µ¥ÀÌÅÍ¸¦ ÁØºñÇÏ´Â Áß...", displayTime = 2f },
-            new LoadingTip { message = "¾ÆÅ© Áß½ÉºÎ Á¢¼ÓÀ» ´ë±âÇÏ´Â Áß...", displayTime = 2f },
-            new LoadingTip { message = "ÀûÀ» Ã³Ä¡ÇÏ¸é ¹æÀ» Á¤È­ÇÒ ¼ö ÀÖ½À´Ï´Ù.", displayTime = 2f },
-            new LoadingTip { message = "°æ°í Ç¥½ÄÀÌ º¸ÀÎ´Ù¸é ½ÅÁßÇÏ°Ô Á¢±ÙÇØ¾ß ÇÕ´Ï´Ù.", displayTime = 2f }
+            new LoadingTip { message = "ê°ì—¼ëœ êµ¬ì—­ì— ì§„ì…í•˜ëŠ” ì¤‘...", displayTime = 2f },
+            new LoadingTip { message = "ë°©í™”ë²½ ìš°íšŒ ê²½ë¡œë¥¼ ê³„ì‚°í•˜ëŠ” ì¤‘...", displayTime = 2f },
+            new LoadingTip { message = "ë¼íŒŒì—˜ ë°±ì‹  ë°ì´í„°ë¥¼ ì¤€ë¹„í•˜ëŠ” ì¤‘...", displayTime = 2f },
+            new LoadingTip { message = "ì•„í¬ ì¤‘ì‹¬ë¶€ ì ‘ì†ì„ ëŒ€ê¸°í•˜ëŠ” ì¤‘...", displayTime = 2f },
+            new LoadingTip { message = "ì ì„ ì²˜ì¹˜í•˜ë©´ ë°©ì„ ì •í™”í•  ìˆ˜ ìˆìŠµë‹ˆë‹¤.", displayTime = 2f },
+            new LoadingTip { message = "ê²½ê³  í‘œì‹ì´ ë³´ì¸ë‹¤ë©´ ì‹ ì¤‘í•˜ê²Œ ì ‘ê·¼í•´ì•¼ í•©ë‹ˆë‹¤.", displayTime = 2f }
         };
     }
 

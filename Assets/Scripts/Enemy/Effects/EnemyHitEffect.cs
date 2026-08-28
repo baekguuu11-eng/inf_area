@@ -43,7 +43,7 @@ public class EnemyHitEffect : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
 
         if (animator == null)
-            animator = GetComponent<Animator>();
+            animator = GetComponentInChildren<Animator>(true);
 
         CreateOutlineRenderer();
     }

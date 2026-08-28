@@ -23,7 +23,7 @@ public class PlayerHealth : MonoBehaviour
     [SerializeField] private Color hitColor = Color.red;
 
     [Header("Defense Chip")]
-    [SerializeField] private bool showDefenseLog = true;
+    [SerializeField] private bool showDefenseLog = false;
 
     [Header("Test")]
     [SerializeField] private int testDamage = 1;
@@ -38,37 +38,33 @@ public class PlayerHealth : MonoBehaviour
     [Header("Death Sequence")]
     [SerializeField] private DeathSequenceUI deathSequenceUI;
 
+    private PlayerStats stats;
+    private PlayerDashController dashController;
     private bool isInvincible;
     private bool isDead;
-
-    private int defenseStoredDamage = 0;
+    private float damageCarry;
     private float lastDamageTime = -999f;
-
     private Color originalColor = Color.white;
     private Coroutine hitEffectCoroutine;
     private Coroutine invincibleCoroutine;
+    private System.IDisposable deathLock;
 
-    public bool IsDead => isDead;
-    public bool IsInvincible => isInvincible;
+    public bool IsDead { get { return isDead; } }
+    public bool IsInvincible { get { return isInvincible; } }
 
     private void Awake()
     {
+        stats = GetComponent<PlayerStats>();
+        dashController = GetComponent<PlayerDashController>();
         FindSpriteRendererIfNeeded();
 
         if (playerSpriteRenderer != null)
-        {
             originalColor = playerSpriteRenderer.color;
-        }
 
         if (audioSource == null)
-        {
             audioSource = GetComponent<AudioSource>();
-        }
-
         if (audioSource == null)
-        {
             audioSource = gameObject.AddComponent<AudioSource>();
-        }
 
         audioSource.playOnAwake = false;
         audioSource.spatialBlend = 0f;
@@ -77,231 +73,185 @@ public class PlayerHealth : MonoBehaviour
     private void Start()
     {
         Time.timeScale = 1f;
-        GameInputState.IsLocked = false;
-
         baseMaxHealth = Mathf.Max(1, baseMaxHealth);
-        maxHealth = baseMaxHealth;
+        SyncMaxHealth(true);
 
         if (currentHealth <= 0)
-        {
-            currentHealth = baseMaxHealth;
-        }
+            currentHealth = maxHealth;
 
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
 
         if (deathPanel != null)
-        {
             deathPanel.SetActive(false);
-        }
 
         RefreshUI();
     }
 
     private void Update()
     {
+        SyncMaxHealth(false);
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (Input.GetKeyDown(KeyCode.N))
-        {
             TakeDamage(testDamage);
-        }
+#endif
+    }
+
+    private void SyncMaxHealth(bool force)
+    {
+        int targetMax = stats != null ? stats.MaxHealth : Mathf.Max(1, baseMaxHealth);
+        if (!force && targetMax == maxHealth)
+            return;
+
+        int previousMax = Mathf.Max(1, maxHealth);
+        maxHealth = Mathf.Max(1, targetMax);
+        baseMaxHealth = stats != null ? Mathf.Min(baseMaxHealth, maxHealth) : Mathf.Max(1, baseMaxHealth);
+
+        if (force)
+            currentHealth = currentHealth <= 0 ? maxHealth : Mathf.Clamp(currentHealth, 0, maxHealth);
+        else if (maxHealth > previousMax)
+            currentHealth = Mathf.Min(maxHealth, currentHealth + (maxHealth - previousMax));
+        else
+            currentHealth = Mathf.Min(currentHealth, maxHealth);
+
+        RefreshUI();
     }
 
     public void TakeDamage(int damage)
     {
-        if (damage <= 0)
-        {
+        if (damage <= 0 || isDead || IsInInvincibleTime())
             return;
-        }
-
-        if (isDead)
-        {
-            return;
-        }
-
-        // 핵심: 무적시간 중이면 데미지 자체를 완전히 무시
-        if (IsInInvincibleTime())
-        {
-            Debug.Log("무적시간 중: 데미지 무시");
-
-            if (heartUI != null)
-            {
-                heartUI.PlayDefenseFeedback(currentHealth);
-            }
-
-            return;
-        }
 
         int healthBefore = currentHealth;
-        int finalDamage = GetFinalDamage(damage);
+        int finalDamage = CalculateFinalDamage(damage);
 
-        // 방어칩 때문에 이번 공격이 막힌 경우
         if (finalDamage <= 0)
         {
-            Debug.Log("방어 칩 적용: 이번 공격은 하트가 닳지 않음");
-
             if (heartUI != null)
-            {
                 heartUI.PlayDefenseFeedback(currentHealth);
-            }
 
             PlayHitEffect();
             StartInvincible();
-
             return;
         }
 
-        currentHealth -= finalDamage;
-        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
-
-        Debug.Log("현재 체력 : " + currentHealth + " / 받은 데미지 : " + finalDamage);
-
+        currentHealth = Mathf.Clamp(currentHealth - finalDamage, 0, maxHealth);
         RefreshUI();
 
         if (heartUI != null)
-        {
             heartUI.PlayDamageFeedback(healthBefore, currentHealth);
-        }
 
         PlayHurtSound();
         PlayHitEffect();
+        CombatPostProcessV61.PulsePlayerDamage();
         StartInvincible();
 
         if (currentHealth <= 0)
-        {
             Die();
-        }
+    }
+
+    private int CalculateFinalDamage(int incomingDamage)
+    {
+        float multiplier = stats != null ? stats.DefenseMultiplier : 1f;
+        multiplier = Mathf.Clamp(multiplier, 0.05f, 5f);
+
+        damageCarry += incomingDamage * multiplier;
+        int result = Mathf.FloorToInt(damageCarry + 0.0001f);
+        damageCarry -= result;
+
+        if (showDefenseLog)
+            Debug.Log("[PlayerHealth] incoming=" + incomingDamage + ", multiplier=" + multiplier + ", applied=" + result);
+
+        return result;
     }
 
     private bool IsInInvincibleTime()
     {
-        if (isInvincible)
-        {
-            return true;
-        }
-
-        if (Time.time - lastDamageTime < invincibleTime)
-        {
-            return true;
-        }
-
-        return false;
+        if (dashController == null)
+            dashController = GetComponent<PlayerDashController>();
+        return (dashController != null && dashController.IsInvulnerable)
+            || isInvincible
+            || Time.time - lastDamageTime < invincibleTime;
     }
 
-    private int GetFinalDamage(int damage)
+    public void GrantTemporaryInvulnerability(float duration)
     {
-        if (!IsDefenseChipEquipped())
-        {
-            defenseStoredDamage = 0;
-            return damage;
-        }
-
-        defenseStoredDamage += damage;
-
-        int finalDamage = defenseStoredDamage / 2;
-        defenseStoredDamage = defenseStoredDamage % 2;
-
-        if (showDefenseLog)
-        {
-            Debug.Log("방어 칩 누적 데미지 처리 / 이번 최종 데미지: " + finalDamage);
-        }
-
-        return finalDamage;
+        if (duration <= 0f || isDead)
+            return;
+        lastDamageTime = Time.time;
+        if (invincibleCoroutine != null)
+            StopCoroutine(invincibleCoroutine);
+        invincibleCoroutine = StartCoroutine(ExternalInvincibleCoroutine(duration));
     }
 
-    private bool IsDefenseChipEquipped()
+    private IEnumerator ExternalInvincibleCoroutine(float duration)
     {
-        if (ChipSlotManager.Instance == null)
-        {
-            return false;
-        }
-
-        return ChipSlotManager.Instance.IsChipEquipped(ChipSlotManager.ChipType.Defense);
+        isInvincible = true;
+        yield return new WaitForSecondsRealtime(Mathf.Max(0.01f, duration));
+        isInvincible = false;
+        invincibleCoroutine = null;
     }
 
     public void Heal(int amount)
     {
-        if (amount <= 0)
-        {
+        if (amount <= 0 || isDead)
             return;
-        }
 
-        if (isDead)
-        {
-            return;
-        }
-
-        currentHealth += amount;
-        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
-
+        currentHealth = Mathf.Clamp(currentHealth + amount, 0, maxHealth);
         RefreshUI();
     }
 
     public void ApplyOverclockHealth(int bonusAmount)
     {
-        if (bonusAmount <= 0)
+        if (stats != null)
         {
+            stats.SetOverclockHealthBonus(bonusAmount);
+            SyncMaxHealth(false);
             return;
         }
 
-        if (isDead)
-        {
-            return;
-        }
-
-        maxHealth = baseMaxHealth + bonusAmount;
-
-        currentHealth += bonusAmount;
-        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
-
+        maxHealth = Mathf.Max(1, baseMaxHealth + Mathf.Max(0, bonusAmount));
+        currentHealth = Mathf.Min(maxHealth, currentHealth + Mathf.Max(0, bonusAmount));
         RefreshUI();
     }
 
     public void RemoveOverclockHealth()
     {
-        maxHealth = baseMaxHealth;
-
-        if (currentHealth > baseMaxHealth)
+        if (stats != null)
         {
-            currentHealth = baseMaxHealth;
+            stats.SetOverclockHealthBonus(0);
+            SyncMaxHealth(false);
+            return;
         }
 
-        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
-
+        maxHealth = Mathf.Max(1, baseMaxHealth);
+        currentHealth = Mathf.Min(currentHealth, maxHealth);
         RefreshUI();
     }
 
     public void RefreshUI()
     {
         if (heartUI != null)
-        {
-            heartUI.RefreshUI(currentHealth, maxHealth, baseMaxHealth);
-        }
+            heartUI.RefreshUI(currentHealth, maxHealth, Mathf.Min(baseMaxHealth, maxHealth));
     }
 
     private void PlayHitEffect()
     {
         FindSpriteRendererIfNeeded();
-
         if (hitEffectCoroutine != null)
-        {
             StopCoroutine(hitEffectCoroutine);
-        }
-
         hitEffectCoroutine = StartCoroutine(HitEffect());
     }
 
     private IEnumerator HitEffect()
     {
         if (playerSpriteRenderer != null)
-        {
             playerSpriteRenderer.color = hitColor;
-        }
 
-        yield return new WaitForSeconds(hitFlashTime);
+        yield return new WaitForSecondsRealtime(Mathf.Max(0.01f, hitFlashTime));
 
         if (playerSpriteRenderer != null && !isDead)
-        {
             playerSpriteRenderer.color = originalColor;
-        }
 
         hitEffectCoroutine = null;
     }
@@ -309,66 +259,41 @@ public class PlayerHealth : MonoBehaviour
     private void StartInvincible()
     {
         lastDamageTime = Time.time;
-
         if (invincibleCoroutine != null)
-        {
             StopCoroutine(invincibleCoroutine);
-        }
-
         invincibleCoroutine = StartCoroutine(InvincibleCoroutine());
     }
 
     private IEnumerator InvincibleCoroutine()
     {
         isInvincible = true;
-
-        yield return new WaitForSeconds(invincibleTime);
-
+        yield return new WaitForSeconds(Mathf.Max(0.01f, invincibleTime));
         isInvincible = false;
         invincibleCoroutine = null;
     }
 
     private void PlayHurtSound()
     {
-        if (audioSource == null)
-        {
+        if (audioSource == null || hurtSound == null)
             return;
-        }
-
-        if (hurtSound == null)
-        {
-            return;
-        }
 
         float originalPitch = audioSource.pitch;
-
         if (randomizeHurtPitch)
-        {
             audioSource.pitch = Random.Range(hurtPitchRange.x, hurtPitchRange.y);
-        }
 
         audioSource.PlayOneShot(hurtSound, hurtVolume);
-
         audioSource.pitch = originalPitch;
     }
 
     private void FindSpriteRendererIfNeeded()
     {
         if (playerSpriteRenderer != null)
-        {
             return;
-        }
 
         SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>(true);
-
         for (int i = 0; i < renderers.Length; i++)
         {
-            if (renderers[i] == null)
-            {
-                continue;
-            }
-
-            if (renderers[i].sprite != null)
+            if (renderers[i] != null && renderers[i].sprite != null)
             {
                 playerSpriteRenderer = renderers[i];
                 return;
@@ -379,15 +304,14 @@ public class PlayerHealth : MonoBehaviour
     private void Die()
     {
         if (isDead)
-        {
             return;
-        }
 
         isDead = true;
+        deathLock = GameInputState.Acquire("PlayerDeath");
 
-        Debug.Log("플레이어 사망!");
-
-        GameInputState.IsLocked = true;
+        Rigidbody2D body = GetComponent<Rigidbody2D>();
+        if (body != null)
+            body.linearVelocity = Vector2.zero;
 
         if (deathSequenceUI != null)
         {
@@ -396,10 +320,17 @@ public class PlayerHealth : MonoBehaviour
         }
 
         if (deathPanel != null)
-        {
             deathPanel.SetActive(true);
-        }
 
         Time.timeScale = 0f;
+    }
+
+    private void OnDestroy()
+    {
+        if (deathLock != null)
+        {
+            deathLock.Dispose();
+            deathLock = null;
+        }
     }
 }

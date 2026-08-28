@@ -1,332 +1,246 @@
+// TARGET: Assets/Scripts/Enemy/EnemyMeleeAI.cs
 using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
-public class EnemyMeleeAI : MonoBehaviour
+[RequireComponent(typeof(EnemyPerception))]
+[RequireComponent(typeof(EnemyMotor))]
+[DisallowMultipleComponent]
+public sealed class EnemyMeleeAI : MonoBehaviour
 {
-    private enum AIState { Idle, Chase, Attack }
-    private enum AttackType { Standard, Charge } // Standard: 제자리 판정 / Charge: 박치기(히트박스가 짧게 튀어나갔다 복귀)
+    private enum State
+    {
+        Observe,
+        Approach,
+        Reposition,
+        Windup,
+        Lunge,
+        Recovery
+    }
 
-    [Header("Detection")]
-    [SerializeField] private float detectRange = 5f;
-    [SerializeField] private float attackRange = 1.2f;
+    [Header("감지 및 전투 위치")]
+    [SerializeField] private float detectRange = 7f;
+    [SerializeField] private float combatRingRadius = 0.95f;
+    [SerializeField] private float attackStartRange = 1.12f;
+    [SerializeField] private float repositionSpeedMultiplier = 0.78f;
+    [SerializeField] private float decisionInterval = 0.08f;
 
-    [Header("Movement")]
-    [SerializeField] private float moveSpeed = 2.5f;
+    [Header("이동")]
+    [SerializeField] private float moveSpeed = 2.45f;
 
-    [Header("Attack Type")]
-    [SerializeField] private AttackType attackType = AttackType.Standard;
-
-    [Header("Standard Attack Settings")]
-    [SerializeField] private float attackWindup = 0.3f;
-    [SerializeField] private float attackCooldown = 1f;
+    [Header("짧은 돌진 공격")]
+    [SerializeField] private float attackWindup = 0.30f;
+    [SerializeField] private float lungeDuration = 0.12f;
+    [SerializeField] private float lungeDistance = 0.76f;
+    [SerializeField] private float attackHitRadius = 0.68f;
     [SerializeField] private int attackDamage = 1;
-    [Tooltip("실제 데미지 판정 반경. Attack Range보다 작으면 안 됨 (적이 윈드업 중 멈춰있기 때문에, 작으면 거의 항상 빗나감)")]
-    [SerializeField] private float attackHitRadius = 1.4f;
+    [SerializeField] private float recoveryDuration = 0.44f;
+    [SerializeField] private float telegraphWidth = 0.28f;
 
-    [Header("Charge Attack Settings (박치기 - 짧게 튀어나갔다 복귀)")]
-    [Tooltip("튀어나가기 전 짧은 예고(멈칫) 시간")]
-    [SerializeField] private float chargeWindup = 0.25f;
-    [Tooltip("히트박스(몸체)가 앞으로 튀어나가는 거리")]
-    [SerializeField] private float chargeDistance = 1.0f;
-    [Tooltip("목표 지점까지 튀어나가는 데 걸리는 시간")]
-    [SerializeField] private float chargeOutDuration = 0.12f;
-    [Tooltip("원래 자리로 돌아오는 데 걸리는 시간")]
-    [SerializeField] private float chargeReturnDuration = 0.18f;
-    [Tooltip("복귀가 끝난 뒤 다시 움직이기 전 경직(회복) 시간")]
-    [SerializeField] private float chargeRecovery = 0.35f;
-    [SerializeField] private int chargeDamage = 2;
+    [Header("참조")]
+    [SerializeField] private EnemyPerception perception;
+    [SerializeField] private EnemyMotor motor;
+    [SerializeField] private EnemyVisualMotion visualMotion;
+    [SerializeField] private EnemyTelegraph telegraph;
+    [SerializeField] private EnemyHealth health;
+    [SerializeField] private EnemyAttackContract attackContract;
 
-    [Header("Optional Visual Hook")]
-    [Tooltip("있으면 IsChasing / IsAttacking / IsCharging bool을 보냄. 파라미터가 없으면 그냥 무시됨 (에러 없음)")]
-    [SerializeField] private Animator animator;
-
-    private Rigidbody2D rb;
-    private Transform player;
-    private AIState state = AIState.Idle;
-    private bool isAttacking = false;
-
-    private bool isCharging = false;
-    private bool hasHitDuringCharge = false;
-
-    private const float MinDirectionSqrMagnitude = 0.0001f;
+    private Rigidbody2D body;
+    private EnemyAttackCoordinator coordinator;
+    private State state;
+    private Coroutine attackRoutine;
+    private float nextDecisionTime;
+    private bool ownsAttackToken;
+    private int orbitSign;
 
     private void Awake()
     {
-        rb = GetComponent<Rigidbody2D>();
-
-        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-        if (playerObj != null)
-            player = playerObj.transform;
-
-        if (animator == null)
-            animator = GetComponent<Animator>();
-
-        ValidateColliderOffset();
-        ValidateAttackRanges();
+        body = GetComponent<Rigidbody2D>();
+        perception = perception != null ? perception : GetComponent<EnemyPerception>();
+        motor = motor != null ? motor : GetComponent<EnemyMotor>();
+        visualMotion = visualMotion != null ? visualMotion : GetComponent<EnemyVisualMotion>();
+        telegraph = telegraph != null ? telegraph : GetComponentInChildren<EnemyTelegraph>(true);
+        health = health != null ? health : GetComponent<EnemyHealth>();
+        attackContract = attackContract != null ? attackContract : (GetComponent<EnemyAttackContract>() ?? gameObject.AddComponent<EnemyAttackContract>());
+        coordinator = EnemyAttackCoordinator.EnsureInstance();
+        orbitSign = Random.value < 0.5f ? -1 : 1;
     }
 
-    private void ValidateColliderOffset()
+    private void OnEnable()
     {
-        Collider2D col = GetComponent<Collider2D>();
-        if (col == null)
-        {
-            Debug.LogWarning($"[{name}] Collider2D가 없습니다. 벽 충돌/공격 판정이 제대로 동작하지 않습니다.");
-            return;
-        }
-
-        float offsetMagnitude = col.offset.magnitude;
-        float sizeReference = Mathf.Max(col.bounds.extents.x, col.bounds.extents.y, 0.5f);
-
-        if (offsetMagnitude > sizeReference * 2f)
-        {
-            Debug.LogWarning(
-                $"[{name}] Collider2D의 Offset({col.offset})이 비정상적으로 큽니다. " +
-                "Transform 위치와 실제 물리 판정 위치가 크게 어긋나 있을 수 있으니 Offset을 0,0에 가깝게 재설정하세요."
-            );
-        }
-    }
-
-    private void ValidateAttackRanges()
-    {
-        if (attackType == AttackType.Standard && attackHitRadius < attackRange)
-        {
-            Debug.LogWarning(
-                $"[{name}] Attack Hit Radius({attackHitRadius})가 Attack Range({attackRange})보다 작습니다. " +
-                "공격 판정이 자주 빗나갈 수 있으니 Attack Hit Radius를 Attack Range 이상으로 설정하세요."
-            );
-        }
+        coordinator = EnemyAttackCoordinator.EnsureInstance();
+        nextDecisionTime = 0f;
     }
 
     private void Update()
     {
-        if (player == null)
+        if (health != null && health.IsDead)
             return;
 
         if (GameInputState.IsLocked)
         {
-            state = AIState.Idle;
-            UpdateAnimator();
+            InterruptAttack();
+            state = State.Observe;
+            motor.StopIntent();
             return;
         }
 
-        if (!isAttacking)
+        if (motor.IsKnockedBack)
         {
-            float distance = Vector2.Distance(transform.position, player.position);
-
-            if (distance <= attackRange)
-                state = AIState.Attack;
-            else if (distance <= detectRange)
-                state = AIState.Chase;
-            else
-                state = AIState.Idle;
-
-            if (state == AIState.Attack)
-                StartCoroutine(AttackRoutine());
-        }
-
-        UpdateAnimator();
-    }
-
-    private void FixedUpdate()
-    {
-        if (player == null || GameInputState.IsLocked)
-        {
-            rb.linearVelocity = Vector2.zero;
+            if (attackRoutine != null)
+                InterruptAttack();
             return;
         }
 
-        if (isAttacking && attackType == AttackType.Charge)
+        if (attackRoutine != null || Time.time < nextDecisionTime)
             return;
 
-        if (state == AIState.Chase && !isAttacking)
+        nextDecisionTime = Time.time + Mathf.Max(0.03f, decisionInterval);
+        perception.RefreshNow();
+        if (!perception.HasPlayer || perception.DistanceToPlayer > detectRange)
         {
-            Vector2 toPlayer = (Vector2)player.position - rb.position;
-
-            if (toPlayer.sqrMagnitude > MinDirectionSqrMagnitude)
-            {
-                Vector2 direction = toPlayer.normalized;
-                rb.MovePosition(rb.position + direction * moveSpeed * Time.fixedDeltaTime);
-            }
+            state = State.Observe;
+            motor.StopIntent();
+            visualMotion.SetAction(EnemyVisualMotion.ActionState.None, Vector2.down);
+            return;
         }
 
-        rb.linearVelocity = Vector2.zero;
+        Vector2 toPlayer = perception.PlayerPosition - body.position;
+        float distance = toPlayer.magnitude;
+        Vector2 slotDirection = coordinator.GetMeleeSlotDirection(this);
+        Vector2 slotPoint = perception.PlayerPosition + slotDirection * combatRingRadius;
+        Vector2 toSlot = slotPoint - body.position;
+
+        if (distance <= attackStartRange && perception.HasLineOfSight() &&
+            coordinator.TryAcquire(this, EnemyAttackCoordinator.AttackChannel.Melee, attackWindup + lungeDuration + recoveryDuration + 1f))
+        {
+            ownsAttackToken = true;
+            attackRoutine = StartCoroutine(AttackRoutine());
+            return;
+        }
+
+        if (toSlot.magnitude > 0.38f)
+        {
+            state = State.Approach;
+            motor.SetMoveIntent(toSlot, moveSpeed);
+            visualMotion.SetAction(EnemyVisualMotion.ActionState.None, toSlot);
+        }
+        else
+        {
+            state = State.Reposition;
+            Vector2 tangent = EnemyAIUtility.Perpendicular(toPlayer, orbitSign);
+            Vector2 radialCorrection = slotPoint - body.position;
+            Vector2 desired = (tangent * 0.72f + radialCorrection.normalized * 0.55f).normalized;
+            motor.SetMoveIntent(desired, moveSpeed * repositionSpeedMultiplier);
+            visualMotion.SetAction(EnemyVisualMotion.ActionState.None, desired);
+        }
     }
 
     private IEnumerator AttackRoutine()
     {
-        isAttacking = true;
-        rb.linearVelocity = Vector2.zero;
+        state = State.Windup;
+        attackContract.BeginTelegraph(telegraph);
+        motor.SetMovementEnabled(false, true);
+        Vector2 lockedDirection = perception.DirectionToPlayer;
 
-        if (attackType == AttackType.Charge)
-            yield return ChargeAttackRoutine();
-        else
-            yield return StandardAttackRoutine();
-
-        isAttacking = false;
-    }
-
-    private IEnumerator StandardAttackRoutine()
-    {
-        yield return new WaitForSeconds(attackWindup);
-
-        if (player != null)
-        {
-            float distance = Vector2.Distance(transform.position, player.position);
-            if (distance <= attackHitRadius)
-            {
-                DealDamageToPlayer(player.gameObject, attackDamage);
-            }
-        }
-
-        yield return new WaitForSeconds(attackCooldown);
-    }
-
-    private IEnumerator ChargeAttackRoutine()
-    {
-        yield return new WaitForSeconds(chargeWindup);
-
-        if (player == null)
-            yield break;
-
-        Vector2 toPlayer = (Vector2)player.position - rb.position;
-        Vector2 direction = toPlayer.sqrMagnitude > MinDirectionSqrMagnitude ? toPlayer.normalized : Vector2.down;
-
-        Vector2 startPos = rb.position;
-        Vector2 outTargetPos = startPos + direction * chargeDistance;
-
-        isCharging = true;
-        hasHitDuringCharge = false;
+        if (telegraph != null)
+            telegraph.ShowLine(lockedDirection, lungeDistance + attackHitRadius * 0.85f, telegraphWidth);
+        visualMotion.SetAction(EnemyVisualMotion.ActionState.Windup, lockedDirection);
 
         float elapsed = 0f;
-        float safeOutDuration = Mathf.Max(0.01f, chargeOutDuration);
-
-        while (elapsed < safeOutDuration && isCharging)
+        while (elapsed < attackWindup)
         {
-            elapsed += Time.fixedDeltaTime;
-            float t = Mathf.Clamp01(elapsed / safeOutDuration);
-            float smoothT = 1f - Mathf.Pow(1f - t, 3f);
-
-            rb.MovePosition(Vector2.Lerp(startPos, outTargetPos, smoothT));
-
-            yield return new WaitForFixedUpdate();
-        }
-
-        isCharging = false;
-
-        Vector2 returnStartPos = rb.position;
-        elapsed = 0f;
-        float safeReturnDuration = Mathf.Max(0.01f, chargeReturnDuration);
-
-        while (elapsed < safeReturnDuration)
-        {
-            elapsed += Time.fixedDeltaTime;
-            float t = Mathf.Clamp01(elapsed / safeReturnDuration);
-            float smoothT = 1f - Mathf.Pow(1f - t, 3f);
-
-            rb.MovePosition(Vector2.Lerp(returnStartPos, startPos, smoothT));
-
-            yield return new WaitForFixedUpdate();
-        }
-
-        rb.MovePosition(startPos);
-        rb.linearVelocity = Vector2.zero;
-
-        yield return new WaitForSeconds(chargeRecovery);
-    }
-
-    private void OnCollisionEnter2D(Collision2D collision)
-    {
-        HandleChargeContact(collision.gameObject);
-    }
-
-    private void OnTriggerEnter2D(Collider2D collision)
-    {
-        HandleChargeContact(collision.gameObject);
-    }
-
-    private void HandleChargeContact(GameObject other)
-    {
-        if (!isCharging)
-            return;
-
-        if (IsObstacle(other))
-        {
-            isCharging = false;
-            return;
-        }
-
-        if (hasHitDuringCharge)
-            return;
-
-        if (other.CompareTag("Player"))
-        {
-            hasHitDuringCharge = true;
-            isCharging = false;
-
-            DealDamageToPlayer(other, chargeDamage);
-
-            if (GameFeelManager.Instance != null)
+            if (ShouldInterrupt())
             {
-                GameFeelManager.Instance.DoHitStop(0.05f);
-                GameFeelManager.Instance.Shake(0.12f, 0.1f);
+                InterruptAttack();
+                yield break;
             }
+
+            elapsed += Time.deltaTime;
+            telegraph?.SetProgress(elapsed / Mathf.Max(0.01f, attackWindup));
+            yield return null;
         }
+
+        attackContract.BeginActive(telegraph);
+        state = State.Lunge;
+        visualMotion.SetAction(EnemyVisualMotion.ActionState.Attack, lockedDirection);
+
+        float movementElapsed = 0f;
+        bool damaged = false;
+        while (movementElapsed < lungeDuration)
+        {
+            if (ShouldInterrupt())
+            {
+                InterruptAttack();
+                yield break;
+            }
+
+            float step = lungeDistance / Mathf.Max(0.01f, lungeDuration) * Time.fixedDeltaTime;
+            if (!motor.MoveScripted(lockedDirection * step))
+                break;
+
+            if (!damaged)
+                damaged = attackContract.TryDamageCircle(body.position + lockedDirection * 0.06f, attackHitRadius, attackDamage);
+
+            movementElapsed += Time.fixedDeltaTime;
+            yield return new WaitForFixedUpdate();
+        }
+
+        attackContract.BeginRecovery(telegraph);
+        state = State.Recovery;
+        visualMotion.SetAction(EnemyVisualMotion.ActionState.Recovery, lockedDirection);
+        yield return new WaitForSeconds(Mathf.Max(0.01f, recoveryDuration));
+        FinishAttack();
     }
 
-    private bool IsObstacle(GameObject obj)
+    private bool ShouldInterrupt()
     {
-        return obj.layer == LayerMask.NameToLayer("Obstacle");
+        return GameInputState.IsLocked || motor.IsKnockedBack || (health != null && health.IsDead) || !isActiveAndEnabled;
     }
 
-    private void DealDamageToPlayer(GameObject playerObject, int damage)
+    private void FinishAttack()
     {
-        PlayerHealth playerHealth = playerObject.GetComponent<PlayerHealth>();
-        if (playerHealth == null)
-            playerHealth = playerObject.GetComponentInParent<PlayerHealth>();
-        if (playerHealth == null)
-            playerHealth = playerObject.GetComponentInChildren<PlayerHealth>();
-
-        if (playerHealth != null)
-            playerHealth.TakeDamage(damage);
-        else
-            Debug.LogWarning($"[{name}] PlayerHealth를 찾을 수 없어 데미지를 주지 못했습니다. Player 오브젝트 계층을 확인하세요.");
+        attackContract.FinishAttack(telegraph);
+        motor.SetMovementEnabled(true, true);
+        visualMotion.SetAction(EnemyVisualMotion.ActionState.None, Vector2.down);
+        state = State.Reposition;
+        attackRoutine = null;
+        ReleaseToken();
     }
 
-    private void UpdateAnimator()
+    private void InterruptAttack()
     {
-        if (animator == null)
+        if (attackRoutine != null)
+            StopCoroutine(attackRoutine);
+        attackRoutine = null;
+        attackContract?.CancelAttack(telegraph);
+        motor?.SetMovementEnabled(true, true);
+        if (visualMotion != null)
+            visualMotion.SetAction(EnemyVisualMotion.ActionState.None, Vector2.down);
+        ReleaseToken();
+    }
+
+    private void ReleaseToken()
+    {
+        if (!ownsAttackToken)
             return;
+        ownsAttackToken = false;
+        coordinator?.Release(this, EnemyAttackCoordinator.AttackChannel.Melee);
+    }
 
-        animator.SetBool("IsChasing", state == AIState.Chase && !isAttacking);
-        animator.SetBool("IsAttacking", isAttacking);
-        animator.SetBool("IsCharging", isCharging);
+    private void OnDisable()
+    {
+        InterruptAttack();
+        coordinator?.ReleaseAll(this);
     }
 
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, detectRange);
-
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, attackRange);
-
-        if (attackType == AttackType.Standard)
-        {
-            Gizmos.color = Color.green;
-            Gizmos.DrawWireSphere(transform.position, attackHitRadius);
-        }
-        else
-        {
-            Gizmos.color = new Color(1f, 0.5f, 0f);
-            Gizmos.DrawWireSphere(transform.position, chargeDistance);
-        }
-
-        Collider2D col = GetComponent<Collider2D>();
-        if (col != null)
-        {
-            Gizmos.color = Color.magenta;
-            Gizmos.DrawWireCube(col.bounds.center, col.bounds.size);
-        }
+        Gizmos.DrawWireSphere(transform.position, attackStartRange);
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawWireSphere(transform.position, attackHitRadius);
     }
 }

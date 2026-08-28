@@ -1,221 +1,318 @@
+// TARGET: Assets/Scripts/Enemy/EnemyRangedAI.cs
+using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
-public class EnemyRangedAI : MonoBehaviour
+[RequireComponent(typeof(EnemyPerception))]
+[RequireComponent(typeof(EnemyMotor))]
+[DisallowMultipleComponent]
+public sealed class EnemyRangedAI : MonoBehaviour
 {
-    private enum AIState { Idle, Chase, Attack, Kite }
+    private enum State
+    {
+        Observe,
+        Approach,
+        Strafe,
+        Retreat,
+        Windup,
+        Burst,
+        Recovery
+    }
 
-    [Header("Detection Zones (Kite < Attack < Detect 순서여야 함)")]
-    [Tooltip("이 범위 안에 들어오면 추적 시작")]
-    [SerializeField] private float detectRange = 6f;
-    [Tooltip("이 범위 안이면 멈춰서 공격. 이보다 멀어지면 다시 쫓아감")]
-    [SerializeField] private float attackRange = 4f;
-    [Tooltip("이보다 가까워지면 플레이어에게서 멀어짐 (도망)")]
-    [SerializeField] private float kiteRange = 2f;
+    [Header("거리 구역")]
+    [SerializeField] private float detectRange = 7.2f;
+    [SerializeField] private float preferredMinRange = 3.2f;
+    [SerializeField] private float preferredMaxRange = 5.4f;
+    [SerializeField] private float retreatTriggerRange = 2.25f;
 
-    [Header("State Transition (부드러운 전환)")]
-    [SerializeField] private float stateChangeDelay = 0.15f;
+    [Header("이동")]
+    [SerializeField] private float moveSpeed = 2.05f;
+    [SerializeField] private float retreatSpeed = 2.75f;
+    [SerializeField] private float retreatDuration = 0.58f;
+    [SerializeField] private float retreatCooldown = 2.45f;
+    [SerializeField] private float strafeDirectionMinDuration = 0.8f;
+    [SerializeField] private float strafeDirectionMaxDuration = 1.35f;
+    [SerializeField] private float decisionInterval = 0.08f;
 
-    [Header("Movement")]
-    [SerializeField] private float moveSpeed = 2f;      // Chase 속도
-    [SerializeField] private float retreatSpeed = 2.5f; // Kite 속도
-
-    [Header("Attack (Attack 구역에서 멈춰서 발사)")]
+    [Header("2점사")]
     [SerializeField] private Transform firePoint;
     [SerializeField] private GameObject projectilePrefab;
-    [SerializeField] private float fireInterval = 1.5f;
+    [SerializeField] private float fireWindup = 0.42f;
+    [SerializeField] private float burstShotInterval = 0.14f;
+    [SerializeField] private float fireRecovery = 1.15f;
     [SerializeField] private float projectileSpeed = 8f;
     [SerializeField] private int projectileDamage = 1;
+    [SerializeField, Range(0f, 1f)] private float predictionChance = 0.2f;
+    [SerializeField] private float predictionTime = 0.20f;
+    [SerializeField] private float aimLineWidth = 0.055f;
+    [SerializeField] private LayerMask lineOfSightMask;
 
-    [Header("Optional Animator Hook")]
-    [SerializeField] private Animator animator;
+    [Header("참조")]
+    [SerializeField] private EnemyPerception perception;
+    [SerializeField] private EnemyMotor motor;
+    [SerializeField] private EnemyVisualMotion visualMotion;
+    [SerializeField] private EnemyTelegraph telegraph;
+    [SerializeField] private EnemyHealth health;
+    [SerializeField] private EnemyAttackContract attackContract;
 
-    private Rigidbody2D rb;
-    private Transform player;
-
-    private AIState state = AIState.Idle;
-    private AIState pendingState = AIState.Idle;
-    private float stateChangeTimer = 0f;
-
-    private float nextFireTime = 0f;
-
-    private const float MinDirectionSqrMagnitude = 0.0001f;
+    private Rigidbody2D body;
+    private EnemyAttackCoordinator coordinator;
+    private State state;
+    private Coroutine burstRoutine;
+    private float nextDecisionTime;
+    private float nextBurstAllowedTime;
+    private float retreatEndTime;
+    private float nextRetreatAllowedTime;
+    private float nextStrafeChangeTime;
+    private int strafeSign;
+    private bool ownsAttackToken;
 
     private void Awake()
     {
-        rb = GetComponent<Rigidbody2D>();
-
-        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-        if (playerObj != null)
-            player = playerObj.transform;
-
+        body = GetComponent<Rigidbody2D>();
+        perception = perception != null ? perception : GetComponent<EnemyPerception>();
+        motor = motor != null ? motor : GetComponent<EnemyMotor>();
+        visualMotion = visualMotion != null ? visualMotion : GetComponent<EnemyVisualMotion>();
+        telegraph = telegraph != null ? telegraph : GetComponentInChildren<EnemyTelegraph>(true);
+        health = health != null ? health : GetComponent<EnemyHealth>();
+        attackContract = attackContract != null ? attackContract : (GetComponent<EnemyAttackContract>() ?? gameObject.AddComponent<EnemyAttackContract>());
         if (firePoint == null)
-            firePoint = transform;
+        {
+            Transform found = transform.Find("FirePoint");
+            firePoint = found != null ? found : transform;
+        }
 
-        if (animator == null)
-            animator = GetComponent<Animator>();
-
-        ValidateColliderOffset();
-        ValidateZoneOrder();
+        coordinator = EnemyAttackCoordinator.EnsureInstance();
+        strafeSign = Random.value < 0.5f ? -1 : 1;
+        ScheduleStrafeChange();
     }
 
-    private void ValidateColliderOffset()
+    private void OnEnable()
     {
-        Collider2D col = GetComponent<Collider2D>();
-        if (col == null)
-        {
-            Debug.LogWarning($"[{name}] Collider2D가 없습니다. 벽 충돌 판정이 제대로 동작하지 않습니다.");
-            return;
-        }
-
-        float offsetMagnitude = col.offset.magnitude;
-        float sizeReference = Mathf.Max(col.bounds.extents.x, col.bounds.extents.y, 0.5f);
-
-        if (offsetMagnitude > sizeReference * 2f)
-        {
-            Debug.LogWarning(
-                $"[{name}] Collider2D의 Offset({col.offset})이 비정상적으로 큽니다. " +
-                "Offset을 0,0에 가깝게 재설정하세요."
-            );
-        }
-    }
-
-    private void ValidateZoneOrder()
-    {
-        if (!(kiteRange < attackRange && attackRange < detectRange))
-        {
-            Debug.LogWarning(
-                $"[{name}] 구역 크기 순서가 잘못되었습니다 (Kite: {kiteRange}, Attack: {attackRange}, Detect: {detectRange}). " +
-                "Kite Range < Attack Range < Detect Range 순서로 설정해야 정상 동작합니다."
-            );
-        }
+        coordinator = EnemyAttackCoordinator.EnsureInstance();
+        nextDecisionTime = 0f;
     }
 
     private void Update()
     {
-        if (player == null)
+        if (health != null && health.IsDead)
             return;
 
         if (GameInputState.IsLocked)
         {
-            state = AIState.Idle;
-            pendingState = AIState.Idle;
-            stateChangeTimer = 0f;
-            UpdateAnimator();
+            InterruptBurst();
+            motor.StopIntent();
+            state = State.Observe;
             return;
         }
 
-        float distance = Vector2.Distance(transform.position, player.position);
-
-        AIState rawState;
-        if (distance <= kiteRange)
-            rawState = AIState.Kite;
-        else if (distance <= attackRange)
-            rawState = AIState.Attack;
-        else if (distance <= detectRange)
-            rawState = AIState.Chase;
-        else
-            rawState = AIState.Idle;
-
-        if (rawState != pendingState)
+        if (motor.IsKnockedBack)
         {
-            pendingState = rawState;
-            stateChangeTimer = 0f;
+            if (burstRoutine != null)
+                InterruptBurst();
+            return;
+        }
+
+        if (burstRoutine != null || Time.time < nextDecisionTime)
+            return;
+
+        nextDecisionTime = Time.time + Mathf.Max(0.03f, decisionInterval);
+        perception.RefreshNow();
+        if (!perception.HasPlayer || perception.DistanceToPlayer > detectRange)
+        {
+            state = State.Observe;
+            motor.StopIntent();
+            return;
+        }
+
+        float distance = perception.DistanceToPlayer;
+        Vector2 toPlayer = perception.PlayerPosition - body.position;
+
+        if (state == State.Retreat && Time.time < retreatEndTime)
+        {
+            motor.SetMoveIntent(-toPlayer, retreatSpeed);
+            visualMotion.SetAction(EnemyVisualMotion.ActionState.None, -toPlayer);
+            return;
+        }
+
+        if (distance <= retreatTriggerRange && Time.time >= nextRetreatAllowedTime)
+        {
+            state = State.Retreat;
+            retreatEndTime = Time.time + retreatDuration;
+            nextRetreatAllowedTime = Time.time + retreatCooldown;
+            motor.SetMoveIntent(-toPlayer, retreatSpeed);
+            return;
+        }
+
+        bool inFireZone = distance >= preferredMinRange && distance <= preferredMaxRange;
+        bool hasSight = perception.HasLineOfSight(lineOfSightMask);
+        if (inFireZone && hasSight && Time.time >= nextBurstAllowedTime &&
+            coordinator.TryAcquire(this, EnemyAttackCoordinator.AttackChannel.Ranged, fireWindup + burstShotInterval + fireRecovery + 1f))
+        {
+            ownsAttackToken = true;
+            burstRoutine = StartCoroutine(BurstRoutine());
+            return;
+        }
+
+        if (distance > preferredMaxRange || !hasSight)
+        {
+            state = State.Approach;
+            Vector2 targetDirection = toPlayer.normalized;
+            if (!hasSight)
+                targetDirection = (targetDirection + EnemyAIUtility.Perpendicular(targetDirection, strafeSign) * 0.55f).normalized;
+            motor.SetMoveIntent(targetDirection, moveSpeed);
+            visualMotion.SetAction(EnemyVisualMotion.ActionState.None, targetDirection);
         }
         else
         {
-            stateChangeTimer += Time.deltaTime;
+            state = State.Strafe;
+            if (Time.time >= nextStrafeChangeTime)
+            {
+                strafeSign *= -1;
+                ScheduleStrafeChange();
+            }
 
-            if (stateChangeTimer >= stateChangeDelay)
-                state = pendingState;
+            Vector2 tangent = EnemyAIUtility.Perpendicular(toPlayer, strafeSign);
+            float radialCorrection = distance < preferredMinRange ? -0.48f : distance > preferredMaxRange ? 0.42f : 0f;
+            Vector2 desired = (tangent + toPlayer.normalized * radialCorrection).normalized;
+            motor.SetMoveIntent(desired, moveSpeed);
+            visualMotion.SetAction(EnemyVisualMotion.ActionState.None, desired);
         }
-
-        if (state == AIState.Attack && Time.time >= nextFireTime)
-        {
-            nextFireTime = Time.time + fireInterval;
-            FireAtPlayer();
-        }
-
-        UpdateAnimator();
     }
 
-    private void FixedUpdate()
+    private IEnumerator BurstRoutine()
     {
-        if (player == null || GameInputState.IsLocked)
+        state = State.Windup;
+        attackContract.BeginTelegraph(telegraph);
+        motor.SetMovementEnabled(false, true);
+        Vector2 lockedDirection = perception.DirectionToPlayer;
+        float elapsed = 0f;
+
+        while (elapsed < fireWindup)
         {
-            rb.linearVelocity = Vector2.zero;
-            return;
+            if (ShouldInterrupt())
+            {
+                InterruptBurst();
+                yield break;
+            }
+
+            float progress = elapsed / Mathf.Max(0.01f, fireWindup);
+            if (progress < 0.62f)
+                lockedDirection = GetAimDirection(false);
+
+            float length = Mathf.Min(6.5f, Vector2.Distance(firePoint.position, perception.PlayerPosition));
+            telegraph?.ShowLine(lockedDirection, length, aimLineWidth);
+            telegraph?.SetProgress(progress);
+            visualMotion.SetAction(EnemyVisualMotion.ActionState.Windup, lockedDirection);
+
+            elapsed += Time.deltaTime;
+            yield return null;
         }
 
-        Vector2 toPlayer = (Vector2)player.position - rb.position;
-
-        if (toPlayer.sqrMagnitude <= MinDirectionSqrMagnitude)
+        state = State.Burst;
+        attackContract.BeginActive(telegraph);
+        for (int shot = 0; shot < 2; shot++)
         {
-            rb.linearVelocity = Vector2.zero;
-            return;
+            if (ShouldInterrupt())
+            {
+                InterruptBurst();
+                yield break;
+            }
+
+            Vector2 direction = shot == 0 ? lockedDirection : GetAimDirection(true);
+            visualMotion.SetAction(EnemyVisualMotion.ActionState.Attack, direction);
+            FireProjectile(direction);
+
+            if (shot == 0)
+                yield return new WaitForSeconds(Mathf.Max(0.01f, burstShotInterval));
         }
 
-        Vector2 direction = toPlayer.normalized;
-
-        switch (state)
-        {
-            case AIState.Chase:
-                rb.MovePosition(rb.position + direction * moveSpeed * Time.fixedDeltaTime);
-                break;
-
-            case AIState.Kite:
-                rb.MovePosition(rb.position - direction * retreatSpeed * Time.fixedDeltaTime);
-                break;
-
-            case AIState.Attack:
-            case AIState.Idle:
-                break;
-        }
-
-        rb.linearVelocity = Vector2.zero;
+        telegraph?.Hide();
+        attackContract.BeginRecovery(telegraph);
+        state = State.Recovery;
+        visualMotion.SetAction(EnemyVisualMotion.ActionState.Recovery, lockedDirection);
+        yield return new WaitForSeconds(Mathf.Max(0.01f, fireRecovery));
+        nextBurstAllowedTime = Time.time + Random.Range(0.2f, 0.5f);
+        FinishBurst();
     }
 
-    private void FireAtPlayer()
+    private Vector2 GetAimDirection(bool allowPrediction)
     {
-        if (projectilePrefab == null || player == null)
+        Vector2 target = perception.PlayerPosition;
+        if (allowPrediction && Random.value < predictionChance)
+            target = perception.PredictPlayerPosition(predictionTime, 0.95f);
+        Vector2 direction = target - (Vector2)firePoint.position;
+        return direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector2.down;
+    }
+
+    private void FireProjectile(Vector2 direction)
+    {
+        if (projectilePrefab == null)
+        {
+            Debug.LogWarning("[EnemyRangedAI] EnemyProjectile 프리팹이 없습니다.", this);
             return;
+        }
 
-        Vector2 direction = ((Vector2)player.position - (Vector2)firePoint.position).normalized;
-        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-
-        GameObject projObj = Instantiate(projectilePrefab, firePoint.position, Quaternion.Euler(0f, 0f, angle));
-
-        EnemyProjectile projectile = projObj.GetComponent<EnemyProjectile>();
+        GameObject projectileObject = Instantiate(projectilePrefab, firePoint.position, Quaternion.identity);
+        EnemyProjectile projectile = projectileObject.GetComponent<EnemyProjectile>();
         if (projectile != null)
             projectile.Setup(direction, projectileSpeed, projectileDamage);
     }
 
-    private void UpdateAnimator()
+    private bool ShouldInterrupt()
     {
-        if (animator == null)
-            return;
+        return GameInputState.IsLocked || motor.IsKnockedBack || (health != null && health.IsDead) || !isActiveAndEnabled;
+    }
 
-        animator.SetBool("IsChasing", state == AIState.Chase);
-        animator.SetBool("IsAttacking", state == AIState.Attack);
-        animator.SetBool("IsKiting", state == AIState.Kite);
+    private void FinishBurst()
+    {
+        attackContract.FinishAttack(telegraph);
+        motor.SetMovementEnabled(true, true);
+        visualMotion.SetAction(EnemyVisualMotion.ActionState.None, Vector2.down);
+        state = State.Strafe;
+        burstRoutine = null;
+        ReleaseToken();
+    }
+
+    private void InterruptBurst()
+    {
+        if (burstRoutine != null)
+            StopCoroutine(burstRoutine);
+        burstRoutine = null;
+        attackContract?.CancelAttack(telegraph);
+        motor?.SetMovementEnabled(true, true);
+        if (visualMotion != null)
+            visualMotion.SetAction(EnemyVisualMotion.ActionState.None, Vector2.down);
+        ReleaseToken();
+    }
+
+    private void ReleaseToken()
+    {
+        if (!ownsAttackToken)
+            return;
+        ownsAttackToken = false;
+        coordinator?.Release(this, EnemyAttackCoordinator.AttackChannel.Ranged);
+    }
+
+    private void ScheduleStrafeChange()
+    {
+        nextStrafeChangeTime = Time.time + Random.Range(strafeDirectionMinDuration, strafeDirectionMaxDuration);
+    }
+
+    private void OnDisable()
+    {
+        InterruptBurst();
+        coordinator?.ReleaseAll(this);
     }
 
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, detectRange);
-
-        Gizmos.color = Color.green;
-        Gizmos.DrawWireSphere(transform.position, attackRange);
-
         Gizmos.color = Color.cyan;
-        Gizmos.DrawWireSphere(transform.position, kiteRange);
-
-        Collider2D col = GetComponent<Collider2D>();
-        if (col != null)
-        {
-            Gizmos.color = Color.magenta;
-            Gizmos.DrawWireCube(col.bounds.center, col.bounds.size);
-        }
+        Gizmos.DrawWireSphere(transform.position, preferredMinRange);
+        Gizmos.DrawWireSphere(transform.position, preferredMaxRange);
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, retreatTriggerRange);
     }
 }
