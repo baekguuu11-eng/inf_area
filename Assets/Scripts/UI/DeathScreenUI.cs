@@ -48,7 +48,7 @@ public class DeathScreenUI : MonoBehaviour
 
     private void OnEnable()
     {
-        // µ¥½º ÆĞ³ÎÀÌ Ç×»ó Á¦ÀÏ À§·Î ¿À°Ô ÇÔ
+        // ë°ìŠ¤ íŒ¨ë„ì´ í•­ìƒ ì œì¼ ìœ„ë¡œ ì˜¤ê²Œ í•¨
         transform.SetAsLastSibling();
 
         HideGameplayUI();
@@ -200,7 +200,18 @@ public class DeathScreenUI : MonoBehaviour
 
     public void GoToMainMenu()
     {
-        Time.timeScale = 1f;
+        PrepareMainMenuReturn();
         SceneManager.LoadScene(mainMenuSceneName);
+    }
+
+    private static void PrepareMainMenuReturn()
+    {
+        Time.timeScale = 1f;
+        AudioListener.pause = false;
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
+        KODBBootSplashController.SkipSplashForMenuReturn();
+        MainMenuIntroAnimator.PrepareForReturnFromGameplay();
     }
 }

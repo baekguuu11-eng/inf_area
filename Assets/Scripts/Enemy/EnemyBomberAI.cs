@@ -1,0 +1,32 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+[RequireComponent(typeof(Rigidbody2D)), RequireComponent(typeof(EnemyPerception)), RequireComponent(typeof(EnemyMotor))]
+[DisallowMultipleComponent]
+public sealed class EnemyBomberAI : MonoBehaviour, IEnemyDeathOverride
+{
+    private enum State { Observe, Chase, WaitingForArmingSlot, Arming, Exploding }
+    [Header("감지 및 이동")]
+    [SerializeField] private float detectRange=7f, armingDistance=1.42f, moveSpeed=2.85f, waitingOrbitSpeed=2.15f, armingMoveMultiplier=.38f;
+    [Header("폭발")]
+    [SerializeField] private float armingDuration=.95f, explosionRadius=1.48f;
+    [SerializeField] private int playerDamage=2, enemyDamage=2;
+    [SerializeField,Range(0f,1f)] private float normalEnemyDamageMultiplier=.70f, tankDamageMultiplier=.35f;
+    [Header("처치 시 약화 폭발")]
+    [SerializeField] private float deathExplosionDelay=.24f, deathExplosionRadiusMultiplier=.82f, deathExplosionDamageMultiplier=.65f;
+    [Header("참조")]
+    [SerializeField] private EnemyPerception perception; [SerializeField] private EnemyMotor motor; [SerializeField] private EnemyVisualMotion visualMotion;
+    [SerializeField] private EnemyTelegraph telegraph; [SerializeField] private EnemyHealth health; [SerializeField] private EnemyRole role; [SerializeField] private EnemyAttackContract attackContract;
+    private Rigidbody2D body; private Collider2D bodyCollider; private EnemyAttackCoordinator coordinator; private State state; private Coroutine armingRoutine;
+    private bool ownsArmingToken, explosionResolved; private int orbitSign;
+    private void Awake(){body=GetComponent<Rigidbody2D>();bodyCollider=GetComponent<Collider2D>();perception=perception??GetComponent<EnemyPerception>();motor=motor??GetComponent<EnemyMotor>();visualMotion=visualMotion??GetComponent<EnemyVisualMotion>();telegraph=telegraph??GetComponentInChildren<EnemyTelegraph>(true);health=health??GetComponent<EnemyHealth>();role=role??GetComponent<EnemyRole>();attackContract=attackContract??(GetComponent<EnemyAttackContract>()??gameObject.AddComponent<EnemyAttackContract>());coordinator=EnemyAttackCoordinator.EnsureInstance();orbitSign=Random.value<.5f?-1:1;}
+    private void OnEnable(){coordinator=EnemyAttackCoordinator.EnsureInstance();}
+    private void Update(){if(explosionResolved||state==State.Exploding||(health!=null&&health.IsDead))return;if(GameInputState.IsLocked){motor.StopIntent();return;}if(motor.IsKnockedBack)return;perception.RefreshNow();if(!perception.HasPlayer||perception.DistanceToPlayer>detectRange){state=State.Observe;motor.StopIntent();return;}if(armingRoutine!=null)return;float d=perception.DistanceToPlayer;if(d<=armingDistance){if(coordinator.TryAcquire(this,EnemyAttackCoordinator.AttackChannel.Bomber,armingDuration+2f)){ownsArmingToken=true;armingRoutine=StartCoroutine(ArmAndExplodeRoutine());return;}state=State.WaitingForArmingSlot;Vector2 to=perception.PlayerPosition-body.position;Vector2 desired=(EnemyAIUtility.Perpendicular(to,orbitSign)-to.normalized*.35f).normalized;motor.SetMoveIntent(desired,waitingOrbitSpeed);visualMotion.SetAction(EnemyVisualMotion.ActionState.None,desired);return;}state=State.Chase;Vector2 dir=perception.DirectionToPlayer;motor.SetMoveIntent(dir,moveSpeed);visualMotion.SetAction(EnemyVisualMotion.ActionState.None,dir);}
+    private IEnumerator ArmAndExplodeRoutine(){state=State.Arming;attackContract.BeginTelegraph(telegraph);float e=0f;while(e<armingDuration){if(GameInputState.IsLocked){yield return null;continue;}if(health!=null&&health.IsDead)yield break;e+=Time.deltaTime;float p=Mathf.Clamp01(e/Mathf.Max(.01f,armingDuration));telegraph?.ShowCircle(explosionRadius*1.07f);telegraph?.SetProgress(p);visualMotion?.SetArming01(p);Vector2 d=perception.HasPlayer?perception.DirectionToPlayer:Vector2.down;motor.SetMoveIntent(d,moveSpeed*armingMoveMultiplier*Mathf.Lerp(1f,.35f,p));yield return null;}attackContract.BeginActive(telegraph);ResolveExplosion(explosionRadius,1f,true,perception.DirectionToPlayer);}
+    public bool HandleRequestedDeath(EnemyHealth requestedHealth,Vector2 hitDirection,EnemyHitKind hitKind){if(explosionResolved||state==State.Exploding)return false;if(armingRoutine!=null)StopCoroutine(armingRoutine);armingRoutine=StartCoroutine(DeathExplosionRoutine(hitDirection));return true;}
+    private IEnumerator DeathExplosionRoutine(Vector2 hitDirection){state=State.Exploding;motor.SetMovementEnabled(false,true);if(bodyCollider!=null)bodyCollider.enabled=false;float r=explosionRadius*deathExplosionRadiusMultiplier;attackContract.BeginTelegraph(telegraph);float e=0f;while(e<deathExplosionDelay){e+=Time.unscaledDeltaTime;float p=Mathf.Clamp01(e/Mathf.Max(.01f,deathExplosionDelay));telegraph?.ShowCircle(r*1.08f);telegraph?.SetProgress(p);visualMotion?.SetArming01(p);yield return null;}attackContract.BeginActive(telegraph);ResolveExplosion(r,deathExplosionDamageMultiplier,false,hitDirection);}
+    private void ResolveExplosion(float radius,float damageMultiplier,bool fullStrength,Vector2 deathDirection){if(explosionResolved)return;explosionResolved=true;state=State.Exploding;motor.SetMovementEnabled(false,true);if(bodyCollider!=null)bodyCollider.enabled=false;attackContract.TryDamageCircle(body.position,radius,Mathf.Max(1,Mathf.RoundToInt(playerDamage*damageMultiplier)));HashSet<EnemyHealth> damaged=new HashSet<EnemyHealth>();Collider2D[] hits=Physics2D.OverlapCircleAll(body.position,radius);foreach(Collider2D hit in hits){EnemyHealth eh=hit!=null?hit.GetComponentInParent<EnemyHealth>():null;if(eh==null||eh==health||eh.IsDead||!damaged.Add(eh))continue;EnemyRole er=eh.GetComponent<EnemyRole>();float m=er!=null&&er.CurrentRole==EnemyRole.Role.Tank?tankDamageMultiplier:normalEnemyDamageMultiplier;int d=Mathf.Max(1,Mathf.RoundToInt(enemyDamage*damageMultiplier*m));Vector2 dir=((Vector2)eh.transform.position-body.position).normalized;eh.TakeDamage(new DamageContext(d,dir,hit.ClosestPoint(body.position),EnemyHitKind.Explosion,.22f));}CameraFeedbackController f=CameraFeedbackController.Instance;if(f!=null)f.Shake(.14f,.12f,deathDirection);attackContract.BeginRecovery(telegraph);ReleaseToken();if(health!=null)health.CompleteDeferredDeath(deathDirection);else Destroy(gameObject);}
+    private void ReleaseToken(){if(!ownsArmingToken)return;ownsArmingToken=false;coordinator?.Release(this,EnemyAttackCoordinator.AttackChannel.Bomber);}
+    private void OnDisable(){attackContract?.CancelAttack(telegraph);ReleaseToken();coordinator?.ReleaseAll(this);}
+}

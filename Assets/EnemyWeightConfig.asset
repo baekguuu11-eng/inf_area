@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e411af51ef863741a6f7e647937669e, type: 3}
+  m_Name: EnemyWeightConfig
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyWeightConfig
+  enemies:
+  - type: 0
+    prefab: {fileID: 3784171233391283871, guid: 428e43e473bf4f5faa34292ceff2e6b8, type: 3}
+    weightCost: 1
+  - type: 1
+    prefab: {fileID: 98281812514411463, guid: 277fd06f85bf4ae4bdd2db6f863b3377, type: 3}
+    weightCost: 2
+  - type: 2
+    prefab: {fileID: 6510211663715359000, guid: 659a39324e094e6abd2b5997e6c45627, type: 3}
+    weightCost: 3
+  - type: 3
+    prefab: {fileID: 6642877629300307458, guid: 3d74321fc585432196f51158ae891e24, type: 3}
+    weightCost: 2

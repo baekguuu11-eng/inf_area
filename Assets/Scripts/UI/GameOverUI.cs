@@ -12,8 +12,18 @@ public class GameOverUI : MonoBehaviour
 
     public void GoToMainMenu()
     {
-        Time.timeScale = 1f;
-
+        PrepareMainMenuReturn();
         SceneManager.LoadScene("MainMenu");
+    }
+
+    private static void PrepareMainMenuReturn()
+    {
+        Time.timeScale = 1f;
+        AudioListener.pause = false;
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
+        KODBBootSplashController.SkipSplashForMenuReturn();
+        MainMenuIntroAnimator.PrepareForReturnFromGameplay();
     }
 }

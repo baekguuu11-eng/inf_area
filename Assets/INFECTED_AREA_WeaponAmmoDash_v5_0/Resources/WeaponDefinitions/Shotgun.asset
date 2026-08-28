@@ -1,0 +1,252 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 049545320426b3940bbabefc71db33c5, type: 3}
+  m_Name: Shotgun
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponDefinition
+  weaponId: shotgun
+  displayName: SHOTGUN
+  shortTrait: CLOSE BURST
+  category: 1
+  defaultOwned: 0
+  shopPrice: 26
+  idleSprite: {fileID: 21300000, guid: af2a855ee5c121749b2ebef74ef91813, type: 3}
+  fireSprite: {fileID: 21300000, guid: 58aa5c50729725442851763df3202027, type: 3}
+  projectileSprite: {fileID: 21300000, guid: 04e50f1dd8630bf4684714311af1951d, type: 3}
+  trailSprite: {fileID: 0}
+  accentColor: {r: 0.85, g: 0.28, b: 1, a: 1}
+  visualWorldLength: 0.544
+  fireLengthMultiplier: 1
+  visualDistanceFromPlayer: 0.176
+  visualAngleOffset: 0
+  fireSpriteDuration: 0.075
+  artForwardAngle: 0
+  idleGripNormalized: {x: 0.28, y: 0.11}
+  fireGripNormalized: {x: 0.2, y: 0.11}
+  idleMuzzleNormalized: {x: 0.98, y: 0.55}
+  fireMuzzleNormalized: {x: 0.98, y: 0.55}
+  attackTipNormalized: {x: 0.98, y: 0.55}
+  visualLengthPlayerRatio: 0.48
+  idleBodyPixelLength: 22
+  fireBodyPixelLength: 38
+  spriteKickPlayerRatio: 0.065
+  rightPose:
+    gripOffsetPlayerRatio: {x: 0.1, y: -0.012}
+    holdForwardAngle: 0
+    attackStartForwardAngle: 0
+    attackEndForwardAngle: 0
+    attackGripStartOffsetPlayerRatio: {x: 0, y: 0}
+    attackGripEndOffsetPlayerRatio: {x: 0, y: 0}
+    flipArtX: 0
+    flipArtY: 0
+    weaponSortingOffset: 2
+    visualLengthPlayerRatio: 0.48
+    gripNormalizedOffset: {x: 0, y: 0}
+    spriteOffsetPlayerRatio: {x: 0, y: 0}
+    showRearHand: 1
+    showFrontHand: 1
+    rearHandOffsetPlayerRatio: {x: 0, y: 0}
+    frontHandOffsetPlayerRatio: {x: 0.185, y: -0.008}
+    rearHandScale: {x: 1.05, y: 0.9}
+    frontHandScale: {x: 1, y: 0.92}
+    rearHandRotation: 0
+    frontHandRotation: 0
+    rearHandSortingOffset: 1
+    frontHandSortingOffset: 3
+    trailForwardAngle: 0
+    trailOffsetPlayerRatio: {x: 0, y: 0}
+    trailScaleMultiplier: 1
+    handOffsetPlayerRatio: {x: 0.1, y: -0.012}
+    baseRotation: 0
+    flipX: 0
+    flipY: 0
+    sortingOffset: 2
+    spriteOffsetPlayerRatioLegacy: {x: 0, y: 0}
+    swingStartAngle: 0
+    swingEndAngle: 0
+    trailRotationOffset: 0
+  upPose:
+    gripOffsetPlayerRatio: {x: 0.02, y: 0.082}
+    holdForwardAngle: 90
+    attackStartForwardAngle: 90
+    attackEndForwardAngle: 90
+    attackGripStartOffsetPlayerRatio: {x: 0, y: 0}
+    attackGripEndOffsetPlayerRatio: {x: 0, y: 0}
+    flipArtX: 0
+    flipArtY: 0
+    weaponSortingOffset: -1
+    visualLengthPlayerRatio: 0.48
+    gripNormalizedOffset: {x: 0, y: 0}
+    spriteOffsetPlayerRatio: {x: 0, y: 0}
+    showRearHand: 1
+    showFrontHand: 1
+    rearHandOffsetPlayerRatio: {x: 0, y: 0}
+    frontHandOffsetPlayerRatio: {x: 0.185, y: -0.008}
+    rearHandScale: {x: 1.05, y: 0.9}
+    frontHandScale: {x: 1, y: 0.92}
+    rearHandRotation: 0
+    frontHandRotation: 0
+    rearHandSortingOffset: -2
+    frontHandSortingOffset: 1
+    trailForwardAngle: 90
+    trailOffsetPlayerRatio: {x: 0, y: 0}
+    trailScaleMultiplier: 1
+    handOffsetPlayerRatio: {x: 0.02, y: 0.082}
+    baseRotation: 90
+    flipX: 0
+    flipY: 0
+    sortingOffset: -1
+    spriteOffsetPlayerRatioLegacy: {x: 0, y: 0}
+    swingStartAngle: 0
+    swingEndAngle: 0
+    trailRotationOffset: 90
+  leftPose:
+    gripOffsetPlayerRatio: {x: -0.1, y: -0.012}
+    holdForwardAngle: 180
+    attackStartForwardAngle: 180
+    attackEndForwardAngle: 180
+    attackGripStartOffsetPlayerRatio: {x: 0, y: 0}
+    attackGripEndOffsetPlayerRatio: {x: 0, y: 0}
+    flipArtX: 0
+    flipArtY: 0
+    weaponSortingOffset: 2
+    visualLengthPlayerRatio: 0.48
+    gripNormalizedOffset: {x: 0, y: 0}
+    spriteOffsetPlayerRatio: {x: 0, y: 0}
+    showRearHand: 1
+    showFrontHand: 1
+    rearHandOffsetPlayerRatio: {x: 0, y: 0}
+    frontHandOffsetPlayerRatio: {x: 0.185, y: -0.008}
+    rearHandScale: {x: 1.05, y: 0.9}
+    frontHandScale: {x: 1, y: 0.92}
+    rearHandRotation: 0
+    frontHandRotation: 0
+    rearHandSortingOffset: 1
+    frontHandSortingOffset: 3
+    trailForwardAngle: 180
+    trailOffsetPlayerRatio: {x: 0, y: 0}
+    trailScaleMultiplier: 1
+    handOffsetPlayerRatio: {x: -0.1, y: -0.012}
+    baseRotation: 180
+    flipX: 0
+    flipY: 0
+    sortingOffset: 2
+    spriteOffsetPlayerRatioLegacy: {x: 0, y: 0}
+    swingStartAngle: 0
+    swingEndAngle: 0
+    trailRotationOffset: 180
+  downPose:
+    gripOffsetPlayerRatio: {x: -0.02, y: -0.108}
+    holdForwardAngle: -90
+    attackStartForwardAngle: -90
+    attackEndForwardAngle: -90
+    attackGripStartOffsetPlayerRatio: {x: 0, y: 0}
+    attackGripEndOffsetPlayerRatio: {x: 0, y: 0}
+    flipArtX: 0
+    flipArtY: 0
+    weaponSortingOffset: 3
+    visualLengthPlayerRatio: 0.48
+    gripNormalizedOffset: {x: 0, y: 0}
+    spriteOffsetPlayerRatio: {x: 0, y: 0}
+    showRearHand: 1
+    showFrontHand: 1
+    rearHandOffsetPlayerRatio: {x: 0, y: 0}
+    frontHandOffsetPlayerRatio: {x: 0.185, y: -0.008}
+    rearHandScale: {x: 1.05, y: 0.9}
+    frontHandScale: {x: 1, y: 0.92}
+    rearHandRotation: 0
+    frontHandRotation: 0
+    rearHandSortingOffset: 2
+    frontHandSortingOffset: 4
+    trailForwardAngle: -90
+    trailOffsetPlayerRatio: {x: 0, y: 0}
+    trailScaleMultiplier: 1
+    handOffsetPlayerRatio: {x: -0.02, y: -0.108}
+    baseRotation: -90
+    flipX: 0
+    flipY: 0
+    sortingOffset: 3
+    spriteOffsetPlayerRatioLegacy: {x: 0, y: 0}
+    swingStartAngle: 0
+    swingEndAngle: 0
+    trailRotationOffset: -90
+  handStyle: 1
+  handBaseSizePlayerRatio: 0.072
+  handOutlineColor: {r: 0.015, g: 0.055, b: 0.08, a: 1}
+  handFillColor: {r: 0.25, g: 0.82, b: 0.94, a: 1}
+  handHighlightColor: {r: 0.62, g: 0.95, b: 1, a: 1}
+  meleeHitShape: 0
+  meleeStartOffset: 0.08
+  meleeReach: 0.72
+  meleeWidth: 0.45
+  trailLengthPlayerRatio: 1
+  trailBodyPixelLength: 128
+  trailArtForwardAngle: 0
+  trailCenterDistance: 0.38
+  trailLocalOffset: {x: 0, y: 0}
+  sweepThicknessPlayerRatio: 0.13
+  visibleReachMultiplier: 1
+  impactRadiusPlayerRatio: 0.16
+  damage: 9
+  attackInterval: 0.82
+  minimumAttackInterval: 0.5
+  knockbackBonus: 0.06
+  cameraKick: 0.12
+  cameraShake: 0.025
+  meleeWindup: 0.08
+  meleeActiveTime: 0.08
+  meleeRecovery: 0.3
+  meleeRange: 0.95
+  meleeAngle: 105
+  trailWorldLength: 1.15
+  trailDuration: 0.1
+  burnDamagePerTick: 0
+  burnTicks: 0
+  burnTickInterval: 0.4
+  fireMode: 0
+  rangedMode: 1
+  magazineShotCapacity: 6
+  ammoCostPerShot: 3
+  reloadDuration: 1.4
+  projectileSpeed: 13
+  projectileLifetime: 8
+  falloffStartDistance: 1.3
+  maximumRange: 7
+  minimumDamageMultiplier: 0.12
+  pierceCount: 0
+  pelletCount: 7
+  spreadDegrees: 18
+  projectileWorldLength: 0.1
+  projectileWorldThickness: 0.058
+  projectileCoreColor: {r: 1, g: 0.92, b: 1, a: 1}
+  projectileGlowColor: {r: 0.85, g: 0.28, b: 1, a: 0.48}
+  projectileGlowMultiplier: 1.85
+  projectileTrailDuration: 0.035
+  projectileArtForwardAngle: 0
+  beamRange: 10
+  beamCoreWidth: 0.03
+  beamGlowWidth: 0.11
+  beamDuration: 0.08
+  beamMaxTargets: 4
+  beamPerTargetMultiplier: 0.82
+  targetBasicEnemyTtk: 1.15
+  targetTankTtk: 8.5
+  debugHotkey: 55
+  mirrorForOppositeHorizontal: 0
+  holdDistancePlayerRatio: 0.11
+  handSideOffsetPlayerRatio: 0
+  showGripSocket: 1
+  gripSocketScalePlayerRatio: 0.07
+  gripSocketOffsetPlayerRatio: {x: 0, y: 0}
+  gripSocketColor: {r: 0.38, g: 0.95, b: 1, a: 1}
+  meleeSwingStartAngle: -42
+  meleeSwingEndAngle: 58
+  trailAngleOffset: 0

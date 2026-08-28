@@ -4,6 +4,7 @@ public class PlayerVisual : MonoBehaviour
 {
     [SerializeField] private SpriteRenderer spriteRenderer;
     [SerializeField] private Animator animator;
+    [SerializeField, Min(0.5f)] private float visualScaleMultiplier = 1.25f;
 
     private PlayerMovement playerMovement;
     private PlayerCombat playerCombat;
@@ -15,6 +16,9 @@ public class PlayerVisual : MonoBehaviour
 
         if (animator == null)
             animator = GetComponent<Animator>();
+
+        transform.localScale *= Mathf.Max(0.5f, visualScaleMultiplier);
+        V620SpriteMaterialUtility.Apply(spriteRenderer);
 
         FindReferences();
     }

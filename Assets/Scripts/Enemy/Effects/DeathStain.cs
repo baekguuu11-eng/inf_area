@@ -13,6 +13,9 @@ public class DeathStain : MonoBehaviour
     private void Awake()
     {
         sr = GetComponent<SpriteRenderer>();
+        if (sr.sprite == null)
+            sr.sprite = RuntimePixelSpriteFactory.GetDeathStainSprite();
+        sr.sortingOrder = Mathf.Max(sr.sortingOrder, 1);
         startColor = sr.color;
     }
 

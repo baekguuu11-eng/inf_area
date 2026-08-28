@@ -4,49 +4,36 @@ using UnityEngine;
 public class GateTrigger : MonoBehaviour
 {
     [SerializeField] private GateDirection direction = GateDirection.None;
+    [SerializeField] private float localCooldown = 0.35f;
 
     private RoomController roomController;
+    private float nextUseTime;
 
     private void Awake()
     {
         roomController = GetComponentInParent<RoomController>();
-
-        if (direction == GateDirection.None)
-            direction = InferDirectionFromName();
-
-        BoxCollider2D col = GetComponent<BoxCollider2D>();
-        col.isTrigger = true;
+        if (direction == GateDirection.None) direction = InferDirectionFromName();
+        GetComponent<BoxCollider2D>().isTrigger = true;
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
+        if (Time.unscaledTime < nextUseTime) return;
         PlayerMovement player = other.GetComponentInParent<PlayerMovement>();
-        if (player == null)
-            return;
-
+        if (player == null) return;
         MapManager manager = FindAnyObjectByType<MapManager>();
-        if (manager == null || roomController == null)
-            return;
-
+        if (manager == null || roomController == null) return;
+        nextUseTime = Time.unscaledTime + Mathf.Max(0.05f, localCooldown);
         manager.TryUseGate(roomController, direction);
     }
 
     private GateDirection InferDirectionFromName()
     {
-        string lowerName = gameObject.name.ToLower();
-
-        if (lowerName.Contains("left"))
-            return GateDirection.Left;
-
-        if (lowerName.Contains("right"))
-            return GateDirection.Right;
-
-        if (lowerName.Contains("top"))
-            return GateDirection.Top;
-
-        if (lowerName.Contains("buttom") || lowerName.Contains("bottom"))
-            return GateDirection.Bottom;
-
+        string lower = gameObject.name.ToLowerInvariant();
+        if (lower.Contains("left")) return GateDirection.Left;
+        if (lower.Contains("right")) return GateDirection.Right;
+        if (lower.Contains("top")) return GateDirection.Top;
+        if (lower.Contains("buttom") || lower.Contains("bottom")) return GateDirection.Bottom;
         return GateDirection.None;
     }
 }

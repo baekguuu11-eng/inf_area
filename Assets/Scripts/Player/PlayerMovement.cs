@@ -5,14 +5,26 @@ public class PlayerMovement : MonoBehaviour
 {
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 5f;
+    [SerializeField] private float acceleration = 42f;
+    [SerializeField] private float deceleration = 55f;
 
     private Rigidbody2D rb;
+    private PlayerStats stats;
+    private PlayerDashController dash;
 
     public Vector2 MoveInput { get; private set; }
+    public Vector2 LastMoveDirection { get; private set; } = Vector2.down;
+    public Vector2 CurrentVelocity { get { return rb != null ? rb.linearVelocity : Vector2.zero; } }
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
+        stats = GetComponent<PlayerStats>();
+        dash = GetComponent<PlayerDashController>();
+
+        rb.gravityScale = 0f;
+        rb.freezeRotation = true;
+        rb.interpolation = RigidbodyInterpolation2D.Interpolate;
     }
 
     private void Update()
@@ -25,35 +37,33 @@ public class PlayerMovement : MonoBehaviour
 
         float x = 0f;
         float y = 0f;
-
         if (Input.GetKey(KeyCode.A)) x -= 1f;
         if (Input.GetKey(KeyCode.D)) x += 1f;
         if (Input.GetKey(KeyCode.W)) y += 1f;
         if (Input.GetKey(KeyCode.S)) y -= 1f;
 
-        MoveInput = new Vector2(x, y).normalized;
+        MoveInput = Vector2.ClampMagnitude(new Vector2(x, y), 1f);
+        if (MoveInput.sqrMagnitude > 0.0001f)
+            LastMoveDirection = MoveInput.normalized;
     }
 
     private void FixedUpdate()
     {
-        if (GameInputState.IsLocked)
-        {
-            rb.linearVelocity = Vector2.zero;
+        if (dash == null)
+            dash = GetComponent<PlayerDashController>();
+        if (dash != null && dash.IsDashing)
             return;
-        }
 
-        float finalMoveSpeed = GetFinalMoveSpeed();
+        float finalSpeed = stats != null ? stats.MoveSpeed : Mathf.Max(0.1f, moveSpeed);
+        Vector2 targetVelocity = GameInputState.IsLocked ? Vector2.zero : MoveInput * finalSpeed;
+        float rate = targetVelocity.sqrMagnitude > rb.linearVelocity.sqrMagnitude ? acceleration : deceleration;
 
-        rb.linearVelocity = MoveInput * finalMoveSpeed;
-    }
+        rb.linearVelocity = Vector2.MoveTowards(
+            rb.linearVelocity,
+            targetVelocity,
+            Mathf.Max(0f, rate) * Time.fixedDeltaTime);
 
-    private float GetFinalMoveSpeed()
-    {
-        if (ChipSlotManager.Instance == null)
-        {
-            return moveSpeed;
-        }
-
-        return moveSpeed * ChipSlotManager.Instance.MoveSpeedMultiplier;
+        if (GameInputState.IsLocked && rb.linearVelocity.sqrMagnitude < 0.0004f)
+            rb.linearVelocity = Vector2.zero;
     }
 }
