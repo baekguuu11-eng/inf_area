@@ -57,13 +57,25 @@ public sealed class AmmoDropper : MonoBehaviour
 
     private void SpawnPickup(int amount)
     {
+        SpawnPickupAt(transform.position, amount, GetComponentInParent<RoomController>());
+    }
+
+    public static AmmoPickup SpawnPickupAt(Vector3 worldPosition, int amount, RoomController ownerRoom)
+    {
         GameObject obj = new GameObject("AmmoPickup");
-        obj.transform.position = transform.position;
+        if (ownerRoom != null)
+            obj.transform.SetParent(ownerRoom.transform, true);
+        obj.transform.position = worldPosition;
+
         SpriteRenderer renderer = obj.AddComponent<SpriteRenderer>();
+        renderer.sortingOrder = 14;
+
         CircleCollider2D trigger = obj.AddComponent<CircleCollider2D>();
         trigger.isTrigger = true;
-        trigger.radius = 0.18f;
+        trigger.radius = 0.20f;
+
         AmmoPickup pickup = obj.AddComponent<AmmoPickup>();
-        pickup.Initialize(amount, GetComponentInParent<RoomController>());
+        pickup.Initialize(Mathf.Max(1, amount), ownerRoom);
+        return pickup;
     }
 }

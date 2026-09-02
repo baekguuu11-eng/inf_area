@@ -6,23 +6,38 @@ using UnityEngine.UI;
 [DisallowMultipleComponent]
 public sealed class WeaponHUDController : MonoBehaviour
 {
-    private PlayerWeaponInventory inventory; private PlayerAmmoController ammo; private Canvas canvas; private CanvasGroup group; private Image icon; private TMP_Text nameText; private TMP_Text ammoText; private Image reloadFill;
+    private PlayerWeaponInventory inventory; private PlayerAmmoController ammo; private Canvas canvas; private CanvasGroup group; private Image icon; private TMP_Text nameText; private TMP_Text ammoText; private Image reloadFill; private string lastWeaponId; private int lastShots=-1; private int lastReserve=-1;
     private void Awake(){inventory=GetComponent<PlayerWeaponInventory>();ammo=GetComponent<PlayerAmmoController>();Build();}
     private void OnEnable(){if(inventory!=null)inventory.WeaponChanged+=OnWeapon;if(ammo!=null){ammo.AmmoChanged+=Refresh;ammo.ReloadStateChanged+=OnReload;}Refresh();}
     private void OnDisable(){if(inventory!=null)inventory.WeaponChanged-=OnWeapon;if(ammo!=null){ammo.AmmoChanged-=Refresh;ammo.ReloadStateChanged-=OnReload;}}
-    private void Update(){if(group!=null){bool show=GameplayIntroShield.GameplayVisible;group.alpha=show?1f:0f;group.blocksRaycasts=false;group.interactable=false;}}
-    private void OnWeapon(WeaponDefinition a,WeaponDefinition b)=>Refresh();
+    private void Update(){if(group!=null){bool show=GameplayIntroShield.GameplayVisible;group.alpha=show?1f:0f;group.blocksRaycasts=false;group.interactable=false;}SyncIfNeeded();}
+    private void LateUpdate(){SyncIfNeeded();}
+    private void OnWeapon(WeaponDefinition a,WeaponDefinition b){Refresh(true);Canvas.ForceUpdateCanvases();}
     private void OnReload(bool active,float progress){if(reloadFill!=null){reloadFill.transform.parent.gameObject.SetActive(active);reloadFill.fillAmount=Mathf.Clamp01(progress);}Refresh();}
-    private void Refresh()
+    private void Refresh(){Refresh(false);}
+    private void Refresh(bool force)
     {
         if(inventory==null)return; WeaponDefinition w=inventory.CurrentWeapon; if(w==null)return;
+        int currentShots=w.category==WeaponCategory.Ranged&&ammo!=null?ammo.GetShotsRemaining(w):-1;
+        int currentReserve=ammo!=null?ammo.ReserveAmmo:0;
+        if(!force&&lastWeaponId==w.weaponId&&lastShots==currentShots&&lastReserve==currentReserve)return;
+        lastWeaponId=w.weaponId;lastShots=currentShots;lastReserve=currentReserve;
         if(icon!=null){icon.sprite=w.idleSprite;icon.preserveAspect=true;icon.color=Color.white;}
         if(nameText!=null)nameText.text=w.displayName;
         if(ammoText!=null)
         {
             if(w.category==WeaponCategory.Melee)ammoText.text="MELEE  ∞";
-            else ammoText.text=(ammo!=null?ammo.GetShotsRemaining(w):0)+" / "+(ammo!=null?ammo.ReserveAmmo:0);
+            else ammoText.text=currentShots+" / "+currentReserve;
         }
+    }
+    private void SyncIfNeeded()
+    {
+        if(inventory==null)return;
+        WeaponDefinition w=inventory.CurrentWeapon;
+        if(w==null)return;
+        int shots=w.category==WeaponCategory.Ranged&&ammo!=null?ammo.GetShotsRemaining(w):-1;
+        int reserve=ammo!=null?ammo.ReserveAmmo:0;
+        if(lastWeaponId!=w.weaponId||lastShots!=shots||lastReserve!=reserve)Refresh(true);
     }
     private void Build()
     {

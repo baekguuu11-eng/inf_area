@@ -22,11 +22,13 @@ public class PlayerCombat : MonoBehaviour
     private WeaponAttackTimeline timeline;
     private MeleeSweepResolver sweep;
     private WeaponFirePresentationV61 firePresentation;
+    private PlayerCombatSFX combatSfx;
     private Coroutine meleeRoutine;
     private Coroutine fireVisualRoutine;
     private bool isAttacking;
     private float nextAttackTime;
     private Vector2 lastAttackDirection = Vector2.down;
+    private bool machineGunWasFiring;
 
     public bool IsAttacking => isAttacking;
     public Vector2 AimDirection => lastAttackDirection;
@@ -48,6 +50,8 @@ public class PlayerCombat : MonoBehaviour
         if (sweep == null) sweep = gameObject.AddComponent<MeleeSweepResolver>();
         firePresentation = GetComponent<WeaponFirePresentationV61>();
         if (firePresentation == null) firePresentation = gameObject.AddComponent<WeaponFirePresentationV61>();
+        combatSfx = GetComponent<PlayerCombatSFX>();
+        if (combatSfx == null) combatSfx = gameObject.AddComponent<PlayerCombatSFX>();
         ResolveAttackOrigin();
     }
 
@@ -70,10 +74,15 @@ public class PlayerCombat : MonoBehaviour
 
     private void Update()
     {
-        if (GameInputState.IsLocked) return;
+        if (GameInputState.IsLocked)
+        {
+            StopMachineGunTailIfNeeded();
+            return;
+        }
 
         if (Input.GetKeyDown(switchWeaponKey))
         {
+            StopMachineGunTailIfNeeded();
             CancelCurrentAction(false);
             if (ammo != null) ammo.CancelReload();
             if (inventory != null) inventory.ToggleCategory();
@@ -92,6 +101,8 @@ public class PlayerCombat : MonoBehaviour
         }
 
         WeaponDefinition weapon = CurrentWeapon;
+        if (machineGunWasFiring && (weapon == null || weapon.weaponId != "machine_gun" || held.sqrMagnitude <= 0.0001f))
+            StopMachineGunTailIfNeeded();
         if (weapon == null || held.sqrMagnitude <= 0.0001f || Time.time < nextAttackTime) return;
 
         if (weapon.category == WeaponCategory.Melee)
@@ -146,8 +157,8 @@ public class PlayerCombat : MonoBehaviour
             visuals.BeginMeleeAttack(lockedDirection);
         }
 
-        int statDamage = stats != null ? Mathf.Max(1, stats.MeleeDamage) : 1;
-        int resolvedDamage = Mathf.Max(1, weapon.damage * statDamage);
+        float statDamageMultiplier = stats != null ? Mathf.Max(0.05f, stats.MeleeDamageMultiplier) : 1f;
+        int resolvedDamage = Mathf.Max(1, Mathf.RoundToInt(weapon.damage * statDamageMultiplier));
         float knockback = weapon.knockbackBonus +
             (stats != null ? Mathf.Clamp(stats.MeleeKnockback * 0.025f, 0f, 0.25f) : 0f);
 
@@ -167,6 +178,7 @@ public class PlayerCombat : MonoBehaviour
                     visuals.ShowTrail(true);
                     visuals.SetTrailAlpha(1f);
                 }
+                if (combatSfx != null) combatSfx.PlayMeleeSwing(weapon);
                 if (sweep != null) sweep.Begin(weapon, visuals, resolvedDamage, knockback);
             },
             t =>
@@ -216,7 +228,11 @@ public class PlayerCombat : MonoBehaviour
 
     private void FireRangedWeapon(WeaponDefinition weapon, Vector2 direction)
     {
-        if (weapon == null || ammo == null || !ammo.TryConsumeShot(weapon)) return;
+        if (weapon == null || ammo == null || !ammo.TryConsumeShot(weapon))
+        {
+            if (weapon != null && weapon.weaponId == "machine_gun") StopMachineGunTailIfNeeded();
+            return;
+        }
 
         Vector2 lockedDirection = Cardinalize(direction);
         lastAttackDirection = lockedDirection;
@@ -224,11 +240,14 @@ public class PlayerCombat : MonoBehaviour
 
         float speedFactor = stats != null ? Mathf.Max(0.2f, stats.RangedCooldown / 0.15f) : 1f;
         nextAttackTime = Time.time + Mathf.Max(weapon.minimumAttackInterval, weapon.attackInterval * speedFactor);
-        int statDamage = stats != null ? Mathf.Max(1, stats.RangedDamage) : 1;
-        int damage = Mathf.Max(1, weapon.damage * statDamage);
+        float statDamageMultiplier = stats != null ? Mathf.Max(0.05f, stats.RangedDamageMultiplier) : 1f;
+        int damage = Mathf.Max(1, Mathf.RoundToInt(weapon.damage * statDamageMultiplier));
         Vector2 origin = visuals != null
             ? visuals.GetMuzzleWorldPosition()
             : (Vector2)transform.position + lockedDirection * 0.25f;
+
+        if (combatSfx != null) combatSfx.PlayRangedFire(weapon);
+        machineGunWasFiring = weapon.weaponId == "machine_gun";
 
         if (weapon.rangedMode == RangedAttackMode.HitscanBeam)
             FireBeam(weapon, origin, lockedDirection, damage);
@@ -320,6 +339,7 @@ public class PlayerCombat : MonoBehaviour
                 float targetFalloff = Mathf.Pow(Mathf.Clamp(weapon.beamPerTargetMultiplier, 0.1f, 1f), index);
                 int resolved = Mathf.Max(1, Mathf.RoundToInt(baseDamage * distanceFalloff * targetFalloff));
                 enemy.TakeDamage(new DamageContext(resolved, safeDirection, hit.point, EnemyHitKind.Ranged, weapon.knockbackBonus));
+                if (combatSfx != null) combatSfx.PlayRangedImpact(weapon, enemy, hit.point);
                 index++;
                 if (index >= weapon.beamMaxTargets)
                 {
@@ -372,9 +392,18 @@ public class PlayerCombat : MonoBehaviour
 
     private void HandleWeaponChanged(WeaponDefinition active, WeaponDefinition standby)
     {
+        StopMachineGunTailIfNeeded();
         CancelCurrentAction(false);
         nextAttackTime = Time.time;
         if (visuals != null) visuals.SetWeapon(active, lastAttackDirection);
+    }
+
+
+    private void StopMachineGunTailIfNeeded()
+    {
+        if (!machineGunWasFiring) return;
+        machineGunWasFiring = false;
+        if (combatSfx != null) combatSfx.PlayMachineGunStop();
     }
 
     private void ResolveAttackOrigin()

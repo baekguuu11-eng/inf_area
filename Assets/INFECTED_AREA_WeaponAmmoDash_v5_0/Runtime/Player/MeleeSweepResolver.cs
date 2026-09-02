@@ -21,10 +21,12 @@ public sealed class MeleeSweepResolver : MonoBehaviour
     private bool hasPrevious;
     private float playerHeight;
     private ContactFilter2D contactFilter;
+    private PlayerCombatSFX combatSfx;
 
     public void Begin(WeaponDefinition definition, WeaponVisualController visualController, int resolvedDamage, float resolvedKnockback)
     {
         weapon = definition;
+        if (combatSfx == null) combatSfx = GetComponent<PlayerCombatSFX>();
         visuals = visualController;
         damage = Mathf.Max(1, resolvedDamage);
         knockback = Mathf.Max(0f, resolvedKnockback);
@@ -166,6 +168,7 @@ public sealed class MeleeSweepResolver : MonoBehaviour
                 dir = visuals != null ? visuals.AimDirection : Vector2.right;
 
             health.TakeDamage(new DamageContext(damage, dir, hitPoint, EnemyHitKind.Melee, knockback));
+            if (combatSfx != null) combatSfx.PlayMeleeImpact(weapon, health, hitPoint);
             if (!health.IsDead && weapon != null && weapon.burnDamagePerTick > 0 && weapon.burnTicks > 0)
             {
                 EnemyBurnStatus burn = health.GetComponent<EnemyBurnStatus>();

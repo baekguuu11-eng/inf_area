@@ -21,6 +21,8 @@ public sealed class EnemySizeController : MonoBehaviour
     [SerializeField] private bool previewChangesInEditor = true;
     [SerializeField] private bool useLivePlayerVisualHeight = true;
     [SerializeField, Min(0.1f)] private float visualOnlyMultiplier = 1f;
+    [Tooltip("64x64 이미지에서 실제 몸체가 차지하는 세로 비율. 0이면 적 역할에 맞춰 자동 계산합니다.")]
+    [SerializeField, Range(0f, 1f)] private float visibleContentHeightRatio = 0f;
 
     [Header("참조")]
     [SerializeField] private Transform visualRoot;
@@ -57,10 +59,17 @@ public sealed class EnemySizeController : MonoBehaviour
 
     private void Start()
     {
-        // Start runs after every scene object's Awake, so PlayerVisual has already applied
-        // its own visual scale. Re-measure once here for an exact screen-size match.
         if (Application.isPlaying)
-            ApplySizeNow();
+            StartCoroutine(ReapplyAfterRuntimeInitialization());
+    }
+
+    private System.Collections.IEnumerator ReapplyAfterRuntimeInitialization()
+    {
+        ApplySizeNow();
+        yield return null;
+        ApplySizeNow();
+        yield return new WaitForSeconds(0.12f);
+        ApplySizeNow();
     }
 
     private void OnValidate()
@@ -95,7 +104,10 @@ public sealed class EnemySizeController : MonoBehaviour
         else
         {
             float targetHeight = GetEffectiveTargetWorldHeight();
-            float spriteHeight = Mathf.Max(0.0001f, bodyRenderer.sprite.bounds.size.y);
+            // 적 도트는 64x64 투명 캔버스 안에 몸체가 작게 들어 있다.
+            // 전체 rect 높이로 계산하면 실제 보이는 몸체가 플레이어의 절반 이하로 남는다.
+            float spriteHeight = Mathf.Max(0.0001f,
+                bodyRenderer.sprite.bounds.size.y * ResolveVisibleContentHeightRatio());
             Transform parent = visualRoot.parent;
             float parentWorldScaleY = parent != null ? Mathf.Max(0.0001f, Mathf.Abs(parent.lossyScale.y)) : 1f;
             float uniformLocalScale = targetHeight / (spriteHeight * parentWorldScaleY);
@@ -158,6 +170,35 @@ public sealed class EnemySizeController : MonoBehaviour
     private float GetEffectiveTargetWorldHeight()
     {
         return Mathf.Max(0.05f, GetTargetWorldHeight() * Mathf.Max(0.1f, visualOnlyMultiplier));
+    }
+
+    private float ResolveVisibleContentHeightRatio()
+    {
+        if (visibleContentHeightRatio > 0.05f)
+            return Mathf.Clamp(visibleContentHeightRatio, 0.15f, 1f);
+
+        EnemyRole role = GetComponent<EnemyRole>();
+        if (role != null)
+        {
+            switch (role.CurrentRole)
+            {
+                case EnemyRole.Role.Ranged:
+                    return 0.40625f; // 약 26 / 64 px
+                case EnemyRole.Role.Tank:
+                    return 0.3125f;  // 약 20 / 64 px
+                case EnemyRole.Role.Bomber:
+                    return 0.4375f;  // 약 28 / 64 px
+                case EnemyRole.Role.Melee:
+                    return 0.4375f;  // 약 28 / 64 px
+            }
+        }
+
+        string spriteName = bodyRenderer != null && bodyRenderer.sprite != null
+            ? bodyRenderer.sprite.name.ToLowerInvariant()
+            : string.Empty;
+        if (spriteName.Contains("tank")) return 0.3125f;
+        if (spriteName.Contains("ranged")) return 0.40625f;
+        return 0.4375f;
     }
 
     private float ResolveLivePlayerVisualWorldHeight()

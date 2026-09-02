@@ -111,6 +111,12 @@ public class RoomEnemySpawner : MonoBehaviour
 
             plannedPositions.Add(position);
             GameObject instance = Instantiate(prefab, position, Quaternion.identity, room.transform);
+            if (instance != null)
+            {
+                EnemySizeController sizeController = instance.GetComponent<EnemySizeController>();
+                if (sizeController != null)
+                    sizeController.ApplySizeNow();
+            }
             if (useSpawnEntrance && instance != null)
             {
                 EnemySpawnEntrance entrance = instance.GetComponent<EnemySpawnEntrance>();

@@ -110,8 +110,6 @@ MonoBehaviour:
   scanColor: {r: 1, g: 0.26, b: 0.16, a: 0.52}
   pulseSpeed: 12
   sortingOrder: 5
-  sectorSegments: 28
-  sectorOutlineWidth: 0.035
 --- !u!1 &3594487251031226707
 GameObject:
   m_ObjectHideFlags: 0
@@ -251,6 +249,28 @@ Transform:
   m_Children: []
   m_Father: {fileID: 6594250016064119527}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!95 &2752854461072837120
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4358918620742036844}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 6e30a16495921b64053b88d83d73a3df, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 1
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!212 &4879587685301080946
 SpriteRenderer:
   serializedVersion: 2
@@ -5172,8 +5192,8 @@ Transform:
   m_GameObject: {fileID: 5190669967002698106}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.61794937, z: 0}
-  m_LocalScale: {x: 1.021293, y: 0.6363636, z: 1}
+  m_LocalPosition: {x: 0, y: -0.7573864, z: 0}
+  m_LocalScale: {x: 1.4443182, y: 0.6363636, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 6968933922642078687}
@@ -5263,7 +5283,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 4.790305, y: 4.790305, z: 1}
+  m_LocalScale: {x: 4.025974, y: 4.025974, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 6499421834334867074}
@@ -5380,7 +5400,7 @@ SpriteRenderer:
   m_Size: {x: 1, y: 1}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 0
+  m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
 --- !u!61 &9170283085772312384
 BoxCollider2D:
@@ -5416,17 +5436,17 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: -0.043112747}
+  m_Offset: {x: 0, y: -0.052840907}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.26, y: 0.3}
+    oldSize: {x: 1, y: 1}
     newSize: {x: 1, y: 1}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 0.8967451, y: 1.005964}
+  m_Size: {x: 1.2681819, y: 1.2329545}
   m_EdgeRadius: 0
 --- !u!114 &3188690391376254253
 MonoBehaviour:
@@ -5529,28 +5549,6 @@ MonoBehaviour:
   health: {fileID: 8337309564424267270}
   role: {fileID: 2266984582620422465}
   attackContract: {fileID: 0}
---- !u!95 &2752854461072837120
-Animator:
-  serializedVersion: 7
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4358918620742036844}
-  m_Enabled: 1
-  m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: 6e30a16495921b64053b88d83d73a3df, type: 2}
-  m_CullingMode: 0
-  m_UpdateMode: 0
-  m_ApplyRootMotion: 0
-  m_LinearVelocityBlending: 0
-  m_StabilizeFeet: 0
-  m_AnimatePhysics: 0
-  m_WarningMessage: 
-  m_HasTransformHierarchy: 1
-  m_AllowConstantClipSamplingOptimization: 1
-  m_KeepAnimatorStateOnDisable: 1
-  m_WriteDefaultValuesOnDisable: 0
 --- !u!114 &2266984582620422465
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5594,7 +5592,6 @@ MonoBehaviour:
   tankHitKickPixels: 2.1
   hitKickDuration: 0.075
   hitScaleAmount: 0.1
-  useRuntimeSpriteAnimation: 0
 --- !u!114 &4212567919901084706
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5697,6 +5694,7 @@ MonoBehaviour:
   previewChangesInEditor: 1
   useLivePlayerVisualHeight: 1
   visualOnlyMultiplier: 1
+  visibleContentHeightRatio: 0.4375
   visualRoot: {fileID: 6594250016064119527}
   bodyRenderer: {fileID: 4879587685301080946}
   bodyCollider: {fileID: 9170283085772312384}

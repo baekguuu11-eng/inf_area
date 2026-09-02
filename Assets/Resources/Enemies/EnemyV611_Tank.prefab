@@ -26,8 +26,8 @@ Transform:
   m_GameObject: {fileID: 4174560958512226489}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.54881316, z: 0}
-  m_LocalScale: {x: 0.8562878, y: 0.4117647, z: 1}
+  m_LocalPosition: {x: 0, y: -0.6763015, z: 0}
+  m_LocalScale: {x: 1.2896911, y: 0.4117647, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1599239137083902842}
@@ -4991,6 +4991,28 @@ Transform:
   m_Children: []
   m_Father: {fileID: 7900942045892283553}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!95 &2427987244813290942
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6336771282264943379}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: ec5a2fe30ecd89cb8664950480a0de76, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 1
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!212 &2267085940157037224
 SpriteRenderer:
   serializedVersion: 2
@@ -5196,17 +5218,17 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: -0.038289286}
+  m_Offset: {x: 0, y: -0.04718382}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.72, y: 0.88}
+    oldSize: {x: 1, y: 1}
     newSize: {x: 1, y: 1}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 0.8145176, y: 0.9189429}
+  m_Size: {x: 1.2267792, y: 1.1324118}
   m_EdgeRadius: 0
 --- !u!114 &6680032726831129341
 MonoBehaviour:
@@ -5276,28 +5298,6 @@ MonoBehaviour:
   animator: {fileID: 2427987244813290942}
   deathTriggerName: 
   deathDestroyDelay: 0
---- !u!95 &2427987244813290942
-Animator:
-  serializedVersion: 7
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6336771282264943379}
-  m_Enabled: 1
-  m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: ec5a2fe30ecd89cb8664950480a0de76, type: 2}
-  m_CullingMode: 0
-  m_UpdateMode: 0
-  m_ApplyRootMotion: 0
-  m_LinearVelocityBlending: 0
-  m_StabilizeFeet: 0
-  m_AnimatePhysics: 0
-  m_WarningMessage: 
-  m_HasTransformHierarchy: 1
-  m_AllowConstantClipSamplingOptimization: 1
-  m_KeepAnimatorStateOnDisable: 1
-  m_WriteDefaultValuesOnDisable: 0
 --- !u!114 &984565642224543454
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5341,7 +5341,6 @@ MonoBehaviour:
   tankHitKickPixels: 2.1
   hitKickDuration: 0.075
   hitScaleAmount: 0.1
-  useRuntimeSpriteAnimation: 0
 --- !u!114 &1950519129782831760
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5395,25 +5394,26 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b0637ba8798223940a2447e4a04d496f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyTankAI
-  detectRange: 6
-  slamTriggerRange: 1.55
+  detectRange: 7
+  slamTriggerRange: 1.85
   chargeMinRange: 2
-  chargeMaxRange: 4.5
-  attackDecisionInterval: 0.45
+  chargeMaxRange: 5.2
+  attackDecisionInterval: 0.18
   chargeSelectionChance: 0.25
   chargeCooldown: 3
   moveSpeed: 1.5
   slamWindup: 0.76
   slamAimTrackingTime: 0.18
-  slamRadius: 0.92
-  slamAngle: 105
+  slamRadius: 1.95
+  slamAngle: 120
   slamDamage: 2
   slamRecovery: 0.85
   chargeWindup: 0.58
   chargeAimTrackingTime: 0.18
-  chargeDistance: 2.8
-  chargeDuration: 0.3
-  chargeWidth: 0.48
+  chargeDistance: 3.15
+  chargeOvershoot: 0.38
+  chargeDuration: 0.32
+  chargeWidth: 0.9
   chargeDamage: 2
   chargeRecovery: 1
   wallMask:
@@ -5478,7 +5478,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemySizeController
   scaleMode: 0
-  playerHeightMultiplier: 1.35
+  playerHeightMultiplier: 1.38
   referencePlayerWorldHeight: 0.775
   absoluteWorldHeight: 0.82
   manualLocalScale: {x: 1, y: 1, z: 1}
@@ -5486,6 +5486,7 @@ MonoBehaviour:
   previewChangesInEditor: 1
   useLivePlayerVisualHeight: 1
   visualOnlyMultiplier: 1
+  visibleContentHeightRatio: 0.3125
   visualRoot: {fileID: 7900942045892283553}
   bodyRenderer: {fileID: 2267085940157037224}
   bodyCollider: {fileID: 8216554476020798426}
@@ -5665,8 +5666,6 @@ MonoBehaviour:
   scanColor: {r: 1, g: 0.26, b: 0.16, a: 0.52}
   pulseSpeed: 12
   sortingOrder: 5
-  sectorSegments: 28
-  sectorOutlineWidth: 0.035
 --- !u!1 &8233749507733612530
 GameObject:
   m_ObjectHideFlags: 0
@@ -5693,7 +5692,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1.4503518, y: 1.4503518, z: 1}
+  m_LocalScale: {x: 5.032941, y: 5.032941, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1579984520198456084}

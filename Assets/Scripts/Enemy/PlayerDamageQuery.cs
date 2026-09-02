@@ -8,12 +8,23 @@ public static class PlayerDamageQuery
         Collider2D root = health.GetComponent<Collider2D>();
         if (IsValid(root)) return root;
         Collider2D[] all = health.GetComponentsInChildren<Collider2D>(true);
-        Collider2D best = null; float bestArea = float.MaxValue;
-        for (int i=0;i<all.Length;i++)
+        Collider2D best = null;
+        float bestArea = -1f;
+        for (int i = 0; i < all.Length; i++)
         {
-            Collider2D c=all[i]; if(!IsValid(c))continue;
-            string n=c.gameObject.name.ToLowerInvariant(); if(n.Contains("attack")||n.Contains("trigger")||n.Contains("weapon")||n.Contains("pickup"))continue;
-            float area=c.bounds.size.x*c.bounds.size.y; if(area<bestArea){bestArea=area;best=c;}
+            Collider2D c = all[i];
+            if (!IsValid(c)) continue;
+            string n = c.gameObject.name.ToLowerInvariant();
+            if (n.Contains("attack") || n.Contains("trigger") || n.Contains("weapon") ||
+                n.Contains("pickup") || n.Contains("dash") || n.Contains("interact"))
+                continue;
+
+            float area = c.bounds.size.x * c.bounds.size.y;
+            if (area > bestArea)
+            {
+                bestArea = area;
+                best = c;
+            }
         }
         return best;
     }
