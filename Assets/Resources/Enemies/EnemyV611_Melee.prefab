@@ -4893,7 +4893,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1.033203, y: 1.033203, z: 1}
+  m_LocalScale: {x: 3.6491427, y: 3.6491427, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3390032054131002852}
@@ -4926,8 +4926,8 @@ Transform:
   m_GameObject: {fileID: 1829804888556618243}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.5331328, z: 0}
-  m_LocalScale: {x: 0.74555933, y: 0.56, z: 1}
+  m_LocalPosition: {x: 0, y: -0.686495, z: 0}
+  m_LocalScale: {x: 1.30913, y: 0.56, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4759037146235479329}
@@ -5101,7 +5101,7 @@ SpriteRenderer:
   m_Size: {x: 1, y: 1}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 0
+  m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
 --- !u!61 &2853055534958702361
 BoxCollider2D:
@@ -5137,17 +5137,17 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: -0.03719531}
+  m_Offset: {x: 0, y: -0.047894996}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 0.88, y: 1.2}
+    oldSize: {x: 1, y: 1}
     newSize: {x: 1, y: 1}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 0.65463746, y: 0.8678906}
+  m_Size: {x: 1.14948, y: 1.1175499}
   m_EdgeRadius: 0
 --- !u!114 &6959424392721543534
 MonoBehaviour:
@@ -5248,28 +5248,6 @@ MonoBehaviour:
   telegraph: {fileID: 1369021811464441349}
   health: {fileID: 1169239835731509554}
   attackContract: {fileID: 0}
---- !u!95 &2398903038268281479
-Animator:
-  serializedVersion: 7
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8443900172115260021}
-  m_Enabled: 1
-  m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: ac09b6b05da0a957e47daf63c3867e51, type: 2}
-  m_CullingMode: 0
-  m_UpdateMode: 0
-  m_ApplyRootMotion: 0
-  m_LinearVelocityBlending: 0
-  m_StabilizeFeet: 0
-  m_AnimatePhysics: 0
-  m_WarningMessage: 
-  m_HasTransformHierarchy: 1
-  m_AllowConstantClipSamplingOptimization: 1
-  m_KeepAnimatorStateOnDisable: 1
-  m_WriteDefaultValuesOnDisable: 0
 --- !u!114 &4103878666400252825
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5313,7 +5291,6 @@ MonoBehaviour:
   tankHitKickPixels: 2.1
   hitKickDuration: 0.075
   hitScaleAmount: 0.1
-  useRuntimeSpriteAnimation: 0
 --- !u!114 &1446404257941362719
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5408,7 +5385,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemySizeController
   scaleMode: 0
-  playerHeightMultiplier: 1
+  playerHeightMultiplier: 1.03
   referencePlayerWorldHeight: 0.775
   absoluteWorldHeight: 0.82
   manualLocalScale: {x: 1, y: 1, z: 1}
@@ -5416,6 +5393,7 @@ MonoBehaviour:
   previewChangesInEditor: 1
   useLivePlayerVisualHeight: 1
   visualOnlyMultiplier: 1
+  visibleContentHeightRatio: 0.4375
   visualRoot: {fileID: 3107529325257139545}
   bodyRenderer: {fileID: 2924164280105922838}
   bodyCollider: {fileID: 2853055534958702361}
@@ -5595,8 +5573,6 @@ MonoBehaviour:
   scanColor: {r: 1, g: 0.26, b: 0.16, a: 0.52}
   pulseSpeed: 12
   sortingOrder: 5
-  sectorSegments: 28
-  sectorOutlineWidth: 0.035
 --- !u!1 &6279169665224436721
 GameObject:
   m_ObjectHideFlags: 0
@@ -5736,6 +5712,28 @@ Transform:
   m_Children: []
   m_Father: {fileID: 3107529325257139545}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!95 &2398903038268281479
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8443900172115260021}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: ac09b6b05da0a957e47daf63c3867e51, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 1
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!212 &2924164280105922838
 SpriteRenderer:
   serializedVersion: 2

@@ -1,0 +1,4 @@
+Executor Boss V3.1 compile fix
+- Fixed CS0104 Random ambiguity in ExecutorBossController.cs.
+- Added: using Random = UnityEngine.Random;
+- No gameplay or balance values changed.

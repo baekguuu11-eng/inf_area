@@ -114,19 +114,75 @@ public sealed class AmmoPickup : MonoBehaviour
     private static Sprite GetFallbackSprite()
     {
         if (fallbackSprite != null) return fallbackSprite;
-        const int w = 14; const int h = 10;
+
+        // V8: 임시 주황 사각형 대신 게임의 청색 네트워크 톤에 맞춘
+        // 소형 에너지 카트리지 픽셀 아이콘을 런타임에 생성한다.
+        const int w = 20;
+        const int h = 14;
         Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
         tex.filterMode = FilterMode.Point;
         tex.wrapMode = TextureWrapMode.Clamp;
+
         Color clear = Color.clear;
-        Color edge = new Color(0.45f, 0.18f, 0.02f, 1f);
-        Color main = new Color(1f, 0.68f, 0.12f, 1f);
+        Color outline = new Color(0.025f, 0.075f, 0.13f, 1f);
+        Color metalDark = new Color(0.12f, 0.27f, 0.36f, 1f);
+        Color metal = new Color(0.24f, 0.48f, 0.58f, 1f);
+        Color blue = new Color(0.08f, 0.45f, 0.92f, 1f);
+        Color cyan = new Color(0.08f, 0.88f, 1f, 1f);
+        Color bright = new Color(0.72f, 0.98f, 1f, 1f);
+
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
-                tex.SetPixel(x, y, x < 1 || x >= w - 1 || y < 1 || y >= h - 1 ? edge : main);
+                tex.SetPixel(x, y, clear);
+
+        // beveled outer cartridge body
+        for (int y = 2; y <= 11; y++)
+        {
+            int minX = (y == 2 || y == 11) ? 3 : 2;
+            int maxX = (y == 2 || y == 11) ? 16 : 17;
+            for (int x = minX; x <= maxX; x++)
+            {
+                bool edge = x == minX || x == maxX || y == 2 || y == 11;
+                tex.SetPixel(x, y, edge ? outline : metalDark);
+            }
+        }
+
+        // side caps / connector teeth
+        for (int y = 5; y <= 8; y++)
+        {
+            tex.SetPixel(1, y, outline);
+            tex.SetPixel(18, y, outline);
+        }
+        tex.SetPixel(2, 4, metal);
+        tex.SetPixel(2, 9, metal);
+        tex.SetPixel(17, 4, metal);
+        tex.SetPixel(17, 9, metal);
+
+        // luminous energy window
+        for (int y = 4; y <= 9; y++)
+        {
+            for (int x = 5; x <= 14; x++)
+            {
+                bool edge = x == 5 || x == 14 || y == 4 || y == 9;
+                tex.SetPixel(x, y, edge ? blue : cyan);
+            }
+        }
+
+        // three cell separators and highlights
+        for (int y = 5; y <= 8; y++)
+        {
+            tex.SetPixel(8, y, blue);
+            tex.SetPixel(11, y, blue);
+        }
+        tex.SetPixel(6, 5, bright);
+        tex.SetPixel(9, 5, bright);
+        tex.SetPixel(12, 5, bright);
+        tex.SetPixel(15, 6, metal);
+        tex.SetPixel(4, 7, metal);
+
         tex.Apply(false, true);
-        fallbackSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 32f);
-        fallbackSprite.name = "AmmoPack_Runtime";
+        fallbackSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 46f);
+        fallbackSprite.name = "AmmoEnergyCell_Runtime_V8";
         return fallbackSprite;
     }
 }

@@ -109,7 +109,9 @@ public class PlayerProjectile : MonoBehaviour
             float travelled = Vector2.Distance(origin, transform.position);
             int appliedDamage = CalculateDistanceDamage(travelled);
             float stoppingPower = weapon != null ? weapon.knockbackBonus : 0f;
-            enemy.TakeDamage(new DamageContext(appliedDamage, direction, collision.ClosestPoint(transform.position), EnemyHitKind.Ranged, stoppingPower));
+            Vector2 hitPoint = collision.ClosestPoint(transform.position);
+            enemy.TakeDamage(new DamageContext(appliedDamage, direction, hitPoint, EnemyHitKind.Ranged, stoppingPower));
+            if (PlayerCombatSFX.Instance != null) PlayerCombatSFX.Instance.PlayRangedImpact(weapon, enemy, hitPoint);
 
             if (remainingPierce <= 0)
                 Terminate();
@@ -172,6 +174,19 @@ public class PlayerProjectile : MonoBehaviour
         float end = Mathf.Max(start + 0.01f, falloffEndDistance);
         float t = Mathf.InverseLerp(start, end, distance);
         float multiplier = Mathf.Lerp(1f, Mathf.Clamp(weapon.minimumDamageMultiplier, 0.05f, 1f), t);
+
+        // 샷건은 위험을 감수하고 붙어서 쏠 때 확실한 보상을 준다.
+        // 극근접 1.10m 이내는 +55%, 1.10~2.00m는 +25%에서 기본값까지 부드럽게 감소한다.
+        if (weapon.weaponId == "shotgun")
+        {
+            float closeMultiplier = 1f;
+            if (distance <= 1.10f)
+                closeMultiplier = 1.55f;
+            else if (distance < 2.00f)
+                closeMultiplier = Mathf.Lerp(1.25f, 1f, Mathf.InverseLerp(1.10f, 2.00f, distance));
+            multiplier *= closeMultiplier;
+        }
+
         return Mathf.Max(1, Mathf.RoundToInt(damage * multiplier));
     }
 

@@ -13,11 +13,11 @@ public sealed class KODBBootSplashController : MonoBehaviour
     private static bool splashRunning;
 
     [Header("Timing")]
-    [SerializeField] private float fadeInDuration = 0.45f;
-    [SerializeField] private float holdDuration = 0.90f;
-    [SerializeField] private float fadeOutDuration = 0.55f;
-    [SerializeField] private float blackHoldDuration = 1.10f;
-    [SerializeField] private float menuStartDelay = 0.05f;
+    [SerializeField] private float fadeInDuration = 0.65f;
+    [SerializeField] private float holdDuration = 0.95f;
+    [SerializeField] private float fadeOutDuration = 0.65f;
+    [SerializeField] private float blackHoldDuration = 0.18f;
+    [SerializeField] private float menuStartDelay = 0.08f;
 
     public static bool ShouldDelayMainMenuIntro
     {

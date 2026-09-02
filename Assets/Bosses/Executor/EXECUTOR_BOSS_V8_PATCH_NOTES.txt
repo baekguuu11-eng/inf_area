@@ -1,0 +1,52 @@
+INFECTED AREA - Executor Boss V8 Debug / Reward / Room UI Polish
+Base: V7 CombatPolish
+
+[V8 changes]
+1) Debug Whip visual sync
+- Keeps gameplay hit reach from V7.
+- Removes the detached large purple historical arc for debug_whip.
+- Draws a connected 14-point curved whip from player grip to the actual displayed hit endpoint.
+- Adds a brighter tip highlight so the maximum visual reach is readable.
+
+2) Executor developer hotkeys (Unity Editor / Development Build only)
+- F8: jump directly to Stage 1 Portal Room (immediately before boss route).
+- F9: recreate Executor boss room and start normal boss intro.
+- F10: recreate boss room, enter combat at 54% HP -> tests Phase 2 transition.
+- F11: recreate boss room, enter combat at 14% HP -> tests Phase 2 + Final Execution transition.
+- M: existing scene restart debug key remains.
+- These hotkeys are excluded from normal Release builds by preprocessor directives.
+
+3) Room transition label redesign
+- Uses Galmuri11 SDF at runtime.
+- Normal rooms: "SECTOR 1-2", "SECTOR 1-3" style with cyan/blue network frame.
+- Portal room: "PORTAL ROOM" + "TRANSFER NODE" with violet accent.
+- Adds dark translucent panel, brackets, node points, and smoother scale/fade animation.
+- Does not modify ShopCanvas/MainCanvas shop logic.
+
+4) Executor visual position restored
+- V7 VisualRoot Y offset -0.12 -> restored to -0.05 (V6/original position).
+
+5) Boss defeat full heal
+- After Executor death settle animation, player current HP is restored to current max HP.
+- Supports max-HP upgrades because it reads current maxHealth.
+
+6) Boss drops unified with normal enemies
+- Removes ExecutorRewardOrb from the active reward path.
+- 24 Byte reward now uses the same ByteDropper/BytePickup implementation as normal enemies (6 x value 4).
+- 24 ammo energy now uses the same AmmoPickup spawn path as normal enemies (3 x value 8).
+
+7) Ammo pickup visual redesign
+- Replaces the rough orange rectangle fallback with a 20x14 blue/cyan pixel energy cartridge.
+- Normal enemies and Executor reward ammo automatically share the new visual.
+
+[V7 features retained]
+- Shotgun close-range damage buff.
+- Machine gun DPS buff.
+- Immediate weapon/ammo HUD sync on switching.
+- Phase-scaled precision artillery.
+- Player-tracking final 8-shot artillery.
+- Executor phase sprites/projectile art and final-stand behavior.
+
+[Validation]
+- Static brace/comment/string scan: all 128 C# files balanced.
+- Unity Editor compile/Play Mode was NOT available in this environment; test in Unity 6.4 before merging.

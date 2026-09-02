@@ -201,6 +201,26 @@ public class PlayerHealth : MonoBehaviour
         RefreshUI();
     }
 
+    public void RestoreToFull()
+    {
+        if (isDead)
+            return;
+
+        SyncMaxHealth(false);
+        currentHealth = Mathf.Max(1, maxHealth);
+        damageCarry = 0f;
+        RefreshUI();
+
+        // 보스 처치 직후 남아 있던 짧은 무적/피격 잔여 상태가 다음 구간으로 넘어가지 않게 정리한다.
+        if (invincibleCoroutine != null)
+        {
+            StopCoroutine(invincibleCoroutine);
+            invincibleCoroutine = null;
+        }
+        isInvincible = false;
+        lastDamageTime = -999f;
+    }
+
     public void ApplyOverclockHealth(int bonusAmount)
     {
         if (stats != null)

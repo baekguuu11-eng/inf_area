@@ -39,12 +39,14 @@ public class PlayerStats : MonoBehaviour
     public float DefenseMultiplier { get; private set; }
 
     public int MeleeDamage { get; private set; }
+    public float MeleeDamageMultiplier { get; private set; }
     public float MeleeCooldown { get; private set; }
     public float MeleeRange { get; private set; }
     public float MeleeAngle { get; private set; }
     public float MeleeKnockback { get; private set; }
 
     public int RangedDamage { get; private set; }
+    public float RangedDamageMultiplier { get; private set; }
     public float RangedCooldown { get; private set; }
     public float ProjectileSpeed { get; private set; }
     public float ProjectileScale { get; private set; }
@@ -128,13 +130,15 @@ public class PlayerStats : MonoBehaviour
         float globalDamage = Mathf.Max(0.05f, ShopRunUpgradeState.AttackDamageMultiplier);
         float weaponDamage = Mathf.Max(0.05f, ShopRunUpgradeState.WeaponDamageMultiplier);
 
-        MeleeDamage = Mathf.Max(1, Mathf.RoundToInt(baseMeleeDamage * meleeDamageMultiplier * globalDamage * weaponDamage));
+        MeleeDamageMultiplier = Mathf.Max(0.05f, meleeDamageMultiplier * globalDamage * weaponDamage);
+        MeleeDamage = Mathf.Max(1, Mathf.RoundToInt(baseMeleeDamage * MeleeDamageMultiplier));
         MeleeCooldown = Mathf.Max(0.03f, baseMeleeCooldown / Mathf.Max(0.05f, meleeSpeedMultiplier));
         MeleeRange = Mathf.Max(0.1f, baseMeleeRange * meleeRangeMultiplier);
         MeleeAngle = Mathf.Clamp(baseMeleeAngle, 10f, 360f);
         MeleeKnockback = Mathf.Max(0f, baseMeleeKnockback);
 
-        RangedDamage = Mathf.Max(1, Mathf.RoundToInt(baseRangedDamage * rangedDamageMultiplier * globalDamage * weaponDamage));
+        RangedDamageMultiplier = Mathf.Max(0.05f, rangedDamageMultiplier * globalDamage * weaponDamage);
+        RangedDamage = Mathf.Max(1, Mathf.RoundToInt(baseRangedDamage * RangedDamageMultiplier));
         RangedCooldown = Mathf.Max(0.03f, baseRangedCooldown / Mathf.Max(0.05f, rangedSpeedMultiplier));
         ProjectileSpeed = Mathf.Max(0.1f, baseProjectileSpeed);
         ProjectileScale = Mathf.Max(0.1f, baseProjectileScale);

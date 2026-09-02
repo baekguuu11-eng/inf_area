@@ -200,7 +200,7 @@ public sealed class WeaponVisualController : MonoBehaviour
             pose.gripOffsetPlayerRatio + Vector2.Lerp(pose.attackGripStartOffsetPlayerRatio, pose.attackGripEndOffsetPlayerRatio, t));
 
         if (meleeArcTrail != null && meleeArcTrail.IsEmitting)
-            meleeArcTrail.Sample(GetAttackTipWorldPosition());
+            meleeArcTrail.Sample(GetGripWorldPosition(), GetDisplayedAttackTipWorldPosition());
     }
 
     public void SetMeleeRecoveryProgress(float normalized)
@@ -284,7 +284,8 @@ public sealed class WeaponVisualController : MonoBehaviour
         ResolvePlayerBodyRenderer();
         int sortingLayer = playerBodyRenderer != null ? playerBodyRenderer.sortingLayerID : 0;
         int sortingOrder = (playerBodyRenderer != null ? Mathf.Max(2, playerBodyRenderer.sortingOrder) : 5) + 5;
-        meleeArcTrail.Begin(currentWeapon, ResolvePlayerWorldHeight(), sortingLayer, sortingOrder, GetAttackTipWorldPosition());
+        meleeArcTrail.Begin(currentWeapon, ResolvePlayerWorldHeight(), sortingLayer, sortingOrder,
+            GetGripWorldPosition(), GetDisplayedAttackTipWorldPosition());
     }
 
     public void SetTrailAlpha(float alpha)
@@ -342,8 +343,21 @@ public sealed class WeaponVisualController : MonoBehaviour
     {
         Vector2 grip = GetGripWorldPosition();
         Vector2 tip = GetAttackTipWorldPosition();
-        float multiplier = currentWeapon != null ? Mathf.Max(0.2f, currentWeapon.visibleReachMultiplier) : 1f;
+        // V9: debug_whip은 스프라이트 자체를 실제 타격 거리만큼 늘린다.
+        // 따라서 채찍만큼은 추가 reach multiplier를 다시 곱하지 않아 실제 판정 거리는 V8과 동일하게 유지한다.
+        float multiplier = currentWeapon != null && currentWeapon.weaponId != "debug_whip"
+            ? Mathf.Max(0.2f, currentWeapon.visibleReachMultiplier)
+            : 1f;
         return Vector2.LerpUnclamped(grip, grip + (tip - grip) * multiplier, Mathf.Clamp01(normalizedReach));
+    }
+
+    private Vector2 GetDisplayedAttackTipWorldPosition()
+    {
+        // 디버그 채찍의 판정은 visibleReachMultiplier를 사용해 실제 스프라이트 끝보다 멀리까지 뻗는다.
+        // 시각 효과도 동일한 끝점을 사용해 '보이는 범위 = 실제 타격 범위'가 되게 한다.
+        if (currentWeapon != null && currentWeapon.weaponId == "debug_whip")
+            return GetAttackPointWorld(1f);
+        return GetAttackTipWorldPosition();
     }
 
     private void SetDirection(Vector2 direction, bool force)
@@ -408,6 +422,10 @@ public sealed class WeaponVisualController : MonoBehaviour
         DirectionalWeaponPose pose = currentWeapon.GetPose(CardinalDirection);
         float ratio = pose.visualLengthPlayerRatio > 0.01f ? pose.visualLengthPlayerRatio : currentWeapon.visualLengthPlayerRatio;
         float targetBodyLength = ResolvePlayerWorldHeight() * Mathf.Max(0.05f, ratio);
+        // V9: 디버그 채찍은 별도 사거리 표시선을 그리는 대신 실제 채찍 스프라이트 자체를
+        // 기존 판정 끝점까지 확대한다. visibleReachMultiplier는 이제 '보이는 채찍 길이'에만 사용된다.
+        if (currentWeapon.weaponId == "debug_whip")
+            targetBodyLength *= Mathf.Max(1f, currentWeapon.visibleReachMultiplier);
         float worldBodyLengthAtScaleOne = currentWeapon.GetBodyPixelLength(firing) / Mathf.Max(1f, sprite.pixelsPerUnit);
         float scale = targetBodyLength / Mathf.Max(0.0001f, worldBodyLengthAtScaleOne);
         weaponRenderer.transform.localScale = Vector3.one * scale;

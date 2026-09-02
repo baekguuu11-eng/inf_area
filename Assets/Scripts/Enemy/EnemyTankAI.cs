@@ -59,6 +59,8 @@ public sealed class EnemyTankAI : MonoBehaviour
     [SerializeField] private EnemyAttackContract attackContract;
 
     private Rigidbody2D body;
+    private Collider2D bodyCollider;
+    private PlayerHealth cachedPlayerHealth;
     private EnemyAttackCoordinator coordinator;
     private State state;
     private Coroutine attackRoutine;
@@ -69,6 +71,19 @@ public sealed class EnemyTankAI : MonoBehaviour
     private void Awake()
     {
         body = GetComponent<Rigidbody2D>();
+        bodyCollider = GetComponent<Collider2D>();
+        if (bodyCollider == null || bodyCollider.isTrigger)
+        {
+            Collider2D[] colliders = GetComponentsInChildren<Collider2D>(true);
+            for (int i = 0; i < colliders.Length; i++)
+            {
+                if (colliders[i] != null && colliders[i].enabled && !colliders[i].isTrigger)
+                {
+                    bodyCollider = colliders[i];
+                    break;
+                }
+            }
+        }
         perception = perception != null ? perception : GetComponent<EnemyPerception>();
         motor = motor != null ? motor : GetComponent<EnemyMotor>();
         visualMotion = visualMotion != null ? visualMotion : GetComponent<EnemyVisualMotion>();
@@ -116,11 +131,14 @@ public sealed class EnemyTankAI : MonoBehaviour
             return;
         }
 
-        float distance = perception.DistanceToPlayer;
+        // 공격 선택과 실제 피해 판정이 같은 기준을 사용하도록 한다.
+        // 탱커 중심(실제 부채꼴 원점)에서 플레이어 몸체의 가장 가까운 지점까지의 거리다.
+        float distance = GetSlamOriginDistanceToPlayer();
+        float effectiveSlamRadius = GetEffectiveSlamRadius();
         bool canHeavyAttack = coordinator.TryAcquire(this, EnemyAttackCoordinator.AttackChannel.Heavy, 5f);
         if (canHeavyAttack)
         {
-            if (distance <= slamTriggerRange)
+            if (distance <= effectiveSlamRadius)
             {
                 ownsHeavyToken = true;
                 attackRoutine = StartCoroutine(SlamRoutine());
@@ -164,7 +182,7 @@ public sealed class EnemyTankAI : MonoBehaviour
             if (elapsed < slamAimTrackingTime)
                 lockedDirection = perception.DirectionToPlayer;
 
-            telegraph?.ShowSector(lockedDirection, slamRadius * 1.07f, slamAngle);
+            telegraph?.ShowSector(lockedDirection, GetEffectiveSlamRadius(), slamAngle);
             telegraph?.SetProgress(elapsed / Mathf.Max(0.01f, slamWindup));
             visualMotion.SetAction(EnemyVisualMotion.ActionState.Windup, lockedDirection);
 
@@ -175,7 +193,7 @@ public sealed class EnemyTankAI : MonoBehaviour
         state = State.Slam;
         attackContract.BeginActive(telegraph);
         visualMotion.SetAction(EnemyVisualMotion.ActionState.Attack, lockedDirection);
-        attackContract.TryDamageSector(body.position, lockedDirection, slamRadius, slamAngle, slamDamage);
+        attackContract.TryDamageSector(body.position, lockedDirection, GetEffectiveSlamRadius(), slamAngle, slamDamage);
 
         CameraFeedbackController feedback = CameraFeedbackController.Instance;
         if (feedback != null)
@@ -280,6 +298,29 @@ public sealed class EnemyTankAI : MonoBehaviour
         visualMotion.SetAction(EnemyVisualMotion.ActionState.Recovery, lockedDirection);
         yield return new WaitForSeconds(Mathf.Max(0.01f, chargeRecovery));
         FinishAttack();
+    }
+
+    private float GetEffectiveSlamRadius()
+    {
+        // 경고선 가장자리에 몸체가 살짝 걸친 경우도 시각적으로 납득되게 작은 여유를 둔다.
+        return Mathf.Max(0.25f, slamRadius + 0.15f);
+    }
+
+    private float GetSlamOriginDistanceToPlayer()
+    {
+        if (perception == null || !perception.HasPlayer)
+            return float.PositiveInfinity;
+
+        if (cachedPlayerHealth == null && perception.Player != null)
+            cachedPlayerHealth = perception.Player.GetComponentInParent<PlayerHealth>();
+
+        Collider2D playerBody = PlayerDamageQuery.ResolveBodyCollider(cachedPlayerHealth);
+        Vector2 origin = body != null ? body.position : (Vector2)transform.position;
+        if (playerBody == null)
+            return Vector2.Distance(origin, perception.Player != null ? (Vector2)perception.Player.position : origin);
+
+        Vector2 nearest = playerBody.ClosestPoint(origin);
+        return Vector2.Distance(origin, nearest);
     }
 
     private bool ShouldInterrupt()

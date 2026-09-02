@@ -195,9 +195,9 @@ MonoBehaviour:
   sweepThicknessPlayerRatio: 0.13
   visibleReachMultiplier: 1
   impactRadiusPlayerRatio: 0.16
-  damage: 7
-  attackInterval: 0.08
-  minimumAttackInterval: 0.05
+  damage: 9
+  attackInterval: 0.074
+  minimumAttackInterval: 0.045
   knockbackBonus: 0.035
   cameraKick: 0.025
   cameraShake: 0.008

@@ -1,0 +1,57 @@
+INFECTED AREA - V9 / BOSS 02 CHERNOBYL FIRST PLAYABLE PASS
+
+1. Debug Whip visual length
+- Keeps the V8 damage reach unchanged.
+- The actual debug_whip sprite is now scaled to the same endpoint that the melee hit resolver already used.
+- Removes the detached purple range-line approach for the whip. The visible whip itself is the attack length.
+
+2. Executor projectile wall impact
+- Executor projectiles now create stage-colored impact flash, sparks and small wall fragments when hitting Wall / Obstacle / RoomBoundary.
+- Phase 1: cyan-blue / Phase 2: magenta-purple / Final Execution: red.
+
+3. Boss 02: Chernobyl
+- Stage 2 portal now routes to a separate Chernobyl boss room before Stage 3.
+- 2700 HP, fixed center reactor-type boss.
+- No imported boss artwork or Executor boss sprite is reused.
+- Runtime body is built only from generated white pixel primitives: chassis, bands, side ribs, control rods, core ring and core.
+- Green / radiation-style boss HUD with delayed-damage overlay.
+- Intro cutscene with normal HUD/music isolation and skip support.
+
+Phase structure
+- Phase 1: 100%~65%
+  * Targeted reactor blast
+  * Cross blast
+  * Sparse 5x3 grid blast
+- Phase 2: 65%~30%
+  * Faster targeted / cross attacks
+  * Chained grid explosions
+  * Expanding core shockwave
+  * Short phase transition cutscene
+- MELTDOWN: 30%~0%
+  * Dense 6x3 grid with two safe cells
+  * Faster chained grid
+  * Double cross pattern
+  * Faster core shockwave / green-white overload visuals
+
+Music
+- Phase 1: Meltdown Core.mp3
+- Phase 2 + MELTDOWN: Geiger Meltdown.mp3
+- The second track was assigned to the higher-pressure phase because its rhythmic activity is stronger in analysis.
+
+Boss 02 reward / flow
+- Boss defeat restores player to current maximum HP.
+- Uses the same BytePickup / AmmoPickup reward path as regular enemies (24 Byte + 24 ammo energy total).
+- Green-tinted exit portal opens after death.
+- Boss BGM crossfades back to normal gameplay BGM.
+
+Development debug keys (Editor / Development Build only)
+- F8/F9/F10/F11: Executor route / intro / phase 2 / final execution.
+- Shift+F8: Stage 2 portal room (right before Chernobyl).
+- Shift+F9: Chernobyl normal intro.
+- Shift+F10: Chernobyl direct Phase 2 test at 64% HP.
+- Shift+F11: Chernobyl MELTDOWN test at 29% HP.
+
+Notes
+- Chernobyl art is intentionally a runtime white-sprite prototype because no final boss sprites exist yet.
+- Existing shop UI/scripts/prefabs are not modified.
+- Unity Editor compile / Play Mode could not be executed in this environment; static source and archive checks are performed instead.
