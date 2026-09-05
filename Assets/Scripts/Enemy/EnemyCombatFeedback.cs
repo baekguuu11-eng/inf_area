@@ -102,51 +102,27 @@ public sealed class EnemyCombatFeedback : MonoBehaviour
         CameraFeedbackController feedback = CameraFeedbackController.Instance;
         if (feedback == null && Camera.main != null)
             feedback = Camera.main.GetComponent<CameraFeedbackController>();
-        if (feedback == null)
-            return;
+        if (feedback == null) return;
 
-        float magnitude;
-        float duration;
-        float hitStop;
-        switch (kind)
+        bool tank = role != null && role.CurrentRole == EnemyRole.Role.Tank;
+        CameraImpactLevelV11 level;
+        bool hitStop;
+        if (lethal && tank)
         {
-            case EnemyHitKind.Ranged:
-                magnitude = 0.030f;
-                duration = 0.045f;
-                hitStop = 0f;
-                break;
-            case EnemyHitKind.Explosion:
-                magnitude = 0.115f;
-                duration = 0.135f;
-                hitStop = 0.028f;
-                break;
-            case EnemyHitKind.Environment:
-                magnitude = 0.042f;
-                duration = 0.055f;
-                hitStop = 0f;
-                break;
-            default:
-                magnitude = 0.085f;
-                duration = 0.082f;
-                hitStop = 0.020f;
-                break;
+            level = CameraImpactLevelV11.Heavy;
+            hitStop = true;
         }
-
-        if (role != null && role.CurrentRole == EnemyRole.Role.Tank)
+        else if (kind == EnemyHitKind.Explosion || kind == EnemyHitKind.Melee)
         {
-            magnitude *= 1.08f;
-            duration *= 1.08f;
+            level = lethal ? CameraImpactLevelV11.Heavy : CameraImpactLevelV11.Medium;
+            hitStop = true;
         }
-        if (lethal)
+        else
         {
-            magnitude *= 1.30f;
-            duration *= 1.16f;
-            hitStop = Mathf.Max(hitStop, kind == EnemyHitKind.Ranged ? 0.018f : 0.032f);
+            level = tank && lethal ? CameraImpactLevelV11.Medium : CameraImpactLevelV11.Small;
+            hitStop = lethal;
         }
-
-        feedback.Shake(duration, magnitude, hitDirection);
-        if (hitStop > 0f)
-            feedback.HitStop(hitStop);
+        feedback.Impact(level, hitDirection, hitStop);
     }
 
     private IEnumerator FlashRoutine(float duration)
@@ -191,6 +167,11 @@ public sealed class EnemyCombatFeedback : MonoBehaviour
         hitParticles.transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(hitDirection.y, hitDirection.x) * Mathf.Rad2Deg);
         int count = lethal ? 12 : kind == EnemyHitKind.Explosion ? 10 : role != null && role.CurrentRole == EnemyRole.Role.Tank ? 7 : 5;
         hitParticles.Emit(count);
+    }
+
+    public void RefreshBaseColors()
+    {
+        CacheBodyRenderers();
     }
 
     private void CacheBodyRenderers()

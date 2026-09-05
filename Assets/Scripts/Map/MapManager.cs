@@ -64,6 +64,7 @@ public class MapManager : MonoBehaviour
     public int CurrentStage { get { return currentStage; } }
     public RoomController CurrentRoom { get { return currentRoom; } }
     public bool IsTransitioning { get { return transitionLocked; } }
+    public ExecutorBossController ActiveExecutorBoss { get { return activeExecutorBoss; } }
 
     private void Awake()
     {
@@ -94,6 +95,7 @@ public class MapManager : MonoBehaviour
 
         if (transitionUI == null) transitionUI = FindAnyObjectByType<RoomTransitionUI>();
         if (enemySpawner == null) enemySpawner = FindAnyObjectByType<RoomEnemySpawner>();
+        V11DebugOverlay.Ensure(this);
     }
 
     private IEnumerator Start()
@@ -124,8 +126,9 @@ public class MapManager : MonoBehaviour
         TrySpawnContentForCurrentRoom();
         SetCameraBase(cameraRestPosition, true);
 
-        if (transitionUI != null)
-            yield return transitionUI.ShowRoomLabel(currentStage, currentRoom.RoomNumber);
+        // The initial spawn room is intentionally unlabelled. The first banner appears
+        // only after the player leaves it, where internal room 2 is displayed as SECTOR 1-1.
+        yield return null;
     }
 
     private void Update()
@@ -137,6 +140,51 @@ public class MapManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.M))
         {
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            return;
+        }
+
+        // V13 일반 시스템 디버그. F8~F11 보스 단축키와 충돌하지 않는 F1~F7 사용.
+        if (Input.GetKeyDown(KeyCode.F1))
+        {
+            ShopManager shop = ShopManager.Instance;
+            if (shop != null) shop.DebugReplayOpenPresentation();
+            return;
+        }
+        if (Input.GetKeyDown(KeyCode.F2))
+        {
+            StageEnemyEvolutionV12.DebugSetStageOverride(1);
+            Debug.Log("[V13 DEBUG] 현재 일반 적을 Stage 1 외형/패턴으로 표시합니다.");
+            return;
+        }
+        if (Input.GetKeyDown(KeyCode.F3))
+        {
+            StageEnemyEvolutionV12.DebugSetStageOverride(2);
+            Debug.Log("[V13 DEBUG] 현재 일반 적을 Stage 2 외형/패턴으로 표시합니다.");
+            return;
+        }
+        if (Input.GetKeyDown(KeyCode.F4))
+        {
+            StageEnemyEvolutionV12.DebugSetStageOverride(3);
+            Debug.Log("[V13 DEBUG] 현재 일반 적을 Stage 3 외형/패턴으로 표시합니다.");
+            return;
+        }
+        if (Input.GetKeyDown(KeyCode.F5))
+        {
+            StageEnemyEvolutionV12.DebugToggleForceEvolved();
+            Debug.Log("[V13 DEBUG] 강화 패턴 강제 모드: " + (StageEnemyEvolutionV12.DebugForceEvolvedPatterns ? "ON" : "OFF"));
+            return;
+        }
+        if (Input.GetKeyDown(KeyCode.F6))
+        {
+            EnemyTankAI[] tanks = FindObjectsByType<EnemyTankAI>(FindObjectsInactive.Exclude);
+            for (int i = 0; i < tanks.Length; i++) tanks[i].DebugFlashSlamRange();
+            Debug.Log("[V13 DEBUG] 탱커 실제 경고 범위를 1초간 표시합니다.");
+            return;
+        }
+        if (Input.GetKeyDown(KeyCode.F7))
+        {
+            StageEnemyEvolutionV12.DebugResetOverrides();
+            Debug.Log("[V13 DEBUG] 일반 적 디버그 오버라이드를 초기화했습니다.");
             return;
         }
 
@@ -159,6 +207,12 @@ public class MapManager : MonoBehaviour
             StartCoroutine(DebugStartExecutorBoss(0.54f, false));
         else if (Input.GetKeyDown(KeyCode.F11))
             StartCoroutine(DebugStartExecutorBoss(0.14f, false));
+        else if (activeExecutorBoss != null && Input.GetKeyDown(KeyCode.PageUp))
+            activeExecutorBoss.DebugCyclePattern(1);
+        else if (activeExecutorBoss != null && Input.GetKeyDown(KeyCode.PageDown))
+            activeExecutorBoss.DebugCyclePattern(-1);
+        else if (activeExecutorBoss != null && Input.GetKeyDown(KeyCode.P))
+            activeExecutorBoss.DebugForcePattern();
 #endif
     }
 
@@ -416,6 +470,7 @@ public class MapManager : MonoBehaviour
             SpawnPortal(portalRoom);
 
         portalRoom.ApplyPortalRoomState();
+        PortalRoomAtmosphereV11.Ensure(portalRoom);
         portalRoom.gameObject.SetActive(false);
         return portalRoom;
     }
@@ -577,6 +632,9 @@ public class MapManager : MonoBehaviour
         if (transitionUI != null)
             StartCoroutine(transitionUI.ShowRoomLabel(currentStage, currentRoom.RoomNumber));
 
+        if (currentRoom.IsPortalRoom)
+            EnsurePortalAmmoSafety();
+
         if (currentRoom.IsPortalRoom && openShopOnPortalRoomEntry)
         {
             ShopManager shop = FindAnyObjectByType<ShopManager>();
@@ -594,6 +652,10 @@ public class MapManager : MonoBehaviour
         yield return AutoCollectCurrentRoomResources();
         yield return PlayExitTransition(GateDirection.None);
 
+        // V12 hard cleanup: a fast boss-exit interaction can destroy the room before the
+        // Chernobyl death coroutine reaches its HUD cleanup line. Remove any surviving boss
+        // HUD before the next stage is made visible.
+        ChernobylBossHUD.CleanupAll();
         ClearCurrentStageRooms();
         currentStage++;
         highestNormalRoomNumber = 1;
@@ -624,6 +686,15 @@ public class MapManager : MonoBehaviour
 
         yield return new WaitForSecondsRealtime(Mathf.Max(0f, gateCooldown));
         EndTransitionLock();
+    }
+
+    private void EnsurePortalAmmoSafety()
+    {
+        PlayerAmmoController playerAmmo = FindAnyObjectByType<PlayerAmmoController>();
+        if (playerAmmo == null) return;
+        const int minimumBossReadyEnergy = 12;
+        int missing = minimumBossReadyEnergy - playerAmmo.CurrentTotalAmmoEnergy;
+        if (missing > 0) playerAmmo.AddReserveAmmo(missing);
     }
 
     private void BeginTransitionLock()

@@ -88,6 +88,11 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
         playerHealth = FindAnyObjectByType<PlayerHealth>();
         player = playerHealth != null ? playerHealth.transform : null;
         hud = ChernobylBossHUD.Create();
+        // Keep the screen-space boss HUD owned by the boss room. If the player enters the
+        // exit portal before the death coroutine reaches its final Destroy call, destroying
+        // the old room will still clean the HUD instead of leaking it into the next stage.
+        if (hud != null && ownerRoom != null)
+            hud.transform.SetParent(ownerRoom.transform, false);
         music = ChernobylBossMusic.Create(transform);
         cutsceneIsolation = new ExecutorCutsceneIsolation();
         BuildSfx();
@@ -257,7 +262,7 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
 
     private bool ShouldSkipIntro()
     {
-        return Time.unscaledTime >= skipAllowedAt && Input.anyKeyDown;
+        return Time.unscaledTime >= skipAllowedAt && Input.anyKeyDown && !Input.GetKeyDown(KeyCode.Escape);
     }
 
     private IEnumerator CombatLoop()

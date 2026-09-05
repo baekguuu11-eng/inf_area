@@ -7,7 +7,7 @@ public class OverclockChip : MonoBehaviour
     public GameObject buffIcon;
     [SerializeField] private GameObject[] extraBuffIcons;
     public KeyCode toggleKey = KeyCode.None;
-    public int bonusHealthAmount = 3;
+    public int bonusHealthAmount = 1;
     public float heartDelay = 0.12f;
 
     [Header("Sound")]

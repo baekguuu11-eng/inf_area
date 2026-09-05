@@ -6,6 +6,10 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public class PlayerProjectile : MonoBehaviour
 {
+    private const int MaxPoolSize = 160;
+    private static readonly Stack<PlayerProjectile> projectilePool = new Stack<PlayerProjectile>();
+    private static Transform projectilePoolRoot;
+    private static float nextCloseShotgunPunchTime;
     [Header("Legacy / Safety Cleanup")]
     [SerializeField] private float lifetime = 8f;
 
@@ -20,6 +24,7 @@ public class PlayerProjectile : MonoBehaviour
     private int remainingPierce;
     private float falloffEndDistance = 16f;
     private bool terminated;
+    private float expireAt;
 
     private void Awake()
     {
@@ -39,18 +44,54 @@ public class PlayerProjectile : MonoBehaviour
         previousPosition = transform.position;
     }
 
-    private void Start()
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetPool()
     {
-        // Gameplay range is no longer capped. This lifetime is only a technical cleanup guard
-        // for projectiles that somehow leave every room without touching a wall.
-        float cleanupLifetime = weapon != null ? weapon.projectileLifetime : lifetime;
-        Destroy(gameObject, Mathf.Max(1f, cleanupLifetime));
+        projectilePool.Clear();
+        projectilePoolRoot = null;
+    }
+
+    public static PlayerProjectile Acquire(GameObject prefab, Vector2 position)
+    {
+        PlayerProjectile projectile = null;
+        while (projectilePool.Count > 0 && projectile == null)
+            projectile = projectilePool.Pop();
+
+        if (projectile == null)
+        {
+            GameObject obj = prefab != null
+                ? Object.Instantiate(prefab, position, Quaternion.identity)
+                : new GameObject("PlayerProjectile_Runtime");
+            if (obj.GetComponent<Rigidbody2D>() == null) obj.AddComponent<Rigidbody2D>();
+            if (obj.GetComponent<BoxCollider2D>() == null) obj.AddComponent<BoxCollider2D>();
+            projectile = obj.GetComponent<PlayerProjectile>();
+            if (projectile == null) projectile = obj.AddComponent<PlayerProjectile>();
+        }
+        else
+        {
+            projectile.transform.position = position;
+            projectile.transform.rotation = Quaternion.identity;
+            projectile.gameObject.SetActive(true);
+        }
+        return projectile;
+    }
+
+    private static void EnsurePoolRoot()
+    {
+        if (projectilePoolRoot != null) return;
+        GameObject root = new GameObject("V11_PlayerProjectilePool");
+        root.hideFlags = HideFlags.DontSave;
+        projectilePoolRoot = root.transform;
     }
 
     private void FixedUpdate()
     {
-        if (terminated)
+        if (terminated) return;
+        if (expireAt > 0f && Time.unscaledTime >= expireAt)
+        {
+            Terminate();
             return;
+        }
 
         Vector2 currentPosition = body.position;
         if (SweepForWall(previousPosition, currentPosition))
@@ -61,6 +102,9 @@ public class PlayerProjectile : MonoBehaviour
 
     public void Configure(PlayerProjectileContext context)
     {
+        terminated = false;
+        hitEnemies.Clear();
+        if (projectileCollider != null) projectileCollider.enabled = true;
         weapon = context.weapon;
         origin = context.origin;
         previousPosition = transform.position;
@@ -69,6 +113,8 @@ public class PlayerProjectile : MonoBehaviour
         falloffEndDistance = weapon != null
             ? Mathf.Max(weapon.falloffStartDistance + 0.01f, weapon.maximumRange)
             : 16f;
+        float cleanupLifetime = weapon != null ? weapon.projectileLifetime : lifetime;
+        expireAt = Time.unscaledTime + Mathf.Max(1f, cleanupLifetime);
 
         Vector2 direction = context.direction.sqrMagnitude > 0.0001f ? context.direction.normalized : Vector2.right;
         body.linearVelocity = direction * Mathf.Max(0.1f, context.speed);
@@ -83,6 +129,10 @@ public class PlayerProjectile : MonoBehaviour
 
     public void Setup(Vector2 direction, float speed, int dmg, int pierceCount, float visualScale)
     {
+        terminated = false;
+        hitEnemies.Clear();
+        if (projectileCollider != null) projectileCollider.enabled = true;
+        expireAt = Time.unscaledTime + Mathf.Max(1f, lifetime);
         origin = transform.position;
         damage = Mathf.Max(1, dmg);
         remainingPierce = Mathf.Max(0, pierceCount);
@@ -110,8 +160,21 @@ public class PlayerProjectile : MonoBehaviour
             int appliedDamage = CalculateDistanceDamage(travelled);
             float stoppingPower = weapon != null ? weapon.knockbackBonus : 0f;
             Vector2 hitPoint = collision.ClosestPoint(transform.position);
+            bool lethal = appliedDamage >= enemy.CurrentHealth;
+            EnemyRole role = enemy.GetComponentInParent<EnemyRole>();
+            bool tank = role != null && role.CurrentRole == EnemyRole.Role.Tank;
             enemy.TakeDamage(new DamageContext(appliedDamage, direction, hitPoint, EnemyHitKind.Ranged, stoppingPower));
+            CombatImpactFXV11.EmitWeaponHit(weapon, hitPoint, direction, lethal, tank, travelled);
             if (PlayerCombatSFX.Instance != null) PlayerCombatSFX.Instance.PlayRangedImpact(weapon, enemy, hitPoint);
+
+            if (weapon != null && weapon.rangedMode == RangedAttackMode.Shotgun && travelled <= 1.10f &&
+                Time.unscaledTime >= nextCloseShotgunPunchTime)
+            {
+                nextCloseShotgunPunchTime = Time.unscaledTime + 0.095f;
+                CameraFeedbackController feedback = CameraFeedbackController.Instance;
+                if (feedback != null) feedback.Impact(CameraImpactLevelV11.Medium, -direction, false);
+                CombatPostProcessV61.PulseShotgunClose();
+            }
 
             if (remainingPierce <= 0)
                 Terminate();
@@ -233,9 +296,15 @@ public class PlayerProjectile : MonoBehaviour
 
     private void Terminate()
     {
-        if (terminated)
-            return;
+        if (terminated) return;
         terminated = true;
-        Destroy(gameObject);
+        if (body != null) body.linearVelocity = Vector2.zero;
+        if (projectileCollider != null) projectileCollider.enabled = false;
+        hitEnemies.Clear();
+        EnsurePoolRoot();
+        gameObject.SetActive(false);
+        transform.SetParent(projectilePoolRoot, false);
+        if (projectilePool.Count < MaxPoolSize) projectilePool.Push(this);
+        else Destroy(gameObject);
     }
 }

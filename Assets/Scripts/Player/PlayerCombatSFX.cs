@@ -19,6 +19,7 @@ public sealed class PlayerCombatSFX : MonoBehaviour
     private int laserIndex;
     private int impactIndex = -1;
     private float nextImpactTime;
+    private float nextPickupTime;
     private Coroutine shotgunPumpRoutine;
 
     private AudioClip rangedEquip;
@@ -149,7 +150,9 @@ public sealed class PlayerCombatSFX : MonoBehaviour
 
     private void HandleAmmoPickedUp(int amount)
     {
-        if (amount > 0) Play(utilitySource, ammoPickup, 0.62f, 0.98f, 1.02f);
+        if (amount <= 0 || Time.unscaledTime < nextPickupTime) return;
+        nextPickupTime = Time.unscaledTime + 0.055f;
+        Play(utilitySource, ammoPickup, 0.62f, 0.98f, 1.02f);
     }
 
     private void HandleReloadState(bool active, float progress)
@@ -196,7 +199,7 @@ public sealed class PlayerCombatSFX : MonoBehaviour
                 PlaySequential(weaponSource, pistolFire, ref pistolIndex, 0.66f, 0.98f, 1.02f);
                 break;
             case "machine_gun":
-                PlaySequential(weaponSource, machineFire, ref machineIndex, 0.42f, 0.99f, 1.01f);
+                PlaySequential(weaponSource, machineFire, ref machineIndex, 0.54f, 0.99f, 1.01f);
                 break;
             case "shotgun":
                 Play(weaponSource, shotgunFire, 0.82f, 0.99f, 1.01f);

@@ -167,8 +167,21 @@ public sealed class MeleeSweepResolver : MonoBehaviour
             if (dir.sqrMagnitude < 0.001f)
                 dir = visuals != null ? visuals.AimDirection : Vector2.right;
 
-            health.TakeDamage(new DamageContext(damage, dir, hitPoint, EnemyHitKind.Melee, knockback));
-            if (combatSfx != null) combatSfx.PlayMeleeImpact(weapon, health, hitPoint);
+            Vector2 trueHitPoint = hit != null ? hit.ClosestPoint(hitPoint) : hitPoint;
+            bool lethal = damage >= health.CurrentHealth;
+            EnemyRole role = health.GetComponentInParent<EnemyRole>();
+            bool tank = role != null && role.CurrentRole == EnemyRole.Role.Tank;
+            health.TakeDamage(new DamageContext(damage, dir, trueHitPoint, EnemyHitKind.Melee, knockback));
+            CombatImpactFXV11.EmitWeaponHit(weapon, trueHitPoint, dir, lethal, tank, 0f);
+            if (combatSfx != null) combatSfx.PlayMeleeImpact(weapon, health, trueHitPoint);
+            if (!health.IsDead && weapon != null && weapon.weaponId == "debug_whip")
+            {
+                // V14 DATA BIND: whip hits slow movement but never slow attack animations/timers.
+                EnemySlowStatusV14 slow = health.GetComponent<EnemySlowStatusV14>();
+                if (slow == null) slow = health.gameObject.AddComponent<EnemySlowStatusV14>();
+                slow.Apply(tank ? 0.85f : 0.70f, tank ? 1.2f : 1.5f);
+            }
+
             if (!health.IsDead && weapon != null && weapon.burnDamagePerTick > 0 && weapon.burnTicks > 0)
             {
                 EnemyBurnStatus burn = health.GetComponent<EnemyBurnStatus>();

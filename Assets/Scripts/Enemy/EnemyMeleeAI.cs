@@ -52,6 +52,7 @@ public sealed class EnemyMeleeAI : MonoBehaviour
     private float nextDecisionTime;
     private bool ownsAttackToken;
     private int orbitSign;
+    private StageEnemyEvolutionV12 evolution;
 
     private void Awake()
     {
@@ -138,6 +139,8 @@ public sealed class EnemyMeleeAI : MonoBehaviour
 
     private IEnumerator AttackRoutine()
     {
+        if (evolution == null) evolution = GetComponent<StageEnemyEvolutionV12>();
+        int evolvedVariant = evolution != null ? evolution.ChooseMeleeVariant() : 0;
         state = State.Windup;
         attackContract.BeginTelegraph(telegraph);
         motor.SetMovementEnabled(false, true);
@@ -186,11 +189,91 @@ public sealed class EnemyMeleeAI : MonoBehaviour
             yield return new WaitForFixedUpdate();
         }
 
+        if (evolvedVariant == 1)
+            yield return EvolvedFollowupLunge();
+        else if (evolvedVariant == 2)
+            yield return EvolvedArcSweep();
+        evolution?.ResetTelegraph(telegraph);
+
         attackContract.BeginRecovery(telegraph);
         state = State.Recovery;
         visualMotion.SetAction(EnemyVisualMotion.ActionState.Recovery, lockedDirection);
         yield return new WaitForSeconds(Mathf.Max(0.01f, recoveryDuration));
         FinishAttack();
+    }
+
+    private IEnumerator EvolvedFollowupLunge()
+    {
+        yield return new WaitForSeconds(0.10f);
+        if (ShouldInterrupt()) yield break;
+
+        perception.RefreshNow();
+        Vector2 direction = perception.HasPlayer ? perception.DirectionToPlayer : Vector2.down;
+        const float windup = 0.18f;
+        const float distance = 0.56f;
+        const float duration = 0.09f;
+
+        attackContract.BeginTelegraph(telegraph);
+        evolution?.ApplyEvolvedTelegraph(telegraph);
+        float elapsed = 0f;
+        while (elapsed < windup)
+        {
+            if (ShouldInterrupt()) yield break;
+            if (elapsed < 0.09f && perception.HasPlayer)
+                direction = perception.DirectionToPlayer;
+            telegraph?.ShowLine(direction, distance + attackHitRadius * 0.72f, telegraphWidth * 0.92f);
+            telegraph?.SetProgress(elapsed / windup);
+            visualMotion.SetAction(EnemyVisualMotion.ActionState.Windup, direction);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        attackContract.BeginActive(telegraph);
+        visualMotion.SetAction(EnemyVisualMotion.ActionState.Attack, direction);
+        bool damaged = false;
+        float moveElapsed = 0f;
+        while (moveElapsed < duration)
+        {
+            if (ShouldInterrupt()) yield break;
+            float step = distance / duration * Time.fixedDeltaTime;
+            if (!motor.MoveScripted(direction * step)) break;
+            if (!damaged)
+                damaged = attackContract.TryDamageCircle(body.position + direction * 0.04f, attackHitRadius * 0.92f, attackDamage);
+            moveElapsed += Time.fixedDeltaTime;
+            yield return new WaitForFixedUpdate();
+        }
+        telegraph?.Hide();
+    }
+
+    private IEnumerator EvolvedArcSweep()
+    {
+        yield return new WaitForSeconds(0.11f);
+        if (ShouldInterrupt()) yield break;
+
+        perception.RefreshNow();
+        Vector2 direction = perception.HasPlayer ? perception.DirectionToPlayer : Vector2.down;
+        const float radius = 0.94f;
+        const float angle = 128f;
+        const float windup = 0.22f;
+        attackContract.BeginTelegraph(telegraph);
+        evolution?.ApplyEvolvedTelegraph(telegraph, true);
+        float elapsed = 0f;
+        while (elapsed < windup)
+        {
+            if (ShouldInterrupt()) yield break;
+            telegraph?.ShowSector(direction, radius, angle);
+            telegraph?.SetProgress(elapsed / windup);
+            visualMotion.SetAction(EnemyVisualMotion.ActionState.Windup, direction);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        attackContract.BeginActive(telegraph);
+        visualMotion.SetAction(EnemyVisualMotion.ActionState.Attack, direction);
+        attackContract.TryDamageSector(body.position, direction, radius, angle, attackDamage);
+        CameraFeedbackController feedback = CameraFeedbackController.Instance;
+        if (feedback != null) feedback.Shake(0.055f, 0.045f, direction);
+        yield return new WaitForSecondsRealtime(0.06f);
+        telegraph?.Hide();
     }
 
     private bool ShouldInterrupt()

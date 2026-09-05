@@ -67,6 +67,7 @@ public sealed class EnemyTankAI : MonoBehaviour
     private float nextDecisionTime;
     private float nextChargeAllowedTime;
     private bool ownsHeavyToken;
+    private StageEnemyEvolutionV12 evolution;
 
     private void Awake()
     {
@@ -165,6 +166,8 @@ public sealed class EnemyTankAI : MonoBehaviour
 
     private IEnumerator SlamRoutine()
     {
+        if (evolution == null) evolution = GetComponent<StageEnemyEvolutionV12>();
+        bool evolvedAftershock = evolution != null && evolution.ShouldTankAftershock();
         state = State.SlamWindup;
         attackContract.BeginTelegraph(telegraph);
         motor.SetMovementEnabled(false, true);
@@ -193,7 +196,7 @@ public sealed class EnemyTankAI : MonoBehaviour
         state = State.Slam;
         attackContract.BeginActive(telegraph);
         visualMotion.SetAction(EnemyVisualMotion.ActionState.Attack, lockedDirection);
-        attackContract.TryDamageSector(body.position, lockedDirection, GetEffectiveSlamRadius(), slamAngle, slamDamage);
+        attackContract.TryDamageSector(body.position, lockedDirection, GetSlamDamageRadius(), GetSlamDamageAngle(), slamDamage);
 
         CameraFeedbackController feedback = CameraFeedbackController.Instance;
         if (feedback != null)
@@ -204,6 +207,10 @@ public sealed class EnemyTankAI : MonoBehaviour
 
         yield return new WaitForSecondsRealtime(0.11f);
         telegraph?.Hide();
+
+        if (evolvedAftershock && !ShouldInterrupt())
+            yield return EvolvedSlamAftershock();
+
         attackContract.BeginRecovery(telegraph);
         state = State.Recovery;
         visualMotion.SetAction(EnemyVisualMotion.ActionState.Recovery, lockedDirection);
@@ -213,6 +220,8 @@ public sealed class EnemyTankAI : MonoBehaviour
 
     private IEnumerator ChargeRoutine()
     {
+        if (evolution == null) evolution = GetComponent<StageEnemyEvolutionV12>();
+        bool evolvedDoubleCharge = evolution != null && evolution.ShouldTankDoubleCharge();
         state = State.ChargeWindup;
         attackContract.BeginTelegraph(telegraph);
         motor.SetMovementEnabled(false, true);
@@ -292,6 +301,10 @@ public sealed class EnemyTankAI : MonoBehaviour
                 feedback.Shake(0.11f, 0.09f, lockedDirection);
             yield return new WaitForSeconds(0.20f);
         }
+        else if (evolvedDoubleCharge && !ShouldInterrupt())
+        {
+            yield return EvolvedSecondCharge();
+        }
 
         attackContract.BeginRecovery(telegraph);
         state = State.Recovery;
@@ -300,10 +313,89 @@ public sealed class EnemyTankAI : MonoBehaviour
         FinishAttack();
     }
 
+    private IEnumerator EvolvedSlamAftershock()
+    {
+        const float radius = 1.18f;
+        const float windup = 0.27f;
+        attackContract.BeginTelegraph(telegraph);
+        evolution?.ApplyEvolvedTelegraph(telegraph);
+        float elapsed = 0f;
+        while (elapsed < windup)
+        {
+            if (ShouldInterrupt()) yield break;
+            telegraph?.ShowCircle(radius);
+            telegraph?.SetProgress(elapsed / windup);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        attackContract.BeginActive(telegraph);
+        attackContract.TryDamageCircle(body.position, radius, 1);
+        CameraFeedbackController feedback = CameraFeedbackController.Instance;
+        if (feedback != null) feedback.Shake(0.07f, 0.055f, Vector2.zero);
+        yield return new WaitForSecondsRealtime(0.06f);
+        telegraph?.Hide();
+        evolution?.ResetTelegraph(telegraph);
+    }
+
+    private IEnumerator EvolvedSecondCharge()
+    {
+        perception.RefreshNow();
+        Vector2 direction = perception.HasPlayer ? perception.DirectionToPlayer : Vector2.down;
+        const float windup = 0.28f;
+        float distance = Mathf.Clamp(perception.DistanceToPlayer + 0.18f, 1.65f, 2.55f);
+        attackContract.BeginTelegraph(telegraph);
+        evolution?.ApplyEvolvedTelegraph(telegraph, true);
+        float elapsed = 0f;
+        while (elapsed < windup)
+        {
+            if (ShouldInterrupt()) yield break;
+            if (elapsed < 0.12f && perception.HasPlayer)
+            {
+                direction = perception.DirectionToPlayer;
+                distance = Mathf.Clamp(perception.DistanceToPlayer + 0.18f, 1.65f, 2.55f);
+            }
+            telegraph?.ShowLine(direction, distance, chargeWidth * 0.92f);
+            telegraph?.SetProgress(elapsed / windup);
+            visualMotion.SetAction(EnemyVisualMotion.ActionState.Windup, direction);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        attackContract.BeginActive(telegraph);
+        visualMotion.SetAction(EnemyVisualMotion.ActionState.Attack, direction);
+        bool damaged = false;
+        float moveElapsed = 0f;
+        const float duration = 0.22f;
+        while (moveElapsed < duration)
+        {
+            if (ShouldInterrupt()) yield break;
+            Vector2 previous = body.position;
+            float step = distance / duration * Time.fixedDeltaTime;
+            if (!motor.MoveScripted(direction * step)) break;
+            if (!damaged)
+                damaged = attackContract.TryDamageCapsule(previous, body.position, chargeWidth * 0.52f, 1);
+            moveElapsed += Time.fixedDeltaTime;
+            yield return new WaitForFixedUpdate();
+        }
+        telegraph?.Hide();
+        evolution?.ResetTelegraph(telegraph);
+    }
+
     private float GetEffectiveSlamRadius()
     {
-        // 경고선 가장자리에 몸체가 살짝 걸친 경우도 시각적으로 납득되게 작은 여유를 둔다.
-        return Mathf.Max(0.25f, slamRadius + 0.15f);
+        // V13: 보이는 경고보다 실제 판정이 바깥으로 튀어나오지 않게 한다.
+        return Mathf.Max(0.25f, slamRadius);
+    }
+
+    private float GetSlamDamageRadius()
+    {
+        // 실제 피해 판정은 경고 테두리보다 살짝 안쪽. 눈으로 벗어난 상태에서 맞는 체감을 제거한다.
+        return Mathf.Max(0.20f, slamRadius - 0.10f);
+    }
+
+    private float GetSlamDamageAngle()
+    {
+        return Mathf.Max(20f, slamAngle - 6f);
     }
 
     private float GetSlamOriginDistanceToPlayer()
@@ -357,6 +449,24 @@ public sealed class EnemyTankAI : MonoBehaviour
         ownsHeavyToken = false;
         coordinator?.Release(this, EnemyAttackCoordinator.AttackChannel.Heavy);
     }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    public void DebugFlashSlamRange()
+    {
+        if (!isActiveAndEnabled || telegraph == null) return;
+        StartCoroutine(DebugFlashSlamRangeRoutine());
+    }
+
+    private IEnumerator DebugFlashSlamRangeRoutine()
+    {
+        Vector2 direction = perception != null && perception.HasPlayer ? perception.DirectionToPlayer : Vector2.right;
+        telegraph.ResetPalette();
+        telegraph.ShowSector(direction, GetEffectiveSlamRadius(), slamAngle);
+        telegraph.SetProgress(0.92f);
+        yield return new WaitForSecondsRealtime(1.0f);
+        if (attackRoutine == null) telegraph.Hide();
+    }
+#endif
 
     private void OnDisable()
     {

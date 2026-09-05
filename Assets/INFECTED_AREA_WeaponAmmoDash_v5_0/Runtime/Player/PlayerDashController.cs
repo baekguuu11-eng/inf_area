@@ -83,6 +83,9 @@ public sealed class PlayerDashController : MonoBehaviour
         float safeDistance = CalculateSafeDistance(direction, dashDistance);
         Vector2 start = body.position;
         Vector2 target = start + direction * safeDistance;
+        CombatImpactFXV11.EmitDashBurst(start, direction, false);
+        CameraFeedbackController dashFeedback = CameraFeedbackController.Instance;
+        if (dashFeedback != null) dashFeedback.Impact(CameraImpactLevelV11.Small, -direction, false);
         float elapsed = 0f;
         int spawned = 0;
 
@@ -104,6 +107,7 @@ public sealed class PlayerDashController : MonoBehaviour
 
         body.position = target;
         body.linearVelocity = Vector2.zero;
+        CombatImpactFXV11.EmitDashBurst(target, direction, true);
         dashRoutine = null;
     }
 

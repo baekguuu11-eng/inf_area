@@ -29,6 +29,7 @@ public class PlayerCombat : MonoBehaviour
     private float nextAttackTime;
     private Vector2 lastAttackDirection = Vector2.down;
     private bool machineGunWasFiring;
+    private float machineGunHeat;
 
     public bool IsAttacking => isAttacking;
     public Vector2 AimDirection => lastAttackDirection;
@@ -74,6 +75,7 @@ public class PlayerCombat : MonoBehaviour
 
     private void Update()
     {
+        machineGunHeat = Mathf.MoveTowards(machineGunHeat, 0f, Time.deltaTime * (machineGunWasFiring ? 0.30f : 1.65f));
         if (GameInputState.IsLocked)
         {
             StopMachineGunTailIfNeeded();
@@ -254,13 +256,26 @@ public class PlayerCombat : MonoBehaviour
         else if (weapon.rangedMode == RangedAttackMode.Shotgun)
             FireShotgun(weapon, origin, lockedDirection, damage);
         else
-            SpawnProjectile(weapon, origin, ApplySpread(lockedDirection, weapon.spreadDegrees), damage);
+        {
+            float spread = weapon.spreadDegrees;
+            if (weapon.weaponId == "machine_gun")
+            {
+                machineGunHeat = Mathf.Clamp01(machineGunHeat + 0.072f);
+                float hot = Mathf.InverseLerp(0.36f, 1f, machineGunHeat);
+                spread += Mathf.Lerp(0f, 2.15f, hot);
+            }
+            SpawnProjectile(weapon, origin, ApplySpread(lockedDirection, spread), damage);
+        }
 
         CameraFeedbackController feedback = CameraFeedbackController.Instance;
         if (feedback != null)
         {
             feedback.AddRecoil(lockedDirection, weapon.cameraKick);
-            if (weapon.cameraShake > 0f)
+            if (weapon.weaponId == "machine_gun")
+                feedback.Impact(CameraImpactLevelV11.Small, -lockedDirection, false);
+            else if (weapon.rangedMode == RangedAttackMode.Shotgun)
+                feedback.Impact(CameraImpactLevelV11.Medium, -lockedDirection, false);
+            else if (weapon.cameraShake > 0f)
                 feedback.Shake(0.045f, weapon.cameraShake, -lockedDirection);
         }
 
@@ -293,14 +308,7 @@ public class PlayerCombat : MonoBehaviour
 
     private void SpawnProjectile(WeaponDefinition weapon, Vector2 origin, Vector2 direction, int damage)
     {
-        GameObject obj = bulletPrefab != null
-            ? Instantiate(bulletPrefab, origin, Quaternion.identity)
-            : new GameObject("PlayerProjectile_Runtime");
-
-        if (obj.GetComponent<Rigidbody2D>() == null) obj.AddComponent<Rigidbody2D>();
-        if (obj.GetComponent<BoxCollider2D>() == null) obj.AddComponent<BoxCollider2D>();
-        PlayerProjectile projectile = obj.GetComponent<PlayerProjectile>();
-        if (projectile == null) projectile = obj.AddComponent<PlayerProjectile>();
+        PlayerProjectile projectile = PlayerProjectile.Acquire(bulletPrefab, origin);
 
         int pierce = weapon.pierceCount + (stats != null ? Mathf.Max(0, stats.ProjectilePierce) : 0);
         projectile.Configure(new PlayerProjectileContext(
@@ -338,7 +346,11 @@ public class PlayerCombat : MonoBehaviour
                 float distanceFalloff = CalculateRangedFalloffMultiplier(weapon, hit.distance);
                 float targetFalloff = Mathf.Pow(Mathf.Clamp(weapon.beamPerTargetMultiplier, 0.1f, 1f), index);
                 int resolved = Mathf.Max(1, Mathf.RoundToInt(baseDamage * distanceFalloff * targetFalloff));
+                bool lethal = resolved >= enemy.CurrentHealth;
+                EnemyRole role = enemy.GetComponentInParent<EnemyRole>();
+                bool tank = role != null && role.CurrentRole == EnemyRole.Role.Tank;
                 enemy.TakeDamage(new DamageContext(resolved, safeDirection, hit.point, EnemyHitKind.Ranged, weapon.knockbackBonus));
+                CombatImpactFXV11.EmitWeaponHit(weapon, hit.point, safeDirection, lethal, tank, hit.distance);
                 if (combatSfx != null) combatSfx.PlayRangedImpact(weapon, enemy, hit.point);
                 index++;
                 if (index >= weapon.beamMaxTargets)

@@ -177,7 +177,12 @@ public class RoomTransitionUI : MonoBehaviour
     {
         if (room == 5)
             return "PORTAL ROOM";
-        return $"SECTOR {stage}-{room}";
+
+        // Stage 1 has an unlabelled spawn/start room. The first room reached after leaving
+        // it is internal room 2, but should be presented to the player as 1-1. Keep the
+        // internal numbering untouched so spawning/portal logic is not destabilized.
+        int displayRoom = (stage == 1 && room >= 2 && room <= 4) ? room - 1 : room;
+        return $"SECTOR {stage}-{displayRoom}";
     }
 
     private void ApplyRoomTheme(int room)

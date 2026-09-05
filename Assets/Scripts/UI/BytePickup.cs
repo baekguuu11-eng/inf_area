@@ -278,6 +278,7 @@ public sealed class BytePickup : MonoBehaviour
             currencyManager = ByteCurrencyManager.Instance;
         if (currencyManager != null)
             currencyManager.AddBytes(value);
+        CombatImpactFXV11.EmitPickup(transform.position, new Color(0.12f, 0.92f, 0.82f, 1f));
         Destroy(gameObject);
     }
 
@@ -374,39 +375,71 @@ public sealed class BytePickup : MonoBehaviour
         if (fallbackSprite != null)
             return fallbackSprite;
 
-        const int size = 16;
+        // V12 Byte: a compact data-token / circuit-core silhouette. The world pickup now
+        // matches the HUD language instead of looking like a plain glowing ball.
+        const int size = 20;
         Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
         {
-            name = "BytePickup_V620_Texture",
+            name = "BytePickup_V12_DataToken",
             filterMode = FilterMode.Point,
             wrapMode = TextureWrapMode.Clamp,
             hideFlags = HideFlags.HideAndDontSave
         };
 
         Color clear = Color.clear;
-        Color main = new Color(0.15f, 1.35f, 1.18f, 1f);
-        Color edge = new Color(0.015f, 0.12f, 0.16f, 1f);
-        Color highlight = new Color(1.45f, 1.65f, 1.55f, 1f);
-        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
-        float radius = size * 0.42f;
-
+        Color shadow = new Color32(2, 13, 22, 255);
+        Color metal = new Color32(12, 53, 67, 255);
+        Color rim = new Color32(23, 177, 184, 255);
+        Color cyan = new Color32(46, 235, 220, 255);
+        Color bright = new Color32(178, 255, 247, 255);
+        Color core = new Color32(8, 91, 118, 255);
         for (int y = 0; y < size; y++)
-        {
             for (int x = 0; x < size; x++)
+                texture.SetPixel(x, y, clear);
+
+        // Pixel-octagon shell.
+        for (int y = 2; y <= 17; y++)
+        {
+            for (int x = 2; x <= 17; x++)
             {
-                float distance = Vector2.Distance(new Vector2(x, y), center);
-                Color color = clear;
-                if (distance <= radius)
-                    color = distance > radius - 2f ? edge : main;
-                if ((x == 6 || x == 7) && (y == 10 || y == 11))
-                    color = highlight;
-                texture.SetPixel(x, y, color);
+                int edge = Mathf.Min(Mathf.Min(x - 2, 17 - x), Mathf.Min(y - 2, 17 - y));
+                bool clippedCorner = (x + y < 7) || (x + (19 - y) < 7) || ((19 - x) + y < 7) || ((19 - x) + (19 - y) < 7);
+                if (clippedCorner) continue;
+                Color c = edge <= 0 ? shadow : edge == 1 ? metal : edge == 2 ? rim : new Color32(4, 39, 55, 255);
+                texture.SetPixel(x, y, c);
             }
         }
 
+        // Inner data diamond and circuit cross.
+        Vector2 center = new Vector2(9.5f, 9.5f);
+        for (int y = 5; y <= 14; y++)
+        {
+            for (int x = 5; x <= 14; x++)
+            {
+                float manhattan = Mathf.Abs(x - center.x) + Mathf.Abs(y - center.y);
+                if (manhattan <= 5.2f)
+                    texture.SetPixel(x, y, core);
+            }
+        }
+        for (int x = 5; x <= 14; x++) texture.SetPixel(x, 9, cyan);
+        for (int y = 5; y <= 14; y++) texture.SetPixel(9, y, cyan);
+        texture.SetPixel(9, 9, bright);
+        texture.SetPixel(10, 9, bright);
+        texture.SetPixel(9, 10, bright);
+        texture.SetPixel(10, 10, bright);
+        texture.SetPixel(5, 9, bright);
+        texture.SetPixel(14, 9, bright);
+        texture.SetPixel(9, 5, bright);
+        texture.SetPixel(9, 14, bright);
+
+        // Segmented rim gives it a digital-token read at very small scale.
+        int[,] nodes = { { 7, 2 }, { 12, 2 }, { 17, 7 }, { 17, 12 }, { 12, 17 }, { 7, 17 }, { 2, 12 }, { 2, 7 } };
+        for (int i = 0; i < nodes.GetLength(0); i++)
+            texture.SetPixel(nodes[i, 0], nodes[i, 1], bright);
+
         texture.Apply(false, true);
-        fallbackSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 16f, 0u, SpriteMeshType.FullRect);
-        fallbackSprite.name = "BytePickup_V620_Sprite";
+        fallbackSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 20f, 0u, SpriteMeshType.FullRect);
+        fallbackSprite.name = "BytePickup_V12_DataToken_Sprite";
         fallbackSprite.hideFlags = HideFlags.HideAndDontSave;
         return fallbackSprite;
     }

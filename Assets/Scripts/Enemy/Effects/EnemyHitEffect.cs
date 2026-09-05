@@ -61,6 +61,19 @@ public class EnemyHitEffect : MonoBehaviour
         outlineRenderer.sortingOrder = spriteRenderer.sortingOrder - 1;
     }
 
+    public void RefreshOriginalColor()
+    {
+        if (spriteRenderer == null)
+            spriteRenderer = GetComponent<SpriteRenderer>();
+        if (spriteRenderer != null)
+        {
+            Color current = spriteRenderer.color;
+            if (current.a <= 0.001f)
+                current.a = originalColor.a > 0.001f ? originalColor.a : 1f;
+            originalColor = current;
+        }
+    }
+
     public void PlayHit()
     {
         if (flashCoroutine != null)

@@ -62,21 +62,24 @@ public class ChipSlotManager : MonoBehaviour
     [SerializeField] private GameObject overclockObject;
 
     [Header("Effect Values")]
-    [SerializeField] private float meleeDamageMultiplier = 1.5f;
-    [SerializeField] private float meleeAttackSpeedMultiplier = 1.3f;
-    [SerializeField] private float meleeRangeMultiplier = 1.4f;
+    [SerializeField] private float meleeDamageMultiplier = 1.20f;
+    [SerializeField] private float meleeAttackSpeedMultiplier = 1.15f;
+    [SerializeField] private float meleeRangeMultiplier = 1.15f;
 
-    [SerializeField] private float rangedDamageMultiplier = 1.5f;
-    [SerializeField] private float rangedAttackSpeedMultiplier = 1.3f;
+    [SerializeField] private float rangedDamageMultiplier = 1.18f;
+    [SerializeField] private float rangedAttackSpeedMultiplier = 1.12f;
     [SerializeField] private bool rangedPierceEnabled = true;
 
-    [SerializeField] private float defenseDamageMultiplier = 0.7f;
-    [SerializeField] private float moveSpeedMultiplier = 1.3f;
+    [SerializeField] private float defenseDamageMultiplier = 0.82f;
+    [SerializeField] private float moveSpeedMultiplier = 1.12f;
 
     [Header("Input Option")]
-    [SerializeField] private bool allowTopNumberKeys = false;
+    [SerializeField] private bool allowTopNumberKeys = true;
 
     private readonly List<ChipType> equippedChips = new List<ChipType>();
+    private readonly HashSet<ChipType> ownedChips = new HashSet<ChipType>();
+
+    public IReadOnlyCollection<ChipType> OwnedChips => ownedChips;
 
     private CanvasGroup[] slotCanvasGroups;
     private Vector3[] slotOriginalScales;
@@ -94,6 +97,40 @@ public class ChipSlotManager : MonoBehaviour
 
     public float DefenseDamageMultiplier => IsChipEquipped(ChipType.Defense) ? defenseDamageMultiplier : 1f;
     public float MoveSpeedMultiplier => IsChipEquipped(ChipType.MoveSpeed) ? moveSpeedMultiplier : 1f;
+
+    public static string GetChipDisplayName(ChipType chipType)
+    {
+        switch (chipType)
+        {
+            case ChipType.MeleeDamage: return "절단 증폭 칩";
+            case ChipType.MeleeAttackSpeed: return "서보 오버클럭 칩";
+            case ChipType.MeleeRange: return "신장 프로토콜 칩";
+            case ChipType.RangedDamage: return "탄도 증폭 칩";
+            case ChipType.RangedAttackSpeed: return "급속 순환 칩";
+            case ChipType.RangedPierce: return "관통 연산 칩";
+            case ChipType.Defense: return "방벽 프로토콜 칩";
+            case ChipType.MaxHealth: return "생체 확장 칩";
+            case ChipType.MoveSpeed: return "기동 최적화 칩";
+            default: return "미확인 칩";
+        }
+    }
+
+    public static string GetChipEffectText(ChipType chipType)
+    {
+        switch (chipType)
+        {
+            case ChipType.MeleeDamage: return "근접 공격력 +20%";
+            case ChipType.MeleeAttackSpeed: return "근접 공격속도 +15%";
+            case ChipType.MeleeRange: return "근접 사거리 +15%";
+            case ChipType.RangedDamage: return "원거리 공격력 +18%";
+            case ChipType.RangedAttackSpeed: return "원거리 연사속도 +12%";
+            case ChipType.RangedPierce: return "투사체 관통 +1회";
+            case ChipType.Defense: return "받는 피해 18% 감소";
+            case ChipType.MaxHealth: return "최대 체력 +1";
+            case ChipType.MoveSpeed: return "이동속도 +12%";
+            default: return string.Empty;
+        }
+    }
 
     private void Awake()
     {
@@ -183,6 +220,13 @@ public class ChipSlotManager : MonoBehaviour
             return;
         }
 
+        // Chips must come from the shop first. Number keys 1-9 only manage chips the
+        // player actually owns; they no longer grant free chip effects.
+        if (!OwnsChip(chipType))
+        {
+            return;
+        }
+
         if (IsChipEquipped(chipType))
         {
             UnequipChip(chipType);
@@ -193,9 +237,47 @@ public class ChipSlotManager : MonoBehaviour
         }
     }
 
+    public bool OwnsChip(ChipType chipType)
+    {
+        return chipType != ChipType.None && ownedChips.Contains(chipType);
+    }
+
+    /// <summary>
+    /// Called by the shop. Buying a chip permanently unlocks it for this run and
+    /// immediately equips it so the purchase is visible in the three active chip slots.
+    /// The player can then toggle/re-equip owned chips with number keys 1-9.
+    /// </summary>
+    public bool PurchaseChip(ChipType chipType)
+    {
+        if (chipType == ChipType.None || ownedChips.Contains(chipType))
+            return false;
+
+        ownedChips.Add(chipType);
+        EquipChip(chipType);
+        Debug.Log("Chip Purchased: " + chipType);
+        return true;
+    }
+
+    public int GetChipHotkeyNumber(ChipType chipType)
+    {
+        switch (chipType)
+        {
+            case ChipType.MeleeDamage: return 1;
+            case ChipType.MeleeAttackSpeed: return 2;
+            case ChipType.MeleeRange: return 3;
+            case ChipType.RangedDamage: return 4;
+            case ChipType.RangedAttackSpeed: return 5;
+            case ChipType.RangedPierce: return 6;
+            case ChipType.Defense: return 7;
+            case ChipType.MaxHealth: return 8;
+            case ChipType.MoveSpeed: return 9;
+            default: return 0;
+        }
+    }
+
     public void EquipChip(ChipType chipType)
     {
-        if (chipType == ChipType.None)
+        if (chipType == ChipType.None || !OwnsChip(chipType))
         {
             return;
         }

@@ -34,6 +34,8 @@ public sealed class EnemyDeathEffect : MonoBehaviour
 
     public void PlayDeath(Vector3 worldPosition, DamageContext context)
     {
+        EnemyRole.Role resolvedRole = role != null ? role.CurrentRole : EnemyRole.Role.Melee;
+        CombatImpactFXV11.EmitEnemyDeath(worldPosition, context.Direction, resolvedRole);
         Vector2 direction = context.Direction.sqrMagnitude > 0.0001f ? context.Direction.normalized : Vector2.up;
         CameraFeedbackController feedback = CameraFeedbackController.Instance;
         if (feedback != null)

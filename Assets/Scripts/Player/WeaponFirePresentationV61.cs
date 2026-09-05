@@ -70,8 +70,8 @@ public sealed class WeaponFirePresentationV61 : MonoBehaviour
         bool shotgun = IsShotgun(weapon);
         bool machineGun = IsMachineGun(weapon);
         float playerHeight = visuals.PlayerWorldHeight;
-        float size = playerHeight * (shotgun ? 0.050f : machineGun ? 0.030f : 0.036f);
-        float speed = shotgun ? 1.10f : machineGun ? 1.95f : 1.65f;
+        float size = playerHeight * (shotgun ? 0.050f : machineGun ? 0.036f : 0.036f);
+        float speed = shotgun ? 1.10f : machineGun ? 2.15f : 1.65f;
         float lifetime = shotgun ? 2.8f : machineGun ? 1.65f : 2.25f;
         Vector2 direction = visuals.GetCasingEjectWorldDirection();
         direction = (Quaternion.Euler(0f, 0f, Random.Range(-16f, 16f)) * direction).normalized;
@@ -137,10 +137,10 @@ public sealed class WeaponFirePresentationV61 : MonoBehaviour
         bool machineGun = IsMachineGun(weapon);
         bool laser = IsLaser(weapon);
         // v6.1.5: keep the muzzle cue outside the face and small enough for the 320x180 pixel camera.
-        float size = shotgun ? 0.20f : laser ? 0.125f : machineGun ? 0.0875f : 0.125f;
-        float intensity = shotgun ? 0.50f : laser ? 0.32f : machineGun ? 0.16f : 0.24f;
-        float radius = shotgun ? 0.42f : laser ? 0.28f : machineGun ? 0.16f : 0.22f;
-        float lifetime = shotgun ? 0.040f : laser ? 0.035f : machineGun ? 0.024f : 0.030f;
+        float size = shotgun ? 0.20f : laser ? 0.125f : machineGun ? 0.1125f : 0.125f;
+        float intensity = shotgun ? 0.50f : laser ? 0.32f : machineGun ? 0.22f : 0.24f;
+        float radius = shotgun ? 0.42f : laser ? 0.28f : machineGun ? 0.20f : 0.22f;
+        float lifetime = shotgun ? 0.040f : laser ? 0.035f : machineGun ? 0.030f : 0.030f;
         Color color = laser ? weapon.accentColor : new Color(1f, 0.70f, 0.22f, 1f);
         color *= laser ? 1.75f : 1.45f;
         color.a = 1f;

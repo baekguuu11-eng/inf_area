@@ -133,10 +133,33 @@ public class ByteCurrencyManager : MonoBehaviour
         byteText.textWrappingMode = TextWrappingModes.NoWrap;
         byteText.overflowMode = TextOverflowModes.Overflow;
         byteText.enableAutoSizing = false;
+        byteText.raycastTarget = false;
+        byteText.alignment = TextAlignmentOptions.Left;
+        byteText.fontSize = 30f;
+
+        TMP_FontAsset galmuri = Resources.Load<TMP_FontAsset>("Fonts & Materials/Galmuri11 SDF");
+        if (galmuri != null)
+            byteText.font = galmuri;
 
         RectTransform rect = byteText.rectTransform;
-        if (rect != null && rect.rect.width < 220f)
-            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 220f);
+        if (rect == null)
+            return;
+
+        // Keep the value completely outside the Byte icon. The old 50 px centered text
+        // rectangle overlapped the 90 px icon, which is why values such as 0/25 appeared
+        // drawn on top of the token. Use a left-pivoted label with a fixed visual gap.
+        rect.pivot = new Vector2(0f, 0.5f);
+        rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 150f);
+        rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 50f);
+
+        if (byteIcon != null && byteIcon.parent == rect.parent)
+        {
+            rect.anchorMin = byteIcon.anchorMin;
+            rect.anchorMax = byteIcon.anchorMax;
+            float iconWidth = byteIcon.rect.width * Mathf.Abs(byteIcon.localScale.x);
+            float iconRight = byteIcon.anchoredPosition.x + iconWidth * (1f - byteIcon.pivot.x);
+            rect.anchoredPosition = new Vector2(iconRight + 18f, byteIcon.anchoredPosition.y);
+        }
     }
 
     private void PlayCollectFeedback()

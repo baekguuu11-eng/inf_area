@@ -11,6 +11,8 @@ public sealed class AmmoPickup : MonoBehaviour
     private bool collected;
     private Coroutine routine;
     private SpriteRenderer spriteRenderer;
+    private SpriteRenderer glowRenderer;
+    private float glowClock;
 
     public bool IsCollected => collected;
 
@@ -19,6 +21,25 @@ public sealed class AmmoPickup : MonoBehaviour
         spriteRenderer = GetComponent<SpriteRenderer>();
         if (spriteRenderer.sprite == null) spriteRenderer.sprite = GetFallbackSprite();
         spriteRenderer.sortingOrder = 14;
+        GameObject glow = new GameObject("AmmoEnergyGlow");
+        glow.transform.SetParent(transform, false);
+        glowRenderer = glow.AddComponent<SpriteRenderer>();
+        glowRenderer.sprite = RuntimePixelSpriteFactory.GetEnergySparkSprite();
+        glowRenderer.sortingOrder = 13;
+        glowRenderer.color = new Color(0.18f, 0.90f, 1f, 0.16f);
+        V620SpriteMaterialUtility.Apply(glowRenderer);
+        glow.transform.localScale = Vector3.one * 0.34f;
+    }
+
+    private void Update()
+    {
+        if (collected || glowRenderer == null) return;
+        glowClock += Time.unscaledDeltaTime;
+        float pulse = Mathf.Sin(glowClock * 4.8f) * 0.5f + 0.5f;
+        Color c = glowRenderer.color;
+        c.a = Mathf.Lerp(0.08f, 0.22f, pulse);
+        glowRenderer.color = c;
+        glowRenderer.transform.localScale = Vector3.one * Mathf.Lerp(0.28f, 0.40f, pulse);
     }
 
     public void Initialize(int ammoAmount, RoomController room)
@@ -47,6 +68,7 @@ public sealed class AmmoPickup : MonoBehaviour
         AmmoRoomRegistry.Unregister(this, ownerRoom);
         PlayerAmmoController ammo = Object.FindAnyObjectByType<PlayerAmmoController>();
         if (ammo != null) ammo.AddReserveAmmo(amount);
+        CombatImpactFXV11.EmitPickup(transform.position, new Color(0.20f, 0.92f, 1f, 1f));
         Destroy(gameObject);
     }
 

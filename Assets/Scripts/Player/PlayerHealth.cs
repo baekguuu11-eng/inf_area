@@ -144,6 +144,8 @@ public class PlayerHealth : MonoBehaviour
         PlayHurtSound();
         PlayHitEffect();
         CombatPostProcessV61.PulsePlayerDamage();
+        CameraFeedbackController damageFeedback = CameraFeedbackController.Instance;
+        if (damageFeedback != null) damageFeedback.Impact(CameraImpactLevelV11.Medium, Vector2.down, false);
         StartInvincible();
 
         if (currentHealth <= 0)
@@ -210,6 +212,8 @@ public class PlayerHealth : MonoBehaviour
         currentHealth = Mathf.Max(1, maxHealth);
         damageCarry = 0f;
         RefreshUI();
+        CombatPostProcessV61.PulseHeal();
+        CombatImpactFXV11.EmitPickup(transform.position, new Color(0.38f, 1f, 0.62f, 1f));
 
         // 보스 처치 직후 남아 있던 짧은 무적/피격 잔여 상태가 다음 구간으로 넘어가지 않게 정리한다.
         if (invincibleCoroutine != null)

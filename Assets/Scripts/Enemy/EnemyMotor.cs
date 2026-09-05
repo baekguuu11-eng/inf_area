@@ -31,6 +31,7 @@ public sealed class EnemyMotor : MonoBehaviour
     private float desiredSpeed;
     private Vector2 currentVelocity;
     private bool movementEnabled = true;
+    private float externalSpeedMultiplier = 1f;
 
     private bool knockbackActive;
     private Vector2 knockbackDirection;
@@ -43,6 +44,7 @@ public sealed class EnemyMotor : MonoBehaviour
     public Vector2 CurrentVelocity => currentVelocity;
     public bool IsKnockedBack => knockbackActive;
     public bool MovementEnabled => movementEnabled;
+    public float ExternalSpeedMultiplier => externalSpeedMultiplier;
 
     private void Awake()
     {
@@ -78,6 +80,11 @@ public sealed class EnemyMotor : MonoBehaviour
     {
         desiredDirection = direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector2.zero;
         desiredSpeed = Mathf.Max(0f, speed);
+    }
+
+    public void SetExternalSpeedMultiplier(float multiplier)
+    {
+        externalSpeedMultiplier = Mathf.Clamp(multiplier, 0.25f, 1.5f);
     }
 
     public void StopIntent()
@@ -157,7 +164,7 @@ public sealed class EnemyMotor : MonoBehaviour
         if (desiredDirection.sqrMagnitude > 0.0001f && desiredSpeed > 0f)
         {
             Vector2 steered = BuildSteeredDirection(desiredDirection);
-            targetVelocity = steered * desiredSpeed;
+            targetVelocity = steered * desiredSpeed * externalSpeedMultiplier;
         }
 
         float rate = targetVelocity.sqrMagnitude > 0.0001f ? acceleration : deceleration;

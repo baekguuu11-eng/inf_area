@@ -1,0 +1,87 @@
+INFECTED AREA V11 - SYSTEM / EXECUTOR POLISH
+Base: V10.1 Chernobyl Visibility/Arena Fix
+Unity target: 6000.4.1f1 / URP 2D
+
+IMPORTANT
+- This pass intentionally does NOT redesign Chernobyl. V10.1 Chernobyl content is retained as-is.
+- Shop scripts/prefabs/canvas are not modified.
+- No Unity Editor / Play Mode compile was available in this environment. Static structure + archive integrity checks are performed before delivery.
+
+V11 IMPLEMENTED
+1) Executor emerge marker timing
+- User-provided emerge mark now appears ~0.5 sec BEFORE combat emerge.
+- Intro emerge mark also appears early, pulses/fades in, stays through impact, then fades out.
+- Existing crack/warning remains the pre-warning layer and is removed at emerge.
+
+2) Debug whip visual sync
+- DebugWhip keeps the V9/V10 rule: the whip SPRITE ITSELF is scaled by visibleReachMultiplier.
+- No detached purple range arc is used.
+- GetAttackPointWorld does not multiply the whip twice, so visible tip == actual hit tip.
+
+3) Executor projectile wall impacts
+- Stage-colored blue -> magenta -> red sparks/debris retained and strengthened.
+- Debris flies away from impact direction.
+- On-screen impacts add rate-limited Small camera impact feedback.
+
+4) Executor death / victory polish
+- More malfunction sparks while shutting down.
+- Boss-level camera impact on final shutdown.
+- Existing death sprite fallback, BGM crossfade, max-HP restore, normal Byte/Ammo drops retained.
+- Victory reward pause increased to 1.20s before exit portal.
+
+5) Executor HUD
+- 55% / 15% phase points are shown as tiny bar ticks (no numeric clutter).
+- Final Stand gets a dedicated red health-bar style and short '최종 집행' transition presentation.
+
+6) Weapon hit feel
+- New pooled CombatImpactFXV11 spawns exact-contact sparks/flashes at projectile/melee hit points.
+- Shotgun close hit: extra local hit VFX + medium camera punch + subtle post-process pulse.
+- Machine gun: stronger muzzle/casing presentation, louder fire audio, small sustained spread after heat builds.
+- Machine gun damage / fire-rate buff from V7 remains (9 dmg, 0.074 interval asset values).
+- Ranged hits and melee hits resolve hit feedback at actual collider closest point.
+
+7) Camera feedback tiers
+- Small / Medium / Heavy / Boss impact levels added to CameraFeedbackController.
+- Player damage, enemy melee/explosion/lethal hits, tank lethal, shotgun close hit, dash, Executor death/wall impact use shared tiers.
+
+8) Dash feedback
+- Pooled cyan burst at dash start/end.
+- Small directional camera impulse on dash start.
+- Existing dash afterimages retained.
+
+9) Pickup polish / ammo economy
+- Ammo pickup keeps cyan energy-cartridge art, adds soft pulsing cyan glow + pickup burst.
+- Byte pickup gets a separate teal pickup burst so Byte and Ammo read differently.
+- Existing low-ammo smart drop correction remains.
+- Portal Room guarantees only a minimum 12 total ammo energy if player enters below that threshold (not a full refill).
+
+10) Portal Room / room flow
+- Existing SECTOR / PORTAL ROOM Galmuri UI retained.
+- Portal gets a low-alpha violet pulse layer; shop code is untouched.
+
+11) Player HP feedback
+- Player damage now uses shared Medium camera impact in addition to existing heart/post-process feedback.
+- Full heal emits a small green/cyan recovery pulse.
+
+12) Enemy / tank feedback
+- Role-colored pooled death sparks added.
+- Tank death gets heavier pooled feedback.
+- Enemy camera response uses shared impact levels instead of many unrelated shake values.
+- Existing role-specific shard counts and tank knockback resistance remain.
+
+13) Debug tools (Editor / Development Build only)
+- Existing F8~F11 Executor shortcuts retained.
+- PageUp / PageDown: select Executor pattern.
+- P: force selected pattern on next attack opportunity.
+- Top-left overlay: Stage/Room, weapon, ammo, Executor HP/phase/state, last/selected pattern.
+
+14) Pooling / performance
+- New pooled CombatImpactFXV11 for weapon impacts, pickup bursts, dash bursts, enemy-death sparks.
+- Player projectile pool added (up to 160) instead of repeated Instantiate/Destroy for every bullet.
+- Existing casing/muzzle-flash and enemy-shard pools retained.
+
+15) Existing final-polish systems retained/verified
+- KODB boot splash timing (0.65 in / 0.95 hold / 0.65 out / 0.18 black).
+- Main-menu hover/micro-glitch/parallax systems already present, no duplicate added.
+- PixelPerfectCamera already present in GameScene; V11 avoids adding a second camera component.
+- Runtime impact/pickup FX use safe Sprite-Unlit material and explicit sorting orders.

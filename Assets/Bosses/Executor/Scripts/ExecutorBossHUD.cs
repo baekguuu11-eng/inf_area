@@ -118,6 +118,12 @@ public sealed class ExecutorBossHUD : MonoBehaviour
         CreateImage("RightBolt", barRootObject.transform, new Color32(142, 27, 30, 255),
             new Vector2(72f, 0f), new Vector2(2f, 2f), 8);
 
+        // V11: 외형/패턴 전환 지점을 숫자 대신 작은 눈금으로만 표시한다.
+        CreateImage("Phase55Marker", barRootObject.transform, new Color32(232, 120, 104, 225),
+            new Vector2(7f, 0f), new Vector2(1f, 7f), 9);
+        CreateImage("Final15Marker", barRootObject.transform, new Color32(255, 78, 58, 235),
+            new Vector2(-49f, 0f), new Vector2(1f, 8f), 9);
+
         introMessage = CreateText("IntroMessage", transform, font, string.Empty, 6.2f, FontStyles.Bold,
             TextAlignmentOptions.Center, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
             new Vector2(0.5f, 0f), new Vector2(0f, 30f), new Vector2(215f, 14f));
@@ -323,6 +329,26 @@ public sealed class ExecutorBossHUD : MonoBehaviour
         if (delayedFillImage != null) delayedFillImage.color = new Color32(255, 144, 86, 255);
         if (redOutlineImage != null) redOutlineImage.color = new Color32(158, 33, 19, 255);
         if (outerFrameImage != null) outerFrameImage.color = new Color32(12, 3, 2, 255);
+    }
+
+    public void SetFinalStandStyle()
+    {
+        if (currentFillImage != null) currentFillImage.color = new Color32(238, 42, 28, 255);
+        if (delayedFillImage != null) delayedFillImage.color = new Color32(255, 112, 72, 255);
+        if (redOutlineImage != null) redOutlineImage.color = new Color32(202, 38, 20, 255);
+        if (outerFrameImage != null) outerFrameImage.color = new Color32(16, 2, 1, 255);
+    }
+
+    public IEnumerator ShowFinalStandTransition(float duration)
+    {
+        if (phaseMessage == null || phaseFlashImage == null) yield break;
+        string previous = phaseMessage.text;
+        Color previousColor = phaseMessage.color;
+        phaseMessage.text = "최종 집행";
+        phaseMessage.color = new Color(1f, 0.22f, 0.12f, 1f);
+        yield return ShowPhaseTransition(duration);
+        phaseMessage.text = previous;
+        phaseMessage.color = previousColor;
     }
 
     public void ShowBossBar(int current, int maximum)

@@ -148,7 +148,7 @@ public class CutsceneManager : MonoBehaviour
         if (isEnding)
             return;
 
-        if (allowEscapeSkipAll && Input.GetKeyDown(KeyCode.Escape))
+        if (allowEscapeSkipAll && Input.GetKeyDown(KeyCode.Escape) && !GameplayPauseSettingsV14.EscapeIsReservedForPause)
         {
             RequestSkipAll();
             return;

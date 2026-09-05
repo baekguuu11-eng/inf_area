@@ -66,6 +66,7 @@ public sealed class EnemyRangedAI : MonoBehaviour
     private float nextStrafeChangeTime;
     private int strafeSign;
     private bool ownsAttackToken;
+    private StageEnemyEvolutionV12 evolution;
 
     private void Awake()
     {
@@ -182,8 +183,12 @@ public sealed class EnemyRangedAI : MonoBehaviour
 
     private IEnumerator BurstRoutine()
     {
+        if (evolution == null) evolution = GetComponent<StageEnemyEvolutionV12>();
+        int evolvedVariant = evolution != null ? evolution.ChooseRangedVariant() : 0;
         state = State.Windup;
         attackContract.BeginTelegraph(telegraph);
+        if (evolvedVariant > 0) evolution?.ApplyEvolvedTelegraph(telegraph, evolvedVariant >= 2);
+        else evolution?.ResetTelegraph(telegraph);
         motor.SetMovementEnabled(false, true);
         Vector2 lockedDirection = perception.DirectionToPlayer;
         float elapsed = 0f;
@@ -211,29 +216,67 @@ public sealed class EnemyRangedAI : MonoBehaviour
 
         state = State.Burst;
         attackContract.BeginActive(telegraph);
-        for (int shot = 0; shot < 2; shot++)
+        if (evolvedVariant == 1)
         {
-            if (ShouldInterrupt())
+            // Stage 2 pattern: a readable three-way fan instead of the normal 2-shot burst.
+            Vector2 center = lockedDirection.sqrMagnitude > 0.001f ? lockedDirection.normalized : Vector2.down;
+            Vector2[] directions = { Rotate(center, -13f), center, Rotate(center, 13f) };
+            for (int shot = 0; shot < directions.Length; shot++)
             {
-                InterruptBurst();
-                yield break;
+                if (ShouldInterrupt()) { InterruptBurst(); yield break; }
+                visualMotion.SetAction(EnemyVisualMotion.ActionState.Attack, directions[shot]);
+                FireProjectile(directions[shot]);
+                if (shot < directions.Length - 1)
+                    yield return new WaitForSeconds(0.055f);
             }
+        }
+        else if (evolvedVariant == 2)
+        {
+            // Stage 3 pattern: three pursuit shots that re-read the player's movement each time.
+            for (int shot = 0; shot < 3; shot++)
+            {
+                if (ShouldInterrupt()) { InterruptBurst(); yield break; }
+                Vector2 direction = shot == 0 ? lockedDirection : GetAimDirection(true);
+                visualMotion.SetAction(EnemyVisualMotion.ActionState.Attack, direction);
+                FireProjectile(direction);
+                if (shot < 2) yield return new WaitForSeconds(0.12f);
+            }
+        }
+        else
+        {
+            for (int shot = 0; shot < 2; shot++)
+            {
+                if (ShouldInterrupt())
+                {
+                    InterruptBurst();
+                    yield break;
+                }
 
-            Vector2 direction = shot == 0 ? lockedDirection : GetAimDirection(true);
-            visualMotion.SetAction(EnemyVisualMotion.ActionState.Attack, direction);
-            FireProjectile(direction);
+                Vector2 direction = shot == 0 ? lockedDirection : GetAimDirection(true);
+                visualMotion.SetAction(EnemyVisualMotion.ActionState.Attack, direction);
+                FireProjectile(direction);
 
-            if (shot == 0)
-                yield return new WaitForSeconds(Mathf.Max(0.01f, burstShotInterval));
+                if (shot == 0)
+                    yield return new WaitForSeconds(Mathf.Max(0.01f, burstShotInterval));
+            }
         }
 
         telegraph?.Hide();
+        evolution?.ResetTelegraph(telegraph);
         attackContract.BeginRecovery(telegraph);
         state = State.Recovery;
         visualMotion.SetAction(EnemyVisualMotion.ActionState.Recovery, lockedDirection);
         yield return new WaitForSeconds(Mathf.Max(0.01f, fireRecovery));
         nextBurstAllowedTime = Time.time + Random.Range(0.2f, 0.5f);
         FinishBurst();
+    }
+
+    private static Vector2 Rotate(Vector2 direction, float degrees)
+    {
+        float radians = degrees * Mathf.Deg2Rad;
+        float cos = Mathf.Cos(radians);
+        float sin = Mathf.Sin(radians);
+        return new Vector2(direction.x * cos - direction.y * sin, direction.x * sin + direction.y * cos).normalized;
     }
 
     private Vector2 GetAimDirection(bool allowPrediction)
