@@ -1,0 +1,425 @@
+fileFormatVersion: 2
+guid: bc2c3ba33bcfcee4c9c8e11c73ac133d
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -2654834079004173737
+    second: Shop.parts.png_0
+  - first:
+      213: -7423893312742390576
+    second: Shop.parts.png_1
+  - first:
+      213: 96657987258747648
+    second: Shop.parts.png_2
+  - first:
+      213: 2727417430455368651
+    second: Shop.parts.png_3
+  - first:
+      213: -2800477422420706002
+    second: Shop.parts.png_4
+  - first:
+      213: 6411823317022525961
+    second: Shop.parts.png_5
+  - first:
+      213: -2598262752307731910
+    second: Shop.parts.png_6
+  - first:
+      213: 1542117957462686940
+    second: Shop.parts.png_7
+  - first:
+      213: 8653587505077260094
+    second: Shop.parts.png_8
+  - first:
+      213: -1177986767883056009
+    second: Shop.parts.png_9
+  - first:
+      213: -5143298337927591019
+    second: Shop.parts.png_10
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: shop_main_frame
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 510
+        width: 1125
+        height: 576
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 75ada579872282bd0800000000000000
+      internalID: -2654834079004173737
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: icon_heal
+      rect:
+        serializedVersion: 2
+        x: 1245
+        y: 392
+        width: 197
+        height: 130
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 00b03436de5675100800000000000000
+      internalID: 96657987258747648
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: shop_byte_panel
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 221
+        width: 401
+        height: 111
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bcb3088d3bbb9d520800000000000000
+      internalID: 2727417430455368651
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: icon_byte
+      rect:
+        serializedVersion: 2
+        x: 13
+        y: 82
+        width: 119
+        height: 115
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 4, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cdc7050ac14b66510800000000000000
+      internalID: 1542117957462686940
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: shop_close_button
+      rect:
+        serializedVersion: 2
+        x: 877
+        y: 349
+        width: 344
+        height: 141
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 7a64f6b6928ccbe4a8eee879ba0922e6
+      internalID: -521308149
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: shop_reroll_button
+      rect:
+        serializedVersion: 2
+        x: 351
+        y: 351
+        width: 516
+        height: 141
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: b664cc06ae625114c87105afff598da4
+      internalID: 1519562646
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: shop_card_frame
+      rect:
+        serializedVersion: 2
+        x: 1130
+        y: 531
+        width: 301
+        height: 552
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: b60e0dfd0e59378478b36e997a2d58f3
+      internalID: -2053764781
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: shop_buy_button
+      rect:
+        serializedVersion: 2
+        x: 15
+        y: 349
+        width: 328
+        height: 141
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 250247da99ba67645974d0265d80d479
+      internalID: 1845060047
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: icon_explosion
+      rect:
+        serializedVersion: 2
+        x: 1246
+        y: 266
+        width: 197
+        height: 130
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: d01f267cc4954534ab9145c3ecbec1bf
+      internalID: 1381845265
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: icon_electric
+      rect:
+        serializedVersion: 2
+        x: 1249
+        y: 129
+        width: 189
+        height: 142
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 3de229b268e95974484e7641a42e8a6e
+      internalID: -94086801
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: shop_weapon_panel
+      rect:
+        serializedVersion: 2
+        x: 835
+        y: 211
+        width: 382
+        height: 121
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 787915aa400e44f46bd4dc05fe64e1a4
+      internalID: 1802906574
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 43574c74183521f4baeb3dbb51c587e1
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      Shop.parts.png_0: 2088285000
+      Shop.parts.png_1: -7423893312742390576
+      Shop.parts.png_10: -5143298337927591019
+      Shop.parts.png_11: -1521029155
+      Shop.parts.png_4: -2800477422420706002
+      Shop.parts.png_5: 6411823317022525961
+      Shop.parts.png_6: -2598262752307731910
+      Shop.parts.png_8: 8653587505077260094
+      Shop.parts.png_9: -1177986767883056009
+      icon_byte: 1542117957462686940
+      icon_electric: -94086801
+      icon_explosion: 1381845265
+      icon_heal: 96657987258747648
+      shop_buy_button: 1845060047
+      shop_byte_panel: 2727417430455368651
+      shop_card_frame: -2053764781
+      shop_close_button: -521308149
+      shop_main_frame: -2654834079004173737
+      shop_reroll_button: 1519562646
+      shop_weapon_panel: 1802906574
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
