@@ -298,7 +298,12 @@ public class PlayerHealth : MonoBehaviour
 
     private void PlayHurtSound()
     {
-        if (audioSource == null || hurtSound == null)
+        if (hurtSound == null)
+        {
+            TeamGameSFX.PlayPlayerHit();
+            return;
+        }
+        if (audioSource == null)
             return;
 
         float originalPitch = audioSource.pitch;

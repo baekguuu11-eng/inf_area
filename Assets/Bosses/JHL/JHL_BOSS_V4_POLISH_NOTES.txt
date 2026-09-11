@@ -1,0 +1,83 @@
+INFECTED AREA - JHL V4 SCREEN DOMINANCE / MOTION / POLISH
+Date: 2026-09-06
+
+V4 target
+- Rebuild JHL around a screen-dominating boss layout rather than a normal room enemy.
+- Keep temporary art intentionally primitive so motion/timing can be judged before final sprites.
+- Reduce gummy spring motion while preserving visible weight, acceleration, braking and impact follow-through.
+- Make hands much larger, non-damageable hazards. Only the face receives boss damage.
+- Keep phase text out of the center of the screen.
+
+Implemented
+1) JHLPartMotion rewritten
+- Acceleration/braking/stopping-distance solver replaces spring-position SmoothDamp.
+- Explicit velocity and angular velocity remain visible in debug.
+- Overshoot occurs only from deliberate impact impulses, not hidden spring elasticity.
+- Scale transitions no longer spring/overshoot.
+
+2) Screen structure
+- Face ~50% camera width, ~30% camera height.
+- Each hand ~38% camera width, ~45% camera height.
+- Phase progression moves hands/face farther into the visible combat frame.
+- Hands remain hazards only; hand Hurtboxes stay disabled.
+
+3) Pattern Director
+- New JHLPatternDirector.
+- Pattern family history: HandSingle / HandArea / Laser / SpaceControl / Combo / Ultimate.
+- Recent exact patterns and repeated families are suppressed.
+- Player edge/center position and current movement speed influence pattern weights.
+- Full Access becomes the next scripted selection once <=15% HP and not yet used.
+
+4) Attack coverage / safe space
+- Slam radius increased and telegraph/damage share the exact same radius value.
+- Sweep lane height and horizontal coverage increased.
+- Compression places the huge hand visuals using a calculated minimum safe gap instead of fixed center offsets.
+- Hand Prison uses visual hand width + explicit safe width.
+- Debug overlay reports current safe width during space-control attacks.
+
+5) Telegraphs
+- Telegraph root geometry never scales, so visual warning and damage geometry stay aligned.
+- Urgency/flash increases near impact.
+- Circle attacks gain a converging countdown ring.
+
+6) Beams
+- 3-layer beam: outer / middle / white core.
+- Faster attack envelope, stable sustain, fade-out and micro-jitter.
+- Charge-core visual added to face laser patterns.
+- Tracking beam now has angular acceleration/inertia instead of instant constant-speed angle following.
+
+7) Impact FX
+- Dual expanding rings.
+- Runtime white/pink pixel debris.
+- No external art requirement.
+
+8) Camera / URP
+- Existing CameraFeedbackController remains responsible for shake/impact.
+- JHL URP Volume now has no permanent phase wash; bloom/chroma/lens/vignette are event-driven.
+- Compression/beam/transition pressure still drives limited framing and event effects.
+
+9) HUD
+- Slimmer boss bar and smaller boss name.
+- No giant center PHASE 1 text.
+- Temporary system messages moved under the top boss bar.
+
+10) Audio/music hooks
+- Added optional JHLBossAudio and JHLBossMusic.
+- Missing Resources clips are safe/no-op and do not block gameplay.
+- Expected optional paths: Resources/Bosses/JHL/...
+- Three phase BGM hooks with gameplay-BGM restoration.
+
+11) Boss death reward parity
+- Full player heal.
+- 24 Byte (6 x 4) using ByteDropper.
+- 24 ammo energy (3 x 8) using AmmoDropper.
+- Existing JHL exit portal route retained.
+
+12) Debug parity
+- Existing Ctrl+F8/F9/F10/F11 and PageUp/PageDown/P workflow retained.
+- V11 debug overlay expanded with JHL pattern family, part velocities, and current safe width.
+
+Temporary art policy
+- Final face/hand artwork is intentionally NOT included.
+- Runtime primitives remain the visual placeholder.
+- Final art can replace Visual children later without rewriting combat logic.

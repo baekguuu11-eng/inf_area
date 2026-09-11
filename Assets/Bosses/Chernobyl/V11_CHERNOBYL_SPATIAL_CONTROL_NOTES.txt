@@ -1,0 +1,326 @@
+INFECTED AREA - V11 CHERNOBYL SPATIAL CONTROL OVERHAUL
+Base: V10 CHERNOBYL + JHL OVERHAUL
+Date: 2026-09-10
+
+IMPORTANT
+- This package preserves the existing Executor/JHL room, music, reward and boss flow.
+- The previous ChatGPT procedural JHL sound pack is NOT used.
+- Team-provided CC0 audio already present in V10 remains in use.
+- Unity Editor is not available in the build environment, so "Unity Console 0 errors" cannot be truthfully claimed until the project is opened in Unity. Static source/package validation is included separately.
+
+============================================================
+1. EXISTING CHERNOBYL PROBLEMS / ROOT CAUSES
+============================================================
+- Persistent 6x4 runtime arena grid was deliberately rendered during idle, causing the "grid visible while no attack is active" issue.
+- Fixed 6x4 attack geometry prevented page progression from feeling spatially different.
+- SafeShift had been improved once, but the page system still did not guarantee page-specific grid scale and all related safe-zone families did not share one reachability rule.
+- Pattern count was numerically reasonable but most choices were still variations of "cells telegraph -> cells explode" without strong setup/pressure/finisher roles.
+- CombatLoop selected one pattern, waited, selected another; no real combo director existed.
+- Anti-burst existed but its trigger time was much shorter than the design target and did not combine sustained-time and cumulative-damage thresholds cleanly.
+- Boss hit feedback depended mainly on generic enemy feedback and the core pulse, so rapid shooting did not strongly communicate weak-point damage.
+- Debug controls covered page jumps but not direct pattern/combo/counter/grid cleanup/invulnerability testing.
+
+============================================================
+2. MODIFIED SCRIPT LIST
+============================================================
+- Assets/Bosses/Chernobyl/Scripts/ChernobylBossController.cs
+- Assets/Bosses/Chernobyl/Scripts/ChernobylBossControllerOverhaulV10.cs
+- Assets/Bosses/Chernobyl/Scripts/ChernobylBossEffects.cs
+- Assets/Scripts/Systems/V11DebugOverlay.cs
+- Assets/INFECTED_AREA_WeaponAmmoDash_v5_0/Runtime/Player/PlayerDashController.cs
+- Assets/Scenes/GameScene.unity
+
+============================================================
+3. NEW SCRIPT LIST
+============================================================
+- No new MonoBehaviour script file was required. V11 remains a partial extension of the existing ChernobylBossController so the current project structure is not replaced.
+- New runtime helper components ChernobylSafePulse and ChernobylRingTelegraphPulse are implemented inside the existing ChernobylBossEffects.cs.
+
+============================================================
+4. SCRIPT-BY-SCRIPT CORE CHANGES
+============================================================
+ChernobylBossController.cs
+- PatternKind expanded from 18 to 37 enum entries.
+- CombatLoop now decides between standalone patterns and page-specific Combo presets.
+- Recovery timing: P1 1.10-1.42 s, P2 0.82-1.12 s, P3 0.58-0.86 s.
+- Grid warnings are centrally cleared between attacks, transitions, debug resets, death and destruction.
+- Strong/normal boss hit feedback hook added.
+- Page-transition labels now explicitly show GRID 6x4 / GRID 8x5 reconfiguration.
+- Dedicated optional audio hooks prepared for Hit/HeavyHit/GridWarning/GridExplosion/Shockwave/PageTransition/AntiBurst.
+- Legacy SparseGrid, ChainGrid and MeltdownGrid now use the page-based grid system.
+
+ChernobylBossControllerOverhaulV10.cs (V11 implementation)
+- Persistent idle arena grid removed.
+- Page grid dimensions: P1 4x3, P2 6x4, P3 8x5.
+- Player-position / edge / center / velocity aware weighted pattern selection.
+- Recent pattern and pattern-family suppression retained/expanded.
+- 14 page-specific Combo presets added with recent-combo suppression.
+- Safe-zone blocks generated algorithmically and chosen using actual distance from the player's live position.
+- Safe transitions use base-movement reach budget; dash is extra safety margin rather than a mandatory requirement.
+- Hit flash / short transform compression / slight overshoot / pooled sparks / heavy-hit hit-stop and camera response.
+- Anti-burst uses sustained-time OR damage threshold with page-scaled cooldown.
+- Near anti-burst is zero-damage displacement with a visible shockwave and wall-aware Rigidbody2D cast.
+- Debug controls for page/pattern/combo/anti-burst/grid clear/invulnerability/cooldown.
+
+ChernobylBossEffects.cs
+- Cyan Safe Zone indicators added.
+- Safe indicators no longer transition into danger colors.
+- Ring telegraph has separate hazard outer boundary and cyan inner safe boundary.
+- Ring blast visual added.
+- Rect blast can return its GameObject so rotating attack visuals can rotate with the real hit geometry.
+- ChernobylShockwave now supports damage=0 for displacement-only anti-burst visuals.
+- Existing debris pooling retained.
+
+V11DebugOverlay.cs
+- Shows Chernobyl HP, Page, current grid dimensions, active warning count, last pattern/combo, selected pattern/combo, invulnerability flags and no-cooldown state.
+
+PlayerDashController.cs / GameScene.unity
+- Dash distance: 1.15 -> 1.50.
+- Dash duration: 0.14 -> 0.16 s.
+- Dash invulnerability: 0.14 -> 0.16 s.
+- Committed dash / wall collision / JHL wall-hand behavior remains intact.
+
+============================================================
+5. COMPLETE ATTACK PATTERN LIST (37 enum entries)
+============================================================
+Existing/retained:
+1 TargetBlast
+2 CrossBlast
+3 SparseGrid
+4 ChainGrid
+5 CoreShockwave
+6 MeltdownGrid
+7 CheckerA
+8 CheckerB
+9 SweepL2R
+10 SweepR2L
+11 SweepTopDown
+12 SweepBottomUp
+13 CompressHorizontal
+14 ExpandHorizontal
+15 CompressVertical
+16 ExpandVertical
+17 ChainInvert
+18 SafeShift
+
+New V11 spatial-control patterns:
+19 OuterCollapse - outer ring cells force inward movement
+20 CenterEvacuation - center grid forces outward movement
+21 TwinTarget - current-position blast -> movement-predicted second blast
+22 GapSweep - sweeping line with a readable moving gap
+23 SplitField - one half -> opposite half
+24 DelayedTiles - early and delayed cells shown together with distinct timing colors
+25 DelayedCross - two preannounced crosses with staggered execution
+26 MovingSafeLane - safe row/column moves one step at a time
+27 CornerQuarantine - diagonal corner groups alternate
+28 RadiationRing - annular danger area with inner/outer boundaries
+29 CorridorCrush - leaves a player-reachable two-cell corridor
+30 GridChase - position snapshot + short predicted grid sequence, no live homing
+31 RotatingLines - slow rotating oriented attack lines
+32 RotatingSafeSector - safe angular sector rotates gradually
+33 SpiralGrid - grid detonates in spiral order
+34 SafeZoneRelay - three reachable 2x2 safe-zone transitions
+35 DelayedCascade - three timing groups visible before first explosion
+36 ReactorPulse - outer collapse -> center shockwave
+37 SectorCollapse - angular grid sectors collapse in readable sequence
+
+============================================================
+6. COMBO LIST
+============================================================
+PAGE 1
+- P1_OuterTarget: OuterCollapse -> TargetBlast
+- P1_CrossGap: CrossBlast -> GapSweep
+- P1_CheckerInvert: CheckerA -> CheckerB
+
+PAGE 2
+- P2_OuterCrossTarget: OuterCollapse -> CrossBlast -> TargetBlast
+- P2_SafeSweep: SafeShift -> horizontal Line Sweep
+- P2_CompressShockwave: CompressHorizontal -> CoreShockwave
+- P2_CheckerDelayed: ChainInvert -> DelayedTiles
+- P2_LaneTarget: MovingSafeLane -> TwinTarget
+
+PAGE 3
+- P3_ReactorCycle: CoreShockwave -> OuterCollapse -> DelayedCross
+- P3_MeltdownCorridor: CorridorCrush -> RotatingLines -> TargetBlast
+- P3_TimeControl: ChainInvert -> DelayedCascade
+- P3_SafeRelay: SafeZoneRelay -> CoreShockwave
+- P3_SpiralMeltdown: SpiralGrid -> RadiationRing -> CrossBlast
+- P3_RotatingPressure: RotatingSafeSector -> RotatingLines -> GridChase
+
+============================================================
+7. PAGE 1 / 2 / 3 DIFFERENCE
+============================================================
+PAGE 1
+- Grid 4x3.
+- Large readable cells, long telegraphs.
+- Fundamental movement rules: target, cross, checker, line sweep, outer/center movement, split field.
+- Combo probability about 32%, mainly 2-step combos.
+
+PAGE 2
+- Grid 6x4.
+- Adds compression, shockwave, safe shift, delayed timing, moving safe lane, corridor and corner control.
+- Combo probability about 52%, 2-3 step chains.
+- Anti-burst time/damage thresholds and cooldown are reduced from P1.
+
+PAGE 3
+- Grid 8x5. This was chosen instead of 8x8 because the current boss room is much wider than tall; square 8x8 cells would become vertically too small for comfortable player movement.
+- Adds rotating lines/sectors, spiral, 3-step safe relay, delayed cascade, reactor cycle and sector collapse.
+- Combo probability about 68%, strong 3-step spatial sequences.
+- Difficulty comes from information/sequence/space control, not disappearing telegraph time.
+
+============================================================
+8. SAFE ZONE UNAVOIDABLE BUG FIX
+============================================================
+- Safe zones are generated as 2x2 blocks (4 cells), not globally random cell sets.
+- The first safe block is selected from candidates reachable from the player's current live position.
+- After the first blast, the second safe block is selected again using the player's REAL post-blast position.
+- Candidate distance is measured to the safe rectangle itself, not only its center.
+- Movement budget uses base PlayerMovement speed (5 u/s) * warning time * 0.84 safety factor.
+- Therefore the route is designed to be reachable without requiring Dash. Dash 1.5 provides additional recovery margin.
+- SafeZoneRelay uses the same rule for A -> B -> C.
+- MeltdownGrid also uses a reachable 4-cell block rather than two arbitrary safe cells.
+
+============================================================
+9. IDLE GRID BUG ROOT CAUSE / FIX
+============================================================
+Root cause:
+- V10 CreateArenaGridVisualV10() created CHN_FixedArenaGrid_6x4 and UpdateCoreLightV10 continuously assigned visible alpha while idle/combat.
+
+Fix:
+- V11 no longer creates the persistent arena grid.
+- Only attack-specific CHN_*Telegraph and CHN_SafeIndicator objects are visible.
+- ClearAllGridWarningsV11() centrally destroys telegraph/safe-warning objects.
+- Called between attacks, before transitions, debug reset, boss death and OnDestroy.
+- Old runtime grid renderer list is also forced disabled as migration defense.
+
+============================================================
+10. ANTI-BURST IMPLEMENTATION
+============================================================
+Trigger time:
+- P1 7.6 s sustained pressure
+- P2 6.1 s
+- P3 4.8 s
+
+Damage trigger (approx MaxHP):
+- P1 13.5%
+- P2 11.2%
+- P3 9.2%
+
+Cooldown:
+- P1 8.2 s
+- P2 6.8 s
+- P3 5.4 s
+
+Near counter:
+- Clearly telegraphed Core Purge.
+- Main burst deals 0 damage and pushes the player away.
+- Player dash is cancelled, brief protection is granted, and wall-aware Rigidbody2D.Cast prevents pushing through room geometry.
+
+Far counter:
+- Containment row/column attack with readable warning and an adjacent second line on P2/P3.
+
+============================================================
+11. HIT-FEEL IMPROVEMENTS
+============================================================
+- 0.05-0.07 s visual hit flash with minimum replay interval.
+- Normal hit: tiny 0.986 compression -> 1.005 return.
+- Heavy hit: 0.972 compression -> 1.010 return.
+- No spring/jelly loop.
+- 3 small sparks normal / 8 heavy.
+- Heavy hits only: ~0.020-0.030 s hit-stop and small camera impact.
+- Existing HUD delayed health bar retained (actual HP instant, trailing bar follows later).
+- Page transitions retain overload sparks/flash and now announce grid reconfiguration.
+
+============================================================
+12. APPLY-AND-TEST CHECKLIST
+============================================================
+[Compile]
+[ ] Unity Console has 0 red errors.
+[ ] No new repeated warnings appear every frame.
+
+[Dash]
+[ ] Dash visually travels about 1.5 units.
+[ ] Dash remains committed and does not cut off midway.
+[ ] Dash stops at walls/JHL solid-hand patterns as before.
+
+[Grid]
+[ ] Idle: no arena grid is visible.
+[ ] After every attack: all warning cells disappear.
+[ ] Page transition: no previous warning remains.
+[ ] Death: no warning remains.
+[ ] P1 debug overlay says Grid 4x3.
+[ ] P2 says 6x4.
+[ ] P3 says 8x5.
+
+[Safe Zone]
+[ ] Safe cells are cyan and visually distinct from hazard cells.
+[ ] SafeShift first -> second zone is reachable without mandatory dash.
+[ ] Test from center and all four corners.
+[ ] SafeZoneRelay A -> B -> C is physically reachable.
+[ ] MeltdownGrid leaves a 4-cell safe block, not arbitrary distant safe cells.
+
+[Hit Feel]
+[ ] Boss visibly reacts when bullets hit.
+[ ] Rapid fire does not create seizure-like flashing.
+[ ] Heavy single hits feel stronger than normal hits.
+[ ] Boss does not physically move away from center.
+[ ] Trailing health bar follows actual HP cleanly.
+
+[Pattern / Combo]
+[ ] Same pattern does not repeatedly chain several times in a row.
+[ ] P1 feels learnable and spacious.
+[ ] P2 introduces delayed/safe-lane/corridor control.
+[ ] P3 uses rotating/spiral/cascade/relay patterns.
+[ ] Combo sequences feel like movement flow, not three unrelated attacks.
+[ ] DelayedTiles/DelayedCascade timing colors are readable.
+[ ] RotatingLines visual angle matches actual hit angle.
+[ ] RadiationRing inner safe boundary is clearly cyan.
+
+[Anti-Burst]
+[ ] Continuous close-range pressure eventually causes Core Purge.
+[ ] Core Purge has visible charge time and is not instant.
+[ ] Core Purge displacement itself deals 0 damage.
+[ ] Player is not pushed through walls.
+[ ] Long-range sustained pressure causes Containment counter.
+[ ] Counter cooldown is not so short that every attack is interrupted.
+
+[Performance]
+[ ] P3 8x5 mass telegraphs do not cause obvious frame spikes.
+[ ] Debris remains bounded/pool-backed.
+
+============================================================
+13. REMAINING LIMITATIONS / FUTURE POLISH
+============================================================
+- Runtime code/static validation is complete, but Unity Play Mode cannot be run in this environment.
+- Final warning times may need +/-0.05-0.12 s after real player testing.
+- Dedicated CHN_Hit / CHN_HeavyHit / CHN_GridWarning / CHN_GridExplosion / CHN_ShockwaveCharge / CHN_ShockwaveFire / CHN_PageTransition / CHN_AntiBurstCharge / CHN_AntiBurstFire clips are optional hooks. If absent, safe existing Chernobyl activation/overload/explosion fallbacks are used; Hit/HeavyHit hooks remain silent if no dedicated clip exists.
+- Final sprite/art replacement can improve readability further, but the attack rules do not depend on final art.
+
+============================================================
+14. UNITY CONSOLE ERROR / WARNING STATUS
+============================================================
+- Unity Editor could NOT be launched in this environment, so actual Unity Console status is NOT claimed.
+- Static validation checks source structure, enum/run coverage, serialized dash values, meta GUID duplication and ZIP integrity.
+- Open the project in Unity 6000.x and confirm Console before declaring runtime completion.
+
+============================================================
+DEBUG CONTROLS (Editor / Development Build)
+============================================================
+Existing map jumps:
+- Shift+F8: Chernobyl portal room
+- Shift+F9: normal Chernobyl intro / Page 1
+- Shift+F10: direct Page 2
+- Shift+F11: direct Page 3
+
+While Chernobyl is active:
+- Shift+1 / 2 / 3: reset directly to Page 1 / 2 / 3
+- Shift+PageUp / PageDown: select Pattern
+- Shift+N: next Pattern + queue force
+- Shift+P: force selected Pattern
+- Shift+C / X: select next / previous Combo
+- Shift+O: force selected Combo
+- Shift+B: queue Anti-Burst immediately
+- Shift+G: clear all Grid warnings
+- Shift+I: Boss invulnerability toggle
+- Shift+U: Player invulnerability toggle
+- Shift+K: attack recovery/cooldown ignore toggle

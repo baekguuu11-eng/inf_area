@@ -211,12 +211,24 @@ public class EnemyHealth : MonoBehaviour
         if (HasAnimatorTrigger(animator, deathTriggerName))
             animator.SetTrigger(deathTriggerName);
 
+        if (!IsMajorBossRoot())
+            TeamGameSFX.PlayEnemyDeath();
+
         Died?.Invoke(this);
 
         if (deathDestroyDelay > 0f)
             Destroy(rootTransform.gameObject, deathDestroyDelay);
         else
             Destroy(rootTransform.gameObject);
+    }
+
+    private bool IsMajorBossRoot()
+    {
+        if (rootTransform == null) return false;
+        return rootTransform.GetComponentInChildren<ExecutorBossController>(true) != null
+            || rootTransform.GetComponentInChildren<ChernobylBossController>(true) != null
+            || rootTransform.GetComponentInChildren<JHLBossController>(true) != null
+            || rootTransform.GetComponentInChildren<MachineWormBossController>(true) != null;
     }
 
     private static bool HasAnimatorTrigger(Animator targetAnimator, string parameterName)

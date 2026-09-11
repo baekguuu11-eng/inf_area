@@ -31,6 +31,7 @@ public static class WallImpactSystem
         Vector2 incoming = incomingDirection.sqrMagnitude > 0.001f ? incomingDirection.normalized : -normal;
         float incidence = Mathf.Clamp01(Vector2.Dot(-incoming, normal));
         float power = Mathf.Clamp01(damage / 50f * 0.65f + incidence * 0.5f);
+        TeamGameSFX.PlayWallImpact(power);
 
         bool merged = false;
         if (wall != null)

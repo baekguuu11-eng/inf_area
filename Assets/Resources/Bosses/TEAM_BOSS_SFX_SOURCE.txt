@@ -1,0 +1,8 @@
+Boss SFX added in V10/V11 overhaul are selected only from the team-provided CC0 packs.
+
+Sources:
+- rubberduck, 50 CC0 Sci-Fi SFX (OpenGameArt, CC0)
+- rubberduck, 60 CC0 Sci-Fi SFX (OpenGameArt, CC0)
+
+No previously ChatGPT-synthesized JHL SFX pack is included or referenced.
+Existing project audio was not deleted or overwritten except for creating these new Boss Resources paths.

@@ -185,22 +185,31 @@ public sealed class ChernobylCameraFX : MonoBehaviour
             return;
 
         float dt = Mathf.Max(0.0001f, Time.unscaledDeltaTime);
-        float targetWeight = bossActive ? 1f : 0f;
-        volume.weight = Mathf.MoveTowards(volume.weight, targetWeight, dt * (bossActive ? 2.8f : 1.8f));
+        float phaseBaseWeight = phase == 1 ? 0.22f : phase == 2 ? 0.30f : 0.38f;
+        float eventWeight = Mathf.Clamp01(
+            bloomPulse * 0.34f +
+            chromaPulse * 0.95f +
+            exposurePulse * 0.55f +
+            lensPulse * 0.80f +
+            vignettePulse * 0.45f);
+        float targetWeight = bossActive ? Mathf.Clamp01(phaseBaseWeight + eventWeight) : 0f;
+        volume.weight = Mathf.MoveTowards(volume.weight, targetWeight, dt * (targetWeight > volume.weight ? 4.2f : 2.6f));
 
         breathingTime += dt;
         float meltdownBreath = bossActive && phase >= 3 ? (Mathf.Sin(breathingTime * 4.6f) * 0.5f + 0.5f) : 0f;
 
-        float baseBloom = phase == 1 ? 0.34f : phase == 2 ? 0.48f : 0.64f;
-        float baseVignette = phase == 1 ? 0.10f : phase == 2 ? 0.135f : 0.18f;
-        float baseContrast = phase == 1 ? 10f : phase == 2 ? 14f : 18f;
-        float baseSaturation = phase == 1 ? -2f : phase == 2 ? 0f : 3f;
-        float baseGrain = phase == 1 ? 0.025f : phase == 2 ? 0.040f : 0.060f;
+        // V11 readability pass: keep a faint Chernobyl identity but move most of the
+        // post-process energy into event pulses. Grid telegraphs must remain the clearest element.
+        float baseBloom = phase == 1 ? 0.12f : phase == 2 ? 0.18f : 0.24f;
+        float baseVignette = phase == 1 ? 0.040f : phase == 2 ? 0.060f : 0.080f;
+        float baseContrast = phase == 1 ? 4f : phase == 2 ? 6f : 8f;
+        float baseSaturation = phase == 1 ? -1f : phase == 2 ? 0f : 1f;
+        float baseGrain = phase == 1 ? 0.005f : phase == 2 ? 0.008f : 0.012f;
 
-        bloom.intensity.value = baseBloom + bloomPulse + meltdownBreath * 0.08f;
-        vignette.intensity.value = baseVignette + vignettePulse + meltdownBreath * 0.018f;
+        bloom.intensity.value = baseBloom + bloomPulse + meltdownBreath * 0.035f;
+        vignette.intensity.value = baseVignette + vignettePulse + meltdownBreath * 0.008f;
         vignette.color.value = phase >= 3 ? new Color(0.055f, 0.12f, 0.018f, 1f) : new Color(0.015f, 0.075f, 0.025f, 1f);
-        chroma.intensity.value = Mathf.Clamp01(chromaPulse + meltdownBreath * (phase >= 3 ? 0.018f : 0f));
+        chroma.intensity.value = Mathf.Clamp01(chromaPulse + meltdownBreath * (phase >= 3 ? 0.006f : 0f));
         colorAdjustments.postExposure.value = exposurePulse;
         colorAdjustments.contrast.value = baseContrast;
         colorAdjustments.saturation.value = baseSaturation;
@@ -208,9 +217,9 @@ public sealed class ChernobylCameraFX : MonoBehaviour
             ? new Color(0.94f, 1f, 0.92f, 1f)
             : phase == 2 ? new Color(0.98f, 1f, 0.87f, 1f) : new Color(1f, 0.98f, 0.78f, 1f);
         if (lensDistortion != null)
-            lensDistortion.intensity.value = -Mathf.Clamp(lensPulse + meltdownBreath * 0.012f, 0f, 0.16f);
+            lensDistortion.intensity.value = -Mathf.Clamp(lensPulse + meltdownBreath * 0.004f, 0f, 0.12f);
         if (filmGrain != null)
-            filmGrain.intensity.value = baseGrain + meltdownBreath * 0.012f;
+            filmGrain.intensity.value = baseGrain + meltdownBreath * 0.004f;
 
         bloomPulse = Mathf.MoveTowards(bloomPulse, 0f, dt * pulseDecay);
         chromaPulse = Mathf.MoveTowards(chromaPulse, 0f, dt * pulseDecay * 0.75f);

@@ -278,6 +278,7 @@ public sealed class BytePickup : MonoBehaviour
             currencyManager = ByteCurrencyManager.Instance;
         if (currencyManager != null)
             currencyManager.AddBytes(value);
+        TeamGameSFX.PlayBytePickup();
         CombatImpactFXV11.EmitPickup(transform.position, new Color(0.12f, 0.92f, 0.82f, 1f));
         Destroy(gameObject);
     }

@@ -107,7 +107,9 @@ public sealed class PlayerCombatSFX : MonoBehaviour
         const string root = "CombatSFX/Weapons/";
         rangedEquip = Resources.Load<AudioClip>(root + "29_RangedWeaponEquip");
         meleeEquip = Resources.Load<AudioClip>(root + "30_MeleeWeaponEquip");
-        ammoPickup = Resources.Load<AudioClip>(root + "31_AmmoPickup");
+        ammoPickup = TeamGameSFX.LoadAmmoPickupPrimary();
+        if (ammoPickup == null)
+            ammoPickup = Resources.Load<AudioClip>(root + "31_AmmoPickup");
         pistolFire = LoadArray(root, new string[] { "32A_PistolFire", "32B_PistolFire" });
         pistolReload = Resources.Load<AudioClip>(root + "33_PistolReload");
         machineFire = LoadArray(root, new string[] { "34A_MachineGunFire", "34B_MachineGunFire", "34C_MachineGunFire" });

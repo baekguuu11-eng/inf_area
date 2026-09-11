@@ -189,6 +189,7 @@ public sealed class ExecutorProjectile : MonoBehaviour
             Vector2 impactPoint = other.ClosestPoint(transform.position);
             ExecutorCombatEffects.SpawnProjectileWallImpact(owner, impactPoint, velocity,
                 owner != null ? owner.ProjectileVisualStage : 1);
+            TeamGameSFX.PlayWallImpact(0.52f);
             Destroy(gameObject);
         }
     }

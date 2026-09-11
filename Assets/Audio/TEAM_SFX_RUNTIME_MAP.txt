@@ -1,0 +1,15 @@
+TEAM SFX RUNTIME MAP
+
+Pickup/Ammo_01.ogg  <- ammo.ogg / sfx_13c          [PRIMARY]
+Pickup/Ammo_02.ogg  <- ammo2.ogg / sfx_10b         [ALT ONLY]
+Pickup/Byte_01.ogg  <- byte2.ogg / sfx_20a          [PRIMARY]
+Pickup/Byte_02.ogg  <- byte.ogg / sfx_10c           [ALT ONLY]
+Player/Dash_01.ogg  <- player_dash.ogg / misc_01    [ACTIVE]
+Player/Hit_01.ogg   <- player_hit.ogg / terminal_03 [ACTIVE FALLBACK]
+Enemy/Death_01.ogg <- enemy_dead.ogg / weird_01     [REGULAR ENEMIES]
+Impact/Projectile_WallHit_01.ogg <- bullet_wall_hit.ogg / sfx_22a [ACTIVE RANDOM]
+Impact/Projectile_WallHit_02.ogg <- bullet_wall_hit2.ogg / sfx_22b [ACTIVE RANDOM]
+Portal/Activate_01.ogg <- potal_activate.ogg / misc_04 [ACTIVE]
+Portal/Enter_01.ogg    <- portal_enter.ogg / teleport_01 [ACTIVE]
+
+Existing project audio is retained. No destructive replacement was performed.

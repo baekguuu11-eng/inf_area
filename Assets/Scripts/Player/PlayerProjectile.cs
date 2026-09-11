@@ -148,6 +148,21 @@ public class PlayerProjectile : MonoBehaviour
         if (terminated || collision == null || collision.GetComponentInParent<PlayerHealth>() != null)
             return;
 
+        // JHL hands are not damageable. When a hand pattern enables its physical barrier,
+        // projectiles collide with it like a wall instead of leaking damage to the root EnemyHealth.
+        JHLHandBarrier handBarrier = collision.GetComponent<JHLHandBarrier>();
+        if (handBarrier == null) handBarrier = collision.GetComponentInParent<JHLHandBarrier>();
+        if (handBarrier != null && handBarrier.BarrierCollider != null && handBarrier.BarrierCollider.enabled)
+        {
+            Vector2 barrierTravel = body.linearVelocity.sqrMagnitude > 0.0001f ? body.linearVelocity.normalized : Vector2.right;
+            Vector2 barrierPoint = collision.ClosestPoint(transform.position);
+            Vector2 barrierNormal = ((Vector2)transform.position - barrierPoint).normalized;
+            if (barrierNormal.sqrMagnitude < 0.0001f) barrierNormal = -barrierTravel;
+            WallImpactSystem.Emit(barrierPoint, barrierNormal, barrierTravel, damage, weapon, collision);
+            Terminate();
+            return;
+        }
+
         EnemyHealth enemy = collision.GetComponentInParent<EnemyHealth>();
         if (enemy != null)
         {

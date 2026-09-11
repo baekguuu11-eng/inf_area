@@ -1,7 +1,10 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public static class ChernobylBossEffects
 {
+    private static readonly Stack<ChernobylDebris> debrisPool = new Stack<ChernobylDebris>(64);
+    private const int MaxPooledDebris = 64;
     public static GameObject CreateCircleTelegraph(Vector3 position, float radius, float duration, Color color, int sortingOrder = 12)
     {
         GameObject root = new GameObject("CHN_CircleTelegraph");
@@ -23,7 +26,7 @@ public static class ChernobylBossEffects
         return root;
     }
 
-    public static GameObject CreateRectTelegraph(Vector3 position, Vector2 size, float duration, Color color, int sortingOrder = 12)
+    public static GameObject CreateRectTelegraph(Vector3 position, Vector2 size, float duration, Color color, int sortingOrder = 12, bool simple = false)
     {
         GameObject root = new GameObject("CHN_RectTelegraph");
         root.transform.position = new Vector3(position.x, position.y, 0f);
@@ -33,13 +36,63 @@ public static class ChernobylBossEffects
         fill.sortingOrder = sortingOrder;
         root.transform.localScale = new Vector3(Mathf.Max(0.02f, size.x), Mathf.Max(0.02f, size.y), 1f);
 
-        float border = 0.045f;
-        CreateBorder(root.transform, new Vector2(0f, size.y * 0.5f), new Vector2(size.x, border), color, sortingOrder + 1);
-        CreateBorder(root.transform, new Vector2(0f, -size.y * 0.5f), new Vector2(size.x, border), color, sortingOrder + 1);
-        CreateBorder(root.transform, new Vector2(size.x * 0.5f, 0f), new Vector2(border, size.y), color, sortingOrder + 1);
-        CreateBorder(root.transform, new Vector2(-size.x * 0.5f, 0f), new Vector2(border, size.y), color, sortingOrder + 1);
+        if (!simple)
+        {
+            float border = 0.045f;
+            CreateBorder(root.transform, new Vector2(0f, size.y * 0.5f), new Vector2(size.x, border), color, sortingOrder + 1);
+            CreateBorder(root.transform, new Vector2(0f, -size.y * 0.5f), new Vector2(size.x, border), color, sortingOrder + 1);
+            CreateBorder(root.transform, new Vector2(size.x * 0.5f, 0f), new Vector2(border, size.y), color, sortingOrder + 1);
+            CreateBorder(root.transform, new Vector2(-size.x * 0.5f, 0f), new Vector2(border, size.y), color, sortingOrder + 1);
+        }
         ChernobylTelegraphPulse pulse = root.AddComponent<ChernobylTelegraphPulse>();
         pulse.Initialize(duration, color);
+        return root;
+    }
+
+
+    public static GameObject CreateSafeRectIndicator(Vector3 position, Vector2 size, float duration)
+    {
+        Color safe = new Color(0.24f, 0.88f, 1f, 1f);
+        GameObject root = new GameObject("CHN_SafeIndicator");
+        root.transform.position = new Vector3(position.x, position.y, 0f);
+        SpriteRenderer fill = root.AddComponent<SpriteRenderer>();
+        fill.sprite = ChernobylRuntimeSprites.WhitePixel;
+        fill.color = new Color(safe.r, safe.g, safe.b, 0.10f);
+        fill.sortingOrder = 10;
+        root.transform.localScale = new Vector3(Mathf.Max(0.02f, size.x * 0.96f), Mathf.Max(0.02f, size.y * 0.96f), 1f);
+        float border = 0.04f;
+        CreateBorder(root.transform, new Vector2(0f, size.y * 0.48f), new Vector2(size.x * 0.96f, border), safe, 12);
+        CreateBorder(root.transform, new Vector2(0f, -size.y * 0.48f), new Vector2(size.x * 0.96f, border), safe, 12);
+        CreateBorder(root.transform, new Vector2(size.x * 0.48f, 0f), new Vector2(border, size.y * 0.96f), safe, 12);
+        CreateBorder(root.transform, new Vector2(-size.x * 0.48f, 0f), new Vector2(border, size.y * 0.96f), safe, 12);
+        ChernobylSafePulse pulse = root.AddComponent<ChernobylSafePulse>();
+        pulse.Initialize(duration, safe);
+        return root;
+    }
+
+    public static GameObject CreateRingTelegraph(Vector3 position, float innerRadius, float outerRadius, float duration, Color color)
+    {
+        GameObject root = new GameObject("CHN_RingTelegraph");
+        root.transform.position = new Vector3(position.x, position.y, 0f);
+
+        SpriteRenderer outer = root.AddComponent<SpriteRenderer>();
+        outer.sprite = ChernobylRuntimeSprites.Ring;
+        outer.color = new Color(color.r, color.g, color.b, 0.92f);
+        outer.sortingOrder = 14;
+        float outerScale = outerRadius * 2f / Mathf.Max(0.001f, outer.sprite.bounds.size.x);
+        root.transform.localScale = Vector3.one * outerScale;
+
+        GameObject innerObject = new GameObject("InnerBoundary");
+        innerObject.transform.SetParent(root.transform, false);
+        SpriteRenderer inner = innerObject.AddComponent<SpriteRenderer>();
+        inner.sprite = ChernobylRuntimeSprites.Ring;
+        inner.color = new Color(0.24f, 0.88f, 1f, 0.88f);
+        inner.sortingOrder = 15;
+        float ratio = outerRadius > 0.001f ? Mathf.Clamp01(innerRadius / outerRadius) : 0.5f;
+        innerObject.transform.localScale = Vector3.one * ratio;
+
+        ChernobylRingTelegraphPulse pulse = root.AddComponent<ChernobylRingTelegraphPulse>();
+        pulse.Initialize(duration, color, safeColor: new Color(0.24f, 0.88f, 1f, 1f));
         return root;
     }
 
@@ -75,7 +128,12 @@ public static class ChernobylBossEffects
         SpawnFragments(position, color, Mathf.RoundToInt(8 + radius * 5f), 2.7f);
     }
 
-    public static void SpawnRectBlast(Vector3 position, Vector2 size, Color color)
+    public static void SpawnRectBlast(Vector3 position, Vector2 size, Color color, bool spawnFragments = true)
+    {
+        SpawnRectBlastObject(position, size, color, spawnFragments);
+    }
+
+    public static GameObject SpawnRectBlastObject(Vector3 position, Vector2 size, Color color, bool spawnFragments = true)
     {
         GameObject root = new GameObject("CHN_RectBlast");
         root.transform.position = new Vector3(position.x, position.y, 0f);
@@ -87,7 +145,24 @@ public static class ChernobylBossEffects
         root.transform.localScale = target * 0.45f;
         ChernobylFadeBurst fade = root.AddComponent<ChernobylFadeBurst>();
         fade.Initialize(target, 0.24f, Color.white, new Color(color.r, color.g, color.b, 0f));
-        SpawnFragments(position, color, Mathf.Clamp(Mathf.RoundToInt((size.x + size.y) * 1.4f), 7, 18), 2.4f);
+        if (spawnFragments)
+            SpawnFragments(position, color, Mathf.Clamp(Mathf.RoundToInt((size.x + size.y) * 0.85f), 4, 9), 2.4f);
+        return root;
+    }
+
+    public static void SpawnRingBlast(Vector3 position, float innerRadius, float outerRadius, Color color)
+    {
+        GameObject root = new GameObject("CHN_RingBlast");
+        root.transform.position = new Vector3(position.x, position.y, 0f);
+        SpriteRenderer renderer = root.AddComponent<SpriteRenderer>();
+        renderer.sprite = ChernobylRuntimeSprites.Ring;
+        renderer.color = Color.white;
+        renderer.sortingOrder = 29;
+        float target = outerRadius * 2f / Mathf.Max(0.001f, renderer.sprite.bounds.size.x);
+        root.transform.localScale = Vector3.one * target * 0.72f;
+        ChernobylFadeBurst fade = root.AddComponent<ChernobylFadeBurst>();
+        fade.Initialize(Vector3.one * target, 0.26f, Color.white, new Color(color.r, color.g, color.b, 0f));
+        SpawnFragments(position, color, 10, 2.7f);
     }
 
     public static void SpawnCoreSparks(Vector3 position, Color color, int count, float strength = 2.8f)
@@ -105,19 +180,57 @@ public static class ChernobylBossEffects
     {
         for (int i = 0; i < Mathf.Max(1, count); i++)
         {
-            GameObject chip = new GameObject("CHN_WhiteFragment");
+            ChernobylDebris debris = AcquireDebris();
+            if (debris == null) continue;
+            GameObject chip = debris.gameObject;
+            chip.name = "CHN_WhiteFragment";
             chip.transform.position = position + (Vector3)(Random.insideUnitCircle * 0.16f);
-            SpriteRenderer renderer = chip.AddComponent<SpriteRenderer>();
-            renderer.sprite = Random.value > 0.35f ? ChernobylRuntimeSprites.WhitePixel : ChernobylRuntimeSprites.Diamond;
-            renderer.color = Color.Lerp(Color.white, color, Random.Range(0.10f, 0.62f));
-            renderer.sortingOrder = Random.Range(26, 34);
+            chip.transform.rotation = Quaternion.identity;
             chip.transform.localScale = new Vector3(Random.Range(0.035f, 0.085f), Random.Range(0.05f, 0.14f), 1f);
+
+            SpriteRenderer renderer = debris.Renderer;
+            if (renderer != null)
+            {
+                renderer.sprite = Random.value > 0.35f ? ChernobylRuntimeSprites.WhitePixel : ChernobylRuntimeSprites.Diamond;
+                renderer.color = Color.Lerp(Color.white, color, Random.Range(0.10f, 0.62f));
+                renderer.sortingOrder = Random.Range(26, 34);
+            }
+
             Vector2 direction = Random.insideUnitCircle.normalized;
             if (direction.sqrMagnitude < 0.001f) direction = Vector2.up;
-            ChernobylDebris debris = chip.AddComponent<ChernobylDebris>();
             debris.Initialize(direction * Random.Range(strength * 0.45f, strength), Random.Range(0.20f, 0.46f),
                 Random.Range(220f, 580f));
         }
+    }
+
+    private static ChernobylDebris AcquireDebris()
+    {
+        while (debrisPool.Count > 0)
+        {
+            ChernobylDebris pooled = debrisPool.Pop();
+            if (pooled == null) continue;
+            pooled.gameObject.SetActive(true);
+            return pooled;
+        }
+
+        GameObject chip = new GameObject("CHN_WhiteFragment");
+        SpriteRenderer renderer = chip.AddComponent<SpriteRenderer>();
+        renderer.sprite = ChernobylRuntimeSprites.WhitePixel;
+        ChernobylDebris debris = chip.AddComponent<ChernobylDebris>();
+        debris.BindRenderer(renderer);
+        return debris;
+    }
+
+    public static void ReleaseDebris(ChernobylDebris debris)
+    {
+        if (debris == null) return;
+        if (debrisPool.Count >= MaxPooledDebris)
+        {
+            Object.Destroy(debris.gameObject);
+            return;
+        }
+        debris.gameObject.SetActive(false);
+        debrisPool.Push(debris);
     }
 }
 
@@ -162,6 +275,79 @@ public sealed class ChernobylTelegraphPulse : MonoBehaviour
     }
 }
 
+public sealed class ChernobylSafePulse : MonoBehaviour
+{
+    private SpriteRenderer[] renderers;
+    private Color safeColor;
+    private float duration;
+    private float elapsed;
+
+    public void Initialize(float life, Color color)
+    {
+        duration = Mathf.Max(0.05f, life);
+        safeColor = color;
+        renderers = GetComponentsInChildren<SpriteRenderer>(true);
+    }
+
+    private void Update()
+    {
+        elapsed += Time.deltaTime;
+        float t = Mathf.Clamp01(elapsed / duration);
+        float pulse = Mathf.Sin(Time.time * Mathf.Lerp(3.5f, 7.0f, t)) * 0.5f + 0.5f;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            SpriteRenderer r = renderers[i];
+            if (r == null) continue;
+            Color c = safeColor;
+            c.a = i == 0 ? Mathf.Lerp(0.08f, 0.18f, pulse) : Mathf.Lerp(0.72f, 0.98f, pulse);
+            r.color = c;
+        }
+    }
+}
+
+public sealed class ChernobylRingTelegraphPulse : MonoBehaviour
+{
+    private SpriteRenderer outer;
+    private SpriteRenderer inner;
+    private Color hazardColor;
+    private Color safeColor;
+    private float duration;
+    private float elapsed;
+
+    public void Initialize(float life, Color hazard, Color safeColor)
+    {
+        duration = Mathf.Max(0.05f, life);
+        hazardColor = hazard;
+        this.safeColor = safeColor;
+        outer = GetComponent<SpriteRenderer>();
+        Transform child = transform.Find("InnerBoundary");
+        inner = child != null ? child.GetComponent<SpriteRenderer>() : null;
+    }
+
+    private void Update()
+    {
+        elapsed += Time.deltaTime;
+        float t = Mathf.Clamp01(elapsed / duration);
+        float hazardPulse = Mathf.Sin(Time.time * Mathf.Lerp(4.5f, 13.5f, t)) * 0.5f + 0.5f;
+        Color warm = new Color(1f, 0.92f, 0.22f, 1f);
+        Color hot = new Color(1f, 1f, 0.92f, 1f);
+        Color h = t < 0.56f
+            ? Color.Lerp(hazardColor, warm, Mathf.InverseLerp(0.28f, 0.56f, t) * 0.38f)
+            : Color.Lerp(warm, hot, Mathf.InverseLerp(0.56f, 1f, t));
+        if (outer != null)
+        {
+            h.a = Mathf.Lerp(0.72f, 1f, hazardPulse);
+            outer.color = h;
+        }
+        if (inner != null)
+        {
+            Color s = safeColor;
+            s.a = Mathf.Lerp(0.68f, 0.98f, Mathf.Sin(Time.time * 5f) * 0.5f + 0.5f);
+            inner.color = s;
+        }
+    }
+}
+
 public sealed class ChernobylFadeBurst : MonoBehaviour
 {
     private SpriteRenderer renderer;
@@ -202,12 +388,20 @@ public sealed class ChernobylDebris : MonoBehaviour
     private SpriteRenderer renderer;
     private Color start;
 
+    public SpriteRenderer Renderer => renderer;
+
+    public void BindRenderer(SpriteRenderer target)
+    {
+        renderer = target;
+    }
+
     public void Initialize(Vector2 initialVelocity, float life, float angularVelocity)
     {
+        if (renderer == null) renderer = GetComponent<SpriteRenderer>();
         velocity = initialVelocity;
         duration = Mathf.Max(0.08f, life);
+        elapsed = 0f;
         spin = Random.value > 0.5f ? angularVelocity : -angularVelocity;
-        renderer = GetComponent<SpriteRenderer>();
         start = renderer != null ? renderer.color : Color.white;
     }
 
@@ -224,7 +418,8 @@ public sealed class ChernobylDebris : MonoBehaviour
             c.a = 1f - t * t;
             renderer.color = c;
         }
-        if (t >= 1f) Destroy(gameObject);
+        if (t >= 1f)
+            ChernobylBossEffects.ReleaseDebris(this);
     }
 }
 
@@ -258,7 +453,7 @@ public sealed class ChernobylShockwave : MonoBehaviour
         wave.endRadius = Mathf.Max(wave.startRadius + 0.05f, endRadius);
         wave.thickness = Mathf.Max(0.05f, thickness);
         wave.duration = Mathf.Max(0.08f, duration);
-        wave.damage = Mathf.Max(1, damage);
+        wave.damage = Mathf.Max(0, damage);
         wave.color = color;
         wave.previousRadius = wave.startRadius;
         wave.ApplyScale(wave.startRadius);
@@ -273,13 +468,33 @@ public sealed class ChernobylShockwave : MonoBehaviour
         ApplyScale(radius);
         if (!hit && player != null && !player.IsDead)
         {
-            float d = Vector2.Distance(transform.position, player.transform.position);
-            float min = Mathf.Min(previousRadius, radius) - thickness;
-            float max = Mathf.Max(previousRadius, radius) + thickness;
-            if (d >= min && d <= max)
+            float ringMin = Mathf.Max(0f, Mathf.Min(previousRadius, radius) - thickness);
+            float ringMax = Mathf.Max(previousRadius, radius) + thickness;
+            Collider2D[] colliders = player.GetComponentsInChildren<Collider2D>(true);
+            Vector2 center = transform.position;
+            for (int i = 0; i < colliders.Length && !hit; i++)
             {
-                player.TakeDamage(damage);
-                hit = true;
+                Collider2D c = colliders[i];
+                if (c == null || !c.enabled || c.isTrigger) continue;
+
+                // Use the player's actual collider extent instead of only transform.position.
+                Vector2 closest = c.ClosestPoint(center);
+                float minDistance = Vector2.Distance(center, closest);
+                Bounds cb = c.bounds;
+                Vector2[] corners =
+                {
+                    new Vector2(cb.min.x, cb.min.y), new Vector2(cb.min.x, cb.max.y),
+                    new Vector2(cb.max.x, cb.min.y), new Vector2(cb.max.x, cb.max.y)
+                };
+                float maxDistance = minDistance;
+                for (int corner = 0; corner < corners.Length; corner++)
+                    maxDistance = Mathf.Max(maxDistance, Vector2.Distance(center, corners[corner]));
+
+                if (ringMax >= minDistance && ringMin <= maxDistance)
+                {
+                    if (damage > 0) player.TakeDamage(damage);
+                    hit = true;
+                }
             }
         }
         previousRadius = radius;

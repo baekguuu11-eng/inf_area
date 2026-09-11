@@ -39,14 +39,29 @@ public sealed class V11DebugOverlay : MonoBehaviour
         if (inventory == null) inventory = Object.FindAnyObjectByType<PlayerWeaponInventory>();
         if (ammo == null) ammo = Object.FindAnyObjectByType<PlayerAmmoController>();
 
-        ExecutorBossController boss = map.ActiveExecutorBoss;
+        ExecutorBossController executor = map.ActiveExecutorBoss;
+        ChernobylBossController chernobyl = map.ActiveChernobylBoss;
+        JHLBossController jhl = map.ActiveJHLBoss;
         string weapon = inventory != null && inventory.CurrentWeapon != null ? inventory.CurrentWeapon.weaponId : "-";
         string ammoText = ammo != null ? ammo.CurrentTotalAmmoEnergy.ToString() : "-";
-        string bossText = boss != null
-            ? $"Executor {boss.Health.CurrentHealth}/{boss.Health.MaxHealth} P{boss.DebugPhase} {boss.DebugStateName}\nLast: {boss.DebugLastPatternName}  Selected: {boss.DebugSelectedPatternName}"
-            : "Executor: -";
-        string text = $"V11 DEBUG\nStage {map.CurrentStage}  Room {(map.CurrentRoom != null ? map.CurrentRoom.RoomNumber : 0)}\nWeapon {weapon}  Ammo {ammoText}\n{bossText}\nPgUp/PgDn: pattern  P: force";
-        GUI.Label(new Rect(10, 10, 420, 150), text, style);
+        string bossText;
+        if (executor != null)
+            bossText = $"Executor {executor.Health.CurrentHealth}/{executor.Health.MaxHealth} P{executor.DebugPhase} {executor.DebugStateName}\nLast: {executor.DebugLastPatternName}  Selected: {executor.DebugSelectedPatternName}";
+        else if (jhl != null)
+        {
+            string safe = jhl.DebugSafeWidth >= 0f ? jhl.DebugSafeWidth.ToString("0.00") : "-";
+            bossText = $"JHL {jhl.Health.CurrentHealth}/{jhl.Health.MaxHealth} P{jhl.Phase} {jhl.DebugStateName}\n" +
+                       $"Last: {jhl.DebugLastPatternName}  Family: {jhl.DebugPatternFamilyName}  Selected: {jhl.DebugSelectedPatternName}\n" +
+                       $"Vel F {jhl.DebugFaceVelocity.magnitude:0.0}  L {jhl.DebugLeftVelocity.magnitude:0.0}  R {jhl.DebugRightVelocity.magnitude:0.0}  Safe {safe}";
+        }
+        else if (chernobyl != null)
+            bossText = $"Chernobyl {chernobyl.Health.CurrentHealth}/{chernobyl.Health.MaxHealth} P{chernobyl.Phase} Grid {chernobyl.DebugGridDescriptorV11} Warnings {chernobyl.DebugGridWarningCountV11}\n" +
+                       $"Last {chernobyl.DebugLastPatternNameV11} / Combo {chernobyl.DebugLastComboNameV11}\n" +
+                       $"Selected {chernobyl.DebugSelectedPatternNameV11} / {chernobyl.DebugSelectedComboNameV11}  InvBoss {chernobyl.DebugBossInvulnerableV11} InvPlayer {chernobyl.DebugPlayerInvulnerableV11} NoCD {chernobyl.DebugIgnoreCooldownV11}";
+        else
+            bossText = "Boss: -";
+        string text = $"V11 DEBUG\nStage {map.CurrentStage}  Room {(map.CurrentRoom != null ? map.CurrentRoom.RoomNumber : 0)}\nWeapon {weapon}  Ammo {ammoText}\n{bossText}\nChernobyl: Shift+1/2/3 page, Shift+PgUp/PgDn select, Shift+N next+force, Shift+P force, Shift+C/X combo, Shift+O force combo, Shift+B anti-burst, Shift+G clear, Shift+I/U invuln, Shift+K noCD";
+        GUI.Label(new Rect(10, 10, 920, 235), text, style);
 #endif
     }
 }

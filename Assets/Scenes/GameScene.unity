@@ -2370,10 +2370,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerDashController
   dashKey: 101
-  dashDistance: 0.9
-  dashDuration: 0.11
+  dashDistance: 1.5
+  dashDuration: 0.16
   dashCooldown: 0.85
-  invulnerabilityDuration: 0.06
+  invulnerabilityDuration: 0.16
   wallSkin: 0.035
   afterimageCount: 3
   afterimageLifetime: 0.16

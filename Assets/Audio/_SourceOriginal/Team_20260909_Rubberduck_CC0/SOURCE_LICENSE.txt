@@ -1,0 +1,14 @@
+TEAM SOUND SOURCE / LICENSE
+
+50 CC0 Sci-Fi SFX
+Author: rubberduck
+License: CC0 1.0 / Public Domain
+Source: https://opengameart.org/content/50-cc0-sci-fi-sfx
+
+60 CC0 Sci-Fi SFX
+Author: rubberduck
+License: CC0 1.0 / Public Domain
+Source: https://opengameart.org/content/60-cc0-sci-fi-sfx
+
+The selected originals are preserved in this folder. Runtime copies live under Assets/Resources/TeamSFX.
+Existing project audio was not deleted or overwritten.
