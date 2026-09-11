@@ -9,10 +9,10 @@ public sealed class PlayerDashController : MonoBehaviour
     [SerializeField] private KeyCode dashKey = KeyCode.E;
 
     [Header("Dash")]
-    [SerializeField, Min(0.1f)] private float dashDistance = 0.90f;
-    [SerializeField, Min(0.03f)] private float dashDuration = 0.11f;
+    [SerializeField, Min(0.1f)] private float dashDistance = 1.50f;
+    [SerializeField, Min(0.03f)] private float dashDuration = 0.16f;
     [SerializeField, Min(0.05f)] private float dashCooldown = 0.85f;
-    [SerializeField, Min(0f)] private float invulnerabilityDuration = 0.06f;
+    [SerializeField, Min(0f)] private float invulnerabilityDuration = 0.16f;
     [SerializeField, Min(0.005f)] private float wallSkin = 0.035f;
 
     [Header("Afterimage")]
@@ -21,6 +21,8 @@ public sealed class PlayerDashController : MonoBehaviour
     [SerializeField] private Color afterimageColor = new Color(0.2f, 0.95f, 1f, 0.55f);
 
     private readonly RaycastHit2D[] castHits = new RaycastHit2D[12];
+    private readonly System.Collections.Generic.List<Collider2D> ignoredEnemyColliders = new System.Collections.Generic.List<Collider2D>(24);
+    private Collider2D[] playerColliders;
     private Rigidbody2D body;
     private PlayerMovement movement;
     private PlayerCombat combat;
@@ -39,6 +41,7 @@ public sealed class PlayerDashController : MonoBehaviour
         body = GetComponent<Rigidbody2D>();
         movement = GetComponent<PlayerMovement>();
         combat = GetComponent<PlayerCombat>();
+        playerColliders = GetComponentsInChildren<Collider2D>(true);
         bodyRenderer = FindBodyRenderer();
     }
 
@@ -52,6 +55,17 @@ public sealed class PlayerDashController : MonoBehaviour
 
         if (Input.GetKeyDown(dashKey))
             TryDash();
+    }
+
+    public void CancelForExternalForce()
+    {
+        if (dashRoutine != null)
+        {
+            StopCoroutine(dashRoutine);
+            dashRoutine = null;
+        }
+        RestoreIgnoredEnemyCollisions();
+        if (body != null) body.linearVelocity = Vector2.zero;
     }
 
     public bool TryDash()
@@ -77,33 +91,116 @@ public sealed class PlayerDashController : MonoBehaviour
     private IEnumerator DashRoutine(Vector2 direction)
     {
         nextDashTime = Time.unscaledTime + dashCooldown;
-        invulnerableUntil = Time.unscaledTime + Mathf.Min(invulnerabilityDuration, dashDuration);
+        // A committed dash stays invulnerable for the full travel. It is not shortened
+        // by releasing movement input or by a combat action changing state mid-dash.
+        invulnerableUntil = Time.unscaledTime + Mathf.Max(invulnerabilityDuration, dashDuration);
         body.linearVelocity = Vector2.zero;
 
         float safeDistance = CalculateSafeDistance(direction, dashDistance);
         Vector2 start = body.position;
         Vector2 target = start + direction * safeDistance;
+        TeamGameSFX.PlayDash();
+        CombatImpactFXV11.EmitDashBurst(start, direction, false);
+        CameraFeedbackController dashFeedback = CameraFeedbackController.Instance;
+        if (dashFeedback != null) dashFeedback.Impact(CameraImpactLevelV11.Small, -direction, false);
         float elapsed = 0f;
         int spawned = 0;
 
-        while (elapsed < dashDuration)
+        // Enemy bodies must not physically cancel a committed dash. Walls/obstacles are
+        // still respected by CalculateSafeDistance, and damage remains governed by the
+        // dash invulnerability window in PlayerHealth.
+        BeginIgnoreNearbyEnemyCollisions(direction, safeDistance);
+        try
         {
-            elapsed += Time.fixedUnscaledDeltaTime;
-            float t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, dashDuration));
-            float eased = 1f - Mathf.Pow(1f - t, 3f);
-            body.MovePosition(Vector2.Lerp(start, target, eased));
-
-            int expected = Mathf.Min(afterimageCount, Mathf.FloorToInt(t * (afterimageCount + 1)));
-            while (spawned < expected)
+            while (elapsed < dashDuration)
             {
-                SpawnAfterimage();
-                spawned++;
-            }
-            yield return new WaitForFixedUpdate();
-        }
+                elapsed += Time.fixedUnscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, dashDuration));
+                float eased = 1f - Mathf.Pow(1f - t, 3f);
+                body.MovePosition(Vector2.Lerp(start, target, eased));
 
-        body.position = target;
-        body.linearVelocity = Vector2.zero;
+                int expected = Mathf.Min(afterimageCount, Mathf.FloorToInt(t * (afterimageCount + 1)));
+                while (spawned < expected)
+                {
+                    SpawnAfterimage();
+                    spawned++;
+                }
+                yield return new WaitForFixedUpdate();
+            }
+
+            body.position = target;
+            body.linearVelocity = Vector2.zero;
+            CombatImpactFXV11.EmitDashBurst(target, direction, true);
+        }
+        finally
+        {
+            RestoreIgnoredEnemyCollisions();
+            dashRoutine = null;
+        }
+    }
+
+    private void BeginIgnoreNearbyEnemyCollisions(Vector2 direction, float travelDistance)
+    {
+        RestoreIgnoredEnemyCollisions();
+        if (playerColliders == null || playerColliders.Length == 0)
+            playerColliders = GetComponentsInChildren<Collider2D>(true);
+
+        int enemyLayer = LayerMask.NameToLayer("Enemy");
+        if (enemyLayer < 0)
+            return;
+
+        Vector2 center = body.position + direction * (travelDistance * 0.5f);
+        float radius = Mathf.Max(1.25f, travelDistance * 0.65f + 1.4f);
+        Collider2D[] enemies = Physics2D.OverlapCircleAll(center, radius, 1 << enemyLayer);
+        for (int i = 0; i < enemies.Length; i++)
+        {
+            Collider2D enemy = enemies[i];
+            if (enemy == null || enemy.isTrigger)
+                continue;
+            if (enemy.GetComponentInParent<EnemyHealth>() == null)
+                continue;
+
+            bool ignoredAny = false;
+            for (int p = 0; p < playerColliders.Length; p++)
+            {
+                Collider2D playerCollider = playerColliders[p];
+                if (playerCollider == null || playerCollider.isTrigger)
+                    continue;
+                Physics2D.IgnoreCollision(playerCollider, enemy, true);
+                ignoredAny = true;
+            }
+
+            if (ignoredAny && !ignoredEnemyColliders.Contains(enemy))
+                ignoredEnemyColliders.Add(enemy);
+        }
+    }
+
+    private void RestoreIgnoredEnemyCollisions()
+    {
+        if (ignoredEnemyColliders.Count == 0)
+            return;
+        if (playerColliders == null || playerColliders.Length == 0)
+            playerColliders = GetComponentsInChildren<Collider2D>(true);
+
+        for (int i = 0; i < ignoredEnemyColliders.Count; i++)
+        {
+            Collider2D enemy = ignoredEnemyColliders[i];
+            if (enemy == null)
+                continue;
+            for (int p = 0; p < playerColliders.Length; p++)
+            {
+                Collider2D playerCollider = playerColliders[p];
+                if (playerCollider == null || playerCollider.isTrigger)
+                    continue;
+                Physics2D.IgnoreCollision(playerCollider, enemy, false);
+            }
+        }
+        ignoredEnemyColliders.Clear();
+    }
+
+    private void OnDisable()
+    {
+        RestoreIgnoredEnemyCollisions();
         dashRoutine = null;
     }
 
@@ -120,6 +217,11 @@ public sealed class PlayerDashController : MonoBehaviour
             Collider2D hitCollider = castHits[i].collider;
             if (hitCollider == null || hitCollider.transform.IsChildOf(transform))
                 continue;
+            if (hitCollider.GetComponent<JHLHandBarrier>() != null || hitCollider.GetComponentInParent<JHLHandBarrier>() != null)
+            {
+                nearest = Mathf.Min(nearest, Mathf.Max(0f, castHits[i].distance - wallSkin));
+                continue;
+            }
             if (hitCollider.GetComponentInParent<EnemyHealth>() != null)
                 continue;
             nearest = Mathf.Min(nearest, Mathf.Max(0f, castHits[i].distance - wallSkin));

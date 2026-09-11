@@ -116,6 +116,13 @@ public class RoomEnemySpawner : MonoBehaviour
                 EnemySizeController sizeController = instance.GetComponent<EnemySizeController>();
                 if (sizeController != null)
                     sizeController.ApplySizeNow();
+
+                // V12: the stage prefix is now meaningful for normal enemies. Stage 1 keeps
+                // the original kit; every later stage unlocks additional patterns and a darker
+                // visual treatment without turning enemies into HP sponges.
+                StageEnemyEvolutionV12 evolution = instance.GetComponent<StageEnemyEvolutionV12>();
+                if (evolution == null) evolution = instance.AddComponent<StageEnemyEvolutionV12>();
+                evolution.Configure(stageNumber);
             }
             if (useSpawnEntrance && instance != null)
             {
@@ -123,6 +130,7 @@ public class RoomEnemySpawner : MonoBehaviour
                 if (entrance == null)
                     entrance = instance.AddComponent<EnemySpawnEntrance>();
                 entrance.Configure(i * spawnEntranceStagger, spawnEntranceDuration, room);
+                entrance.RefreshStageColorsFromCurrent();
             }
         }
     }

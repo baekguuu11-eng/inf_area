@@ -62,8 +62,11 @@ public sealed class ExecutorBossMusic : MonoBehaviour
             }
         }
 
-        if (gameplayBgmSource != null && gameplayBgmSource.volume > 0.01f)
-            gameplayBgmRestoreVolume = gameplayBgmSource.volume;
+        if (gameplayBgmSource != null)
+        {
+            BossMusicTransitionBridge.RegisterGameplaySource(gameplayBgmSource);
+            gameplayBgmRestoreVolume = BossMusicTransitionBridge.RestoreVolume;
+        }
         if (gameplayBgmRestoreVolume <= 0.01f)
             gameplayBgmRestoreVolume = 0.70f;
     }
@@ -80,8 +83,8 @@ public sealed class ExecutorBossMusic : MonoBehaviour
     public void PrepareSilentIntro()
     {
         ResolveGameplayBgmSource();
-        if (gameplayBgmSource != null && gameplayBgmSource.volume > 0.01f)
-            gameplayBgmRestoreVolume = gameplayBgmSource.volume;
+        gameplayBgmRestoreVolume = BossMusicTransitionBridge.RestoreVolume;
+        BossMusicTransitionBridge.ForceCutsceneSilence();
         if (fadeRoutine != null)
         {
             StopCoroutine(fadeRoutine);
@@ -102,12 +105,11 @@ public sealed class ExecutorBossMusic : MonoBehaviour
             phaseTwoSource.Stop();
             phaseTwoSource.volume = 0f;
         }
-        if (gameplayBgmSource != null)
-            gameplayBgmSource.volume = 0f;
     }
 
     public void PlayPhaseOne(float fadeDuration = 0.45f)
     {
+        BossMusicTransitionBridge.ForceCutsceneSilence();
         if (fadeRoutine != null) StopCoroutine(fadeRoutine);
         if (phaseOneSource != null && phaseOneSource.clip != null)
         {
@@ -116,7 +118,6 @@ public sealed class ExecutorBossMusic : MonoBehaviour
         }
         if (phaseTwoSource != null) phaseTwoSource.Stop();
         fadeRoutine = StartCoroutine(CrossFade(phaseOneSource, PhaseOneVolume, phaseTwoSource, 0f, fadeDuration, false));
-        FadeGameplayBgm(0f, fadeDuration);
     }
 
     public void PlayPhaseTwo(float fadeDuration = 0.55f)
@@ -154,6 +155,8 @@ public sealed class ExecutorBossMusic : MonoBehaviour
     public void CrossFadeBackToGameplay(float duration = 1.75f)
     {
         ResolveGameplayBgmSource();
+        BossMusicTransitionBridge.CancelActiveFade();
+        gameplayBgmRestoreVolume = BossMusicTransitionBridge.RestoreVolume;
         if (fadeRoutine != null)
         {
             StopCoroutine(fadeRoutine);

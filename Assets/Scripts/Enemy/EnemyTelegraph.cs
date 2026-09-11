@@ -26,6 +26,11 @@ public sealed class EnemyTelegraph : MonoBehaviour
     private static readonly Dictionary<int, Sprite> sectorFillCache = new Dictionary<int, Sprite>();
     private static readonly Dictionary<int, Sprite> sectorOutlineCache = new Dictionary<int, Sprite>();
 
+    private Color defaultFillColor;
+    private Color defaultOutlineColor;
+    private Color defaultScanColor;
+    private bool paletteCached;
+
     private SpriteRenderer outlineRenderer;
     private SpriteRenderer scanRenderer;
     private ShapeMode shapeMode;
@@ -36,8 +41,36 @@ public sealed class EnemyTelegraph : MonoBehaviour
 
     private void Awake()
     {
+        CacheDefaultPalette();
         EnsureRenderers();
         Hide();
+    }
+
+    private void CacheDefaultPalette()
+    {
+        if (paletteCached) return;
+        defaultFillColor = fillColor;
+        defaultOutlineColor = outlineColor;
+        defaultScanColor = scanColor;
+        paletteCached = true;
+    }
+
+    public void SetPalette(Color fill, Color outline, Color scan)
+    {
+        CacheDefaultPalette();
+        fillColor = fill;
+        outlineColor = outline;
+        scanColor = scan;
+        if (visible) ApplyCurrentColors();
+    }
+
+    public void ResetPalette()
+    {
+        CacheDefaultPalette();
+        fillColor = defaultFillColor;
+        outlineColor = defaultOutlineColor;
+        scanColor = defaultScanColor;
+        if (visible) ApplyCurrentColors();
     }
 
     private void Update()

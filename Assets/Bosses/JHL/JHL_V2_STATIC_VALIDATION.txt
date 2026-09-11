@@ -1,0 +1,5 @@
+DEPRECATED JHL DEVELOPMENT NOTE
+
+This file is retained only to preserve the existing Unity .meta/GUID relationship.
+The active implementation is JHL V3 (screen-dominant cutscene/motion/debug overhaul).
+Use the project-root JHL_V3_README.txt and JHL_V3_STATIC_VALIDATION.txt as the current handoff documents.

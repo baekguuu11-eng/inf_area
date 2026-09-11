@@ -44,8 +44,8 @@ public sealed class ExecutorProjectile : MonoBehaviour
             case ExecutorProjectileStyle.SpreadPhaseOne:
                 coreColor = Color.white;
                 glowColor = new Color(0.38f, 0.46f, 1f, 0.40f);
-                scale = 0.48f;
-                radius = 0.24f;
+                scale = 0.37f;
+                radius = 0.185f;
                 break;
             case ExecutorProjectileStyle.AimedPhaseTwo:
                 coreColor = Color.white;
@@ -56,8 +56,8 @@ public sealed class ExecutorProjectile : MonoBehaviour
             case ExecutorProjectileStyle.SpreadPhaseTwo:
                 coreColor = Color.white;
                 glowColor = new Color(1f, 0.10f, 0.02f, 0.44f);
-                scale = 0.44f;
-                radius = 0.22f;
+                scale = 0.34f;
+                radius = 0.17f;
                 break;
             default:
                 coreColor = Color.white;
@@ -189,6 +189,7 @@ public sealed class ExecutorProjectile : MonoBehaviour
             Vector2 impactPoint = other.ClosestPoint(transform.position);
             ExecutorCombatEffects.SpawnProjectileWallImpact(owner, impactPoint, velocity,
                 owner != null ? owner.ProjectileVisualStage : 1);
+            TeamGameSFX.PlayWallImpact(0.52f);
             Destroy(gameObject);
         }
     }

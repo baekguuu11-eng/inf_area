@@ -1224,24 +1224,20 @@ public class MainMenuSubPanelManager : MonoBehaviour
 
     private void ApplyMasterVolume(float value)
     {
-        AudioListener.volume =
-            Mathf.Clamp01(value);
+        GlobalAudioSettingsV14.SetMaster(Mathf.Clamp01(value));
     }
 
     private void ApplyBgmVolume(float value)
     {
-        if (menuBgmAudioSource != null)
-        {
-            menuBgmAudioSource.volume =
-                Mathf.Clamp01(value);
-        }
+        // V14: main-menu and in-game BGM now share the same runtime setting.
+        GlobalAudioSettingsV14.SetBgm(Mathf.Clamp01(value));
     }
 
     private void ApplySfxVolume(float value)
     {
-        MenuTextButtonHover.SetGlobalSfxVolume(
-            Mathf.Clamp01(value)
-        );
+        // V14: source-level SFX scaling is global, so the legacy menu-only multiplier stays neutral.
+        MenuTextButtonHover.SetGlobalSfxVolume(1f);
+        GlobalAudioSettingsV14.SetSfx(Mathf.Clamp01(value));
     }
 
     private void UpdateVolumeTexts(

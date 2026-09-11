@@ -1,0 +1,29 @@
+JHL V4 STATIC VALIDATION
+Date: 2026-09-06
+
+Scope
+- All files under Assets/Bosses/JHL/Scripts
+- Assets/Scripts/Systems/V11DebugOverlay.cs
+- Existing MapManager JHL route retained from V3
+
+Checks completed
+- C# brace/preprocessor structural scan: PASS for all JHL/changed files
+- JHL class/enum/interface duplicate-name scan: PASS
+- All JHL non-meta files have matching .meta: PASS
+- Project-wide .meta GUID duplicate scan: 0 duplicates
+- Old JHLBeamVisual two-renderer Initialize call scan: 0 remaining
+- JHL F12 input binding scan: no active F12 binding; existing Ctrl+F8~F11 + PageUp/PageDown/P flow retained
+- New V4 files present: JHLPatternDirector / JHLBossAudio / JHLBossMusic
+
+Important limitation
+- Unity Editor 6000.4.1f1 is not available in this execution environment.
+- Therefore actual Unity compilation, serialization/import, Console red-error check, and Play Mode behavior must be verified in the user's Unity Editor.
+
+Recommended first test
+1. Open project and wait for import/compile.
+2. Confirm Console red errors = 0.
+3. GameScene Play.
+4. Ctrl+F9: full JHL intro.
+5. Verify only face takes damage; hands do not.
+6. Ctrl+F10 / Ctrl+F11 for phase 2/3.
+7. PageUp/PageDown + P to inspect every pattern.

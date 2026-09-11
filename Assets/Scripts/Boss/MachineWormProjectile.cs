@@ -75,6 +75,7 @@ public class MachineWormProjectile : MonoBehaviour
 
         if (!other.isTrigger && IsWall(other.gameObject))
         {
+            TeamGameSFX.PlayWallImpact(0.46f);
             consumed = true;
             Destroy(gameObject);
         }

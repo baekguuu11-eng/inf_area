@@ -24,6 +24,18 @@ public sealed class ChernobylBossHUD : MonoBehaviour
 
     public Canvas Canvas => canvas;
 
+    public static void CleanupAll()
+    {
+        ChernobylBossHUD[] active = Object.FindObjectsByType<ChernobylBossHUD>(FindObjectsInactive.Include);
+        for (int i = 0; i < active.Length; i++)
+        {
+            ChernobylBossHUD hud = active[i];
+            if (hud == null) continue;
+            hud.HideAllImmediate();
+            Object.Destroy(hud.gameObject);
+        }
+    }
+
     public static ChernobylBossHUD Create()
     {
         GameObject root = new GameObject("ChernobylBossHUDCanvas");

@@ -14,7 +14,14 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
         CheckerA, CheckerB,
         SweepL2R, SweepR2L, SweepTopDown, SweepBottomUp,
         CompressHorizontal, ExpandHorizontal, CompressVertical, ExpandVertical,
-        ChainInvert, SafeShift
+        ChainInvert, SafeShift,
+
+        // V11 spatial-control families
+        OuterCollapse, CenterEvacuation, TwinTarget, GapSweep, SplitField,
+        DelayedTiles, DelayedCross, MovingSafeLane, CornerQuarantine, RadiationRing,
+        CorridorCrush, GridChase,
+        RotatingLines, RotatingSafeSector, SpiralGrid, SafeZoneRelay, DelayedCascade,
+        ReactorPulse, SectorCollapse
     }
 
     private struct GridCell
@@ -63,6 +70,17 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
     private AudioClip overloadSfx;
     private AudioClip explosionSfx;
     private AudioClip shutdownSfx;
+    // V11 optional event hooks. Dedicated files can be dropped into Resources/Bosses/Chernobyl/SFX
+    // without changing controller code. Safe fallbacks preserve current audio when a clip is absent.
+    private AudioClip hitSfxV11;
+    private AudioClip heavyHitSfxV11;
+    private AudioClip gridWarningSfxV11;
+    private AudioClip gridExplosionSfxV11;
+    private AudioClip shockwaveChargeSfxV11;
+    private AudioClip shockwaveFireSfxV11;
+    private AudioClip pageTransitionSfxV11;
+    private AudioClip antiBurstChargeSfxV11;
+    private AudioClip antiBurstFireSfxV11;
 
     public EnemyHealth Health => health;
     public RoomController OwnerRoom => ownerRoom;
@@ -88,6 +106,11 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
         playerHealth = FindAnyObjectByType<PlayerHealth>();
         player = playerHealth != null ? playerHealth.transform : null;
         hud = ChernobylBossHUD.Create();
+        // Keep the screen-space boss HUD owned by the boss room. If the player enters the
+        // exit portal before the death coroutine reaches its final Destroy call, destroying
+        // the old room will still clean the HUD instead of leaking it into the next stage.
+        if (hud != null && ownerRoom != null)
+            hud.transform.SetParent(ownerRoom.transform, false);
         music = ChernobylBossMusic.Create(transform);
         cutsceneIsolation = new ExecutorCutsceneIsolation();
         BuildSfx();
@@ -109,11 +132,33 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
         sfxSource.spatialBlend = 0f;
         sfxSource.ignoreListenerPause = true;
         sfxSource.volume = 0.72f;
-        // 2보스 전용 SFX가 아직 없으므로 집행자에서 쓰던 범용 기계/폭발 효과음만 임시 재사용한다.
-        activationSfx = Resources.Load<AudioClip>("Bosses/Executor/Audio/06_MachineActivation");
-        overloadSfx = Resources.Load<AudioClip>("Bosses/Executor/Audio/14_PhaseOverload");
-        explosionSfx = Resources.Load<AudioClip>("Bosses/Executor/Audio/11_ArtilleryExplosion");
-        shutdownSfx = Resources.Load<AudioClip>("Bosses/Executor/Audio/16_FinalPowerShutdown");
+        // V11: use the teammate-provided CC0 sci-fi library for Chernobyl's dedicated layer.
+        // Executor clips remain only as a safety fallback if a resource is missing.
+        activationSfx = Resources.Load<AudioClip>("Bosses/Chernobyl/SFX/CHN_Activation");
+        overloadSfx = Resources.Load<AudioClip>("Bosses/Chernobyl/SFX/CHN_Overload");
+        explosionSfx = Resources.Load<AudioClip>("Bosses/Chernobyl/SFX/CHN_Explosion");
+        shutdownSfx = Resources.Load<AudioClip>("Bosses/Chernobyl/SFX/CHN_Shutdown");
+        if (activationSfx == null) activationSfx = Resources.Load<AudioClip>("Bosses/Executor/Audio/06_MachineActivation");
+        if (overloadSfx == null) overloadSfx = Resources.Load<AudioClip>("Bosses/Executor/Audio/14_PhaseOverload");
+        if (explosionSfx == null) explosionSfx = Resources.Load<AudioClip>("Bosses/Executor/Audio/11_ArtilleryExplosion");
+        if (shutdownSfx == null) shutdownSfx = Resources.Load<AudioClip>("Bosses/Executor/Audio/16_FinalPowerShutdown");
+
+        hitSfxV11 = Resources.Load<AudioClip>("Bosses/Chernobyl/SFX/CHN_Hit");
+        heavyHitSfxV11 = Resources.Load<AudioClip>("Bosses/Chernobyl/SFX/CHN_HeavyHit");
+        gridWarningSfxV11 = Resources.Load<AudioClip>("Bosses/Chernobyl/SFX/CHN_GridWarning");
+        gridExplosionSfxV11 = Resources.Load<AudioClip>("Bosses/Chernobyl/SFX/CHN_GridExplosion");
+        shockwaveChargeSfxV11 = Resources.Load<AudioClip>("Bosses/Chernobyl/SFX/CHN_ShockwaveCharge");
+        shockwaveFireSfxV11 = Resources.Load<AudioClip>("Bosses/Chernobyl/SFX/CHN_ShockwaveFire");
+        pageTransitionSfxV11 = Resources.Load<AudioClip>("Bosses/Chernobyl/SFX/CHN_PageTransition");
+        antiBurstChargeSfxV11 = Resources.Load<AudioClip>("Bosses/Chernobyl/SFX/CHN_AntiBurstCharge");
+        antiBurstFireSfxV11 = Resources.Load<AudioClip>("Bosses/Chernobyl/SFX/CHN_AntiBurstFire");
+        if (gridWarningSfxV11 == null) gridWarningSfxV11 = activationSfx;
+        if (gridExplosionSfxV11 == null) gridExplosionSfxV11 = explosionSfx;
+        if (shockwaveChargeSfxV11 == null) shockwaveChargeSfxV11 = overloadSfx;
+        if (shockwaveFireSfxV11 == null) shockwaveFireSfxV11 = explosionSfx;
+        if (pageTransitionSfxV11 == null) pageTransitionSfxV11 = overloadSfx;
+        if (antiBurstChargeSfxV11 == null) antiBurstChargeSfxV11 = overloadSfx;
+        if (antiBurstFireSfxV11 == null) antiBurstFireSfxV11 = explosionSfx;
     }
 
     private void Update()
@@ -121,6 +166,7 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
         if (dead) return;
         UpdateSustainedPressureV10();
         UpdateCoreLightV10();
+        UpdateDebugControlsV11();
         corePulseTime += Time.deltaTime;
         hitPulse = Mathf.MoveTowards(hitPulse, 0f, Time.deltaTime * 5.5f);
         float pulseSpeed = phase == 1 ? 2.7f : phase == 2 ? 4.3f : 7.2f;
@@ -152,10 +198,13 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
     public void DebugBeginCombatAtHealth(float normalizedHealth)
     {
         if (dead) return;
+        ReleaseAntiBurstInputLockV11();
         StopAllCoroutines();
         if (inputLock != null) { inputLock.Dispose(); inputLock = null; }
         if (cutsceneIsolation != null) cutsceneIsolation.Restore();
         CleanupSpawnedObjects();
+        ClearAllGridWarningsV11();
+        ResetDirectorV11();
 
         float ratio = Mathf.Clamp(normalizedHealth, 0.02f, 1f);
         suppressTransitions = true;
@@ -257,7 +306,7 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
 
     private bool ShouldSkipIntro()
     {
-        return Time.unscaledTime >= skipAllowedAt && Input.anyKeyDown;
+        return Time.unscaledTime >= skipAllowedAt && Input.anyKeyDown && !Input.GetKeyDown(KeyCode.Escape);
     }
 
     private IEnumerator CombatLoop()
@@ -265,6 +314,8 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
         yield return WaitCombatSeconds(0.55f);
         while (!dead && combatStarted)
         {
+            ClearAllGridWarningsV11();
+
             if (transitionRequested && phase == 1)
             {
                 yield return PhaseTwoRoutine();
@@ -280,37 +331,43 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
             if (counterResponseRequestedV10)
             {
                 yield return RunCounterResponseV10();
+                ClearAllGridWarningsV11();
                 if (dead) yield break;
             }
 
-            PatternKind pattern = ChoosePatternV10();
-            yield return RunPatternV10(pattern);
+            if (debugForcedComboV11 >= 0)
+            {
+                int forced = debugForcedComboV11;
+                debugForcedComboV11 = -1;
+                yield return RunComboV11((ComboKindV11)forced);
+            }
+            else if (debugForcedPatternV11 >= 0)
+            {
+                int forced = debugForcedPatternV11;
+                debugForcedPatternV11 = -1;
+                PatternKind forcedPattern = (PatternKind)forced;
+                RememberPatternV11(forcedPattern);
+                yield return RunPatternV10(forcedPattern);
+            }
+            else if (ShouldRunComboV11())
+            {
+                yield return RunComboV11(ChooseComboV11());
+            }
+            else
+            {
+                PatternKind pattern = ChoosePatternV10();
+                yield return RunPatternV10(pattern);
+            }
+
+            ClearAllGridWarningsV11();
             if (dead) yield break;
-            float recovery = phase == 1 ? Random.Range(0.72f, 0.96f) : phase == 2 ? Random.Range(0.52f, 0.74f) : Random.Range(0.34f, 0.52f);
+
+            float recovery = debugIgnoreCooldownV11 ? 0.08f :
+                phase == 1 ? Random.Range(1.10f, 1.42f) :
+                phase == 2 ? Random.Range(0.82f, 1.12f) :
+                Random.Range(0.58f, 0.86f);
             yield return WaitCombatSeconds(recovery);
         }
-    }
-
-    private PatternKind ChoosePattern()
-    {
-        float roll = Random.value;
-        if (phase == 1)
-        {
-            if (roll < 0.34f) return PatternKind.TargetBlast;
-            if (roll < 0.64f) return PatternKind.CrossBlast;
-            return PatternKind.SparseGrid;
-        }
-        if (phase == 2)
-        {
-            if (roll < 0.23f) return PatternKind.TargetBlast;
-            if (roll < 0.44f) return PatternKind.CrossBlast;
-            if (roll < 0.72f) return PatternKind.ChainGrid;
-            return PatternKind.CoreShockwave;
-        }
-        if (roll < 0.38f) return PatternKind.MeltdownGrid;
-        if (roll < 0.67f) return PatternKind.ChainGrid;
-        if (roll < 0.84f) return PatternKind.CoreShockwave;
-        return PatternKind.CrossBlast;
     }
 
     private IEnumerator RunPattern(PatternKind pattern)
@@ -349,7 +406,7 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
         Bounds bounds = GetArenaBounds();
         Vector3 target = ClampArenaPoint(GetPlayerPosition(), 0.35f);
         float thickness = phase == 1 ? 0.82f : phase == 2 ? 0.94f : 1.05f;
-        float warning = phase == 1 ? 1.08f : phase == 2 ? 0.76f : 0.58f;
+        float warning = phase == 1 ? 1.08f : phase == 2 ? 0.82f : 0.66f;
         Vector3 vCenter = new Vector3(target.x, bounds.center.y, 0f);
         Vector3 hCenter = new Vector3(bounds.center.x, target.y, 0f);
         Vector2 vSize = new Vector2(thickness, Mathf.Max(0.5f, bounds.size.y - 0.35f));
@@ -392,85 +449,75 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
 
     private IEnumerator SparseGridRoutine()
     {
-        List<GridCell> cells = BuildGrid(5, 3);
+        List<GridCell> cells = BuildFixedGridV10();
         Shuffle(cells);
-        int count = Mathf.Min(6, cells.Count);
-        List<GridCell> hazards = cells.GetRange(0, count);
-        yield return TelegraphAndDetonateCells(hazards, 1.12f, CurrentHazardColor());
+        int count = Mathf.Clamp(Mathf.RoundToInt(cells.Count * (phase == 1 ? 0.34f : 0.40f)), 3, Mathf.Max(3, cells.Count - 4));
+        List<GridCell> hazards = cells.GetRange(0, Mathf.Min(count, cells.Count));
+        float warning = phase == 1 ? 1.12f : phase == 2 ? 0.90f : 0.74f;
+        yield return TelegraphAndDetonateCells(hazards, warning, CurrentHazardColor());
     }
 
     private IEnumerator ChainGridRoutine()
     {
-        int cols = phase >= 3 ? 6 : 5;
-        int rows = 3;
-        List<GridCell> cells = BuildGrid(cols, rows);
+        List<GridCell> cells = BuildFixedGridV10();
         Color color = CurrentHazardColor();
         int waves = phase >= 3 ? 4 : 3;
-        int perWave = phase >= 3 ? 5 : 4;
-        float warning = phase >= 3 ? 0.52f : 0.68f;
+        int perWave = Mathf.Clamp(Mathf.RoundToInt(cells.Count * (phase >= 3 ? 0.16f : 0.18f)), 3, 7);
+        float warning = phase >= 3 ? 0.66f : 0.82f;
         for (int wave = 0; wave < waves && !dead; wave++)
         {
             Shuffle(cells);
             List<GridCell> hazards = new List<GridCell>();
             for (int i = 0; i < Mathf.Min(perWave, cells.Count); i++) hazards.Add(cells[i]);
             yield return TelegraphAndDetonateCells(hazards, warning, color);
-            if (!dead) yield return WaitCombatSeconds(phase >= 3 ? 0.10f : 0.15f);
+            if (!dead) yield return WaitCombatSeconds(phase >= 3 ? 0.16f : 0.20f);
         }
     }
 
     private IEnumerator MeltdownGridRoutine()
     {
-        List<GridCell> cells = BuildGrid(6, 3);
-        if (cells.Count <= 2) yield break;
-        List<int> safeCandidates = new List<int>();
-        for (int i = 0; i < cells.Count; i++)
-        {
-            if (Vector2.Distance(cells[i].Center, transform.position) > 1.35f)
-                safeCandidates.Add(i);
-        }
-        if (safeCandidates.Count < 2)
-        {
-            for (int i = 0; i < cells.Count; i++) safeCandidates.Add(i);
-        }
-        int safeA = safeCandidates[Random.Range(0, safeCandidates.Count)];
-        int safeB = safeA;
-        for (int tries = 0; tries < 20; tries++)
-        {
-            int candidate = safeCandidates[Random.Range(0, safeCandidates.Count)];
-            if (candidate != safeA && Vector2.Distance(cells[candidate].Center, cells[safeA].Center) > 1.2f)
-            {
-                safeB = candidate;
-                break;
-            }
-        }
-        if (safeB == safeA) safeB = (safeA + Mathf.Max(1, cells.Count / 2)) % cells.Count;
-
-        List<GridCell> hazards = new List<GridCell>();
-        for (int i = 0; i < cells.Count; i++)
-            if (i != safeA && i != safeB) hazards.Add(cells[i]);
-        yield return TelegraphAndDetonateCells(hazards, 0.72f, CurrentHazardColor());
+        List<GridCell> cells = BuildFixedGridV10();
+        int cols, rows;
+        GetGridDimensionsV11(out cols, out rows);
+        List<int[]> safeBlocks = BuildSafeBlocksV11(cols, rows, 2, 2);
+        if (safeBlocks.Count == 0) yield break;
+        float warning = phase >= 3 ? 0.76f : 0.92f;
+        int safeIndex = ChooseReachableSafeSetV11(cells, safeBlocks, -1, GetPlayerPosition(), BasicReachDistanceV11(warning));
+        yield return DetonateAllExceptSafeV11(cells, safeBlocks[safeIndex], warning);
     }
 
     private IEnumerator TelegraphAndDetonateCells(List<GridCell> hazards, float warning, Color color)
     {
+        if (hazards == null || hazards.Count == 0) yield break;
+        PlaySfx(gridWarningSfxV11, hazards.Count >= 10 ? 0.18f : 0.14f, phase >= 3 ? 1.08f : 1.00f);
         List<GameObject> marks = new List<GameObject>();
+        bool simpleMassTelegraph = hazards.Count >= 10;
         for (int i = 0; i < hazards.Count; i++)
         {
-            GameObject mark = ChernobylBossEffects.CreateRectTelegraph(hazards[i].Center, hazards[i].Size, warning, color, 11);
+            // Large checker/meltdown patterns previously created four child border objects
+            // per cell. In mass patterns one pulsing fill per cell keeps the warning clear
+            // while cutting transient GameObject creation dramatically.
+            GameObject mark = ChernobylBossEffects.CreateRectTelegraph(
+                hazards[i].Center, hazards[i].Size, warning, color, 11, simpleMassTelegraph);
             marks.Add(mark);
             RegisterSpawnedObject(mark);
         }
         yield return WaitCombatSeconds(warning);
         if (dead) yield break;
         bool hit = false;
+        // V11 performance fix: mass-grid attacks used to emit debris on every cell,
+        // producing hundreds of temporary GameObjects in a single frame. Keep every
+        // blast flash, but only a bounded subset emits pooled debris.
+        int fragmentStride = hazards.Count >= 16 ? 5 : hazards.Count >= 10 ? 3 : 2;
         for (int i = 0; i < hazards.Count; i++)
         {
             if (PlayerInsideRect(hazards[i].Center, hazards[i].Size)) hit = true;
-            ChernobylBossEffects.SpawnRectBlast(hazards[i].Center, hazards[i].Size, color);
+            bool emitFragments = hazards.Count <= 6 || (i % fragmentStride) == 0;
+            ChernobylBossEffects.SpawnRectBlast(hazards[i].Center, hazards[i].Size, color, emitFragments);
         }
         for (int i = 0; i < marks.Count; i++) ForgetAndDestroy(marks[i]);
         if (hit) DamagePlayerOnce(1);
-        PlaySfx(explosionSfx, hazards.Count >= 10 ? 0.72f : 0.62f, phase >= 3 ? 0.90f : 0.96f);
+        PlaySfx(gridExplosionSfxV11, hazards.Count >= 10 ? 0.72f : 0.62f, phase >= 3 ? 0.90f : 0.96f);
         Shake(hazards.Count >= 10 ? 0.13f : 0.09f);
         if (cameraFxV10 != null) cameraFxV10.PulseExplosion(hazards.Count >= 10 ? 0.78f : 0.46f);
     }
@@ -478,10 +525,11 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
     private IEnumerator CoreShockwaveRoutine()
     {
         Color color = CurrentHazardColor();
-        float warning = phase >= 3 ? 0.55f : 0.78f;
+        float warning = phase >= 3 ? 0.68f : phase == 2 ? 0.82f : 0.94f;
         GameObject mark = ChernobylBossEffects.CreateCircleTelegraph(transform.position, 0.82f, warning, color, 13);
         RegisterSpawnedObject(mark);
         ChernobylBossEffects.SpawnCoreSparks(transform.position + Vector3.up * 0.1f, color, phase >= 3 ? 12 : 8, 2.3f);
+        PlaySfx(shockwaveChargeSfxV11, 0.42f, phase >= 3 ? 1.04f : 0.98f);
         yield return WaitCombatSeconds(warning);
         if (dead) yield break;
         ForgetAndDestroy(mark);
@@ -489,7 +537,7 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
         float endRadius = Mathf.Max(1.6f, Mathf.Min(bounds.extents.y - 0.18f, 2.55f));
         ChernobylShockwave.Create(transform.position, 0.56f, endRadius, phase >= 3 ? 0.22f : 0.18f,
             phase >= 3 ? 0.58f : 0.72f, 1, color);
-        PlaySfx(explosionSfx, 0.66f, 0.88f);
+        PlaySfx(shockwaveFireSfxV11, 0.66f, 0.88f);
         Shake(0.11f);
         if (cameraFxV10 != null) cameraFxV10.PulseExplosion(0.72f);
         yield return WaitCombatSeconds(phase >= 3 ? 0.62f : 0.76f);
@@ -499,13 +547,15 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
     {
         if (dead || phase >= 2) yield break;
         transitionRequested = false;
+        ClearAllGridWarningsV11();
         state = BossState.Transition;
         inputLock = GameInputState.Acquire("ChernobylPhase2");
         phase = 2;
         ApplyPhaseVisuals();
+        NotifyGridReconfiguredV11();
         if (cameraFxV10 != null) cameraFxV10.SetPhase(2);
-        if (hud != null) hud.ShowPhase("임계 출력 상승");
-        PlaySfx(overloadSfx, 0.82f, 0.95f);
+        if (hud != null) hud.ShowPhase("임계 출력 상승 // GRID 6×4");
+        PlaySfx(pageTransitionSfxV11, 0.82f, 0.95f);
         if (music != null) music.PlayPhaseTwo(0.85f);
         ChernobylBossEffects.SpawnCoreSparks(transform.position + Vector3.up * 0.1f, CurrentHazardColor(), 18, 3.6f);
         if (hud != null) StartCoroutine(hud.Flash(new Color(0.48f, 1f, 0.20f, 1f), 0.22f, 0.70f));
@@ -526,13 +576,15 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
     {
         if (dead || phase >= 3) yield break;
         meltdownRequested = false;
+        ClearAllGridWarningsV11();
         state = BossState.Meltdown;
         inputLock = GameInputState.Acquire("ChernobylMeltdown");
         phase = 3;
         ApplyPhaseVisuals();
+        NotifyGridReconfiguredV11();
         if (cameraFxV10 != null) cameraFxV10.SetPhase(3);
-        if (hud != null) hud.ShowPhase("MELTDOWN");
-        PlaySfx(overloadSfx, 0.92f, 0.88f);
+        if (hud != null) hud.ShowPhase("MELTDOWN // GRID 8×5");
+        PlaySfx(pageTransitionSfxV11, 0.92f, 0.88f);
         ChernobylBossEffects.SpawnCoreSparks(transform.position + Vector3.up * 0.1f, CurrentHazardColor(), 26, 4.2f);
         if (hud != null) StartCoroutine(hud.Flash(new Color(0.64f, 1f, 0.18f, 1f), 0.28f, 0.74f));
         yield return WaitRealtime(0.82f);
@@ -545,6 +597,7 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
     {
         if (source != health || dead) return;
         hitPulse = 1f;
+        TriggerHitFeedbackV11(damage, direction);
         RegisterSustainedHitV10(damage);
         if (hud != null) hud.ReportHealth(health.CurrentHealth, health.MaxHealth, false);
         if (suppressTransitions) return;
@@ -558,6 +611,7 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
         if (dead || requestedHealth != health) return dead;
         dead = true;
         state = BossState.Dead;
+        ReleaseAntiBurstInputLockV11();
         StopAllCoroutines();
         StartCoroutine(DeathRoutine(hitDirection));
         return true;
@@ -568,6 +622,7 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
         inputLock = GameInputState.Acquire("ChernobylDeath");
         SetCombatColliders(false);
         CleanupSpawnedObjects();
+        ClearAllGridWarningsV11();
         if (music != null) music.CrossFadeBackToGameplay(1.7f);
         if (hud != null)
         {
@@ -840,8 +895,11 @@ public sealed partial class ChernobylBossController : MonoBehaviour, IEnemyDeath
     private void OnDestroy()
     {
         if (health != null) health.Damaged -= OnDamaged;
+        ReleaseAntiBurstInputLockV11();
         if (inputLock != null) inputLock.Dispose();
         if (cutsceneIsolation != null) cutsceneIsolation.Restore();
+        ClearAllGridWarningsV11();
         if (cameraFxV10 != null) cameraFxV10.EndBoss();
+        if (music != null && !dead) music.RestoreGameplayImmediate();
     }
 }

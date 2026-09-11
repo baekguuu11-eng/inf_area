@@ -1,0 +1,23 @@
+fileFormatVersion: 2
+guid: 5a094d7244de459da9d1bacac6088ad8
+AudioImporter:
+  externalObjects: {}
+  serializedVersion: 8
+  defaultSettings:
+    serializedVersion: 2
+    loadType: 0
+    sampleRateSetting: 0
+    sampleRateOverride: 44100
+    compressionFormat: 1
+    quality: 0.7
+    conversionMode: 0
+    preloadAudioData: 0
+  platformSettingOverrides: {}
+  forceToMono: 0
+  normalize: 1
+  loadInBackground: 0
+  ambisonic: 0
+  3D: 0
+  userData: Team_20260909_Rubberduck_CC0_BossSelected
+  assetBundleName: 
+  assetBundleVariant: 

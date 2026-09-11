@@ -35,6 +35,10 @@ public class MapManager : MonoBehaviour
     [SerializeField] private bool routeStageTwoPortalToChernobylBoss = true;
     [SerializeField] private int chernobylBossRoomNumber = 6;
 
+    [Header("Stage 3 JHL Boss Route")]
+    [SerializeField] private bool routeStageThreePortalToJHLBoss = true;
+    [SerializeField] private int jhlBossRoomNumber = 6;
+
     [Header("Room Entry Placement")]
     [SerializeField] private bool centerPlayerOnInitialStart = true;
     [SerializeField] private bool portalArrivesFromBottomGate = true;
@@ -52,8 +56,10 @@ public class MapManager : MonoBehaviour
     private RoomController currentBossRoom;
     private ExecutorBossController activeExecutorBoss;
     private ChernobylBossController activeChernobylBoss;
+    private JHLBossController activeJHLBoss;
     private bool firstBossDefeated;
     private bool secondBossDefeated;
+    private bool thirdBossDefeated;
     private int currentStage = 1;
     private int highestNormalRoomNumber = 1;
     private bool transitionLocked;
@@ -64,6 +70,9 @@ public class MapManager : MonoBehaviour
     public int CurrentStage { get { return currentStage; } }
     public RoomController CurrentRoom { get { return currentRoom; } }
     public bool IsTransitioning { get { return transitionLocked; } }
+    public ExecutorBossController ActiveExecutorBoss { get { return activeExecutorBoss; } }
+    public ChernobylBossController ActiveChernobylBoss { get { return activeChernobylBoss; } }
+    public JHLBossController ActiveJHLBoss { get { return activeJHLBoss; } }
 
     private void Awake()
     {
@@ -94,6 +103,7 @@ public class MapManager : MonoBehaviour
 
         if (transitionUI == null) transitionUI = FindAnyObjectByType<RoomTransitionUI>();
         if (enemySpawner == null) enemySpawner = FindAnyObjectByType<RoomEnemySpawner>();
+        V11DebugOverlay.Ensure(this);
     }
 
     private IEnumerator Start()
@@ -113,8 +123,10 @@ public class MapManager : MonoBehaviour
         currentBossRoom = null;
         activeExecutorBoss = null;
         activeChernobylBoss = null;
+        activeJHLBoss = null;
         firstBossDefeated = false;
         secondBossDefeated = false;
+        thirdBossDefeated = false;
         currentRoom = startRoom;
 
         if (centerPlayerOnInitialStart)
@@ -124,8 +136,9 @@ public class MapManager : MonoBehaviour
         TrySpawnContentForCurrentRoom();
         SetCameraBase(cameraRestPosition, true);
 
-        if (transitionUI != null)
-            yield return transitionUI.ShowRoomLabel(currentStage, currentRoom.RoomNumber);
+        // The initial spawn room is intentionally unlabelled. The first banner appears
+        // only after the player leaves it, where internal room 2 is displayed as SECTOR 1-1.
+        yield return null;
     }
 
     private void Update()
@@ -140,8 +153,77 @@ public class MapManager : MonoBehaviour
             return;
         }
 
+        // V13 일반 시스템 디버그. F8~F11 보스 단축키와 충돌하지 않는 F1~F7 사용.
+        if (Input.GetKeyDown(KeyCode.F1))
+        {
+            ShopManager shop = ShopManager.Instance;
+            if (shop != null) shop.DebugReplayOpenPresentation();
+            return;
+        }
+        if (Input.GetKeyDown(KeyCode.F2))
+        {
+            StageEnemyEvolutionV12.DebugSetStageOverride(1);
+            Debug.Log("[V13 DEBUG] 현재 일반 적을 Stage 1 외형/패턴으로 표시합니다.");
+            return;
+        }
+        if (Input.GetKeyDown(KeyCode.F3))
+        {
+            StageEnemyEvolutionV12.DebugSetStageOverride(2);
+            Debug.Log("[V13 DEBUG] 현재 일반 적을 Stage 2 외형/패턴으로 표시합니다.");
+            return;
+        }
+        if (Input.GetKeyDown(KeyCode.F4))
+        {
+            StageEnemyEvolutionV12.DebugSetStageOverride(3);
+            Debug.Log("[V13 DEBUG] 현재 일반 적을 Stage 3 외형/패턴으로 표시합니다.");
+            return;
+        }
+        if (Input.GetKeyDown(KeyCode.F5))
+        {
+            StageEnemyEvolutionV12.DebugToggleForceEvolved();
+            Debug.Log("[V13 DEBUG] 강화 패턴 강제 모드: " + (StageEnemyEvolutionV12.DebugForceEvolvedPatterns ? "ON" : "OFF"));
+            return;
+        }
+        if (Input.GetKeyDown(KeyCode.F6))
+        {
+            EnemyTankAI[] tanks = FindObjectsByType<EnemyTankAI>(FindObjectsInactive.Exclude);
+            for (int i = 0; i < tanks.Length; i++) tanks[i].DebugFlashSlamRange();
+            Debug.Log("[V13 DEBUG] 탱커 실제 경고 범위를 1초간 표시합니다.");
+            return;
+        }
+        if (Input.GetKeyDown(KeyCode.F7))
+        {
+            StageEnemyEvolutionV12.DebugResetOverrides();
+            Debug.Log("[V13 DEBUG] 일반 적 디버그 오버라이드를 초기화했습니다.");
+            return;
+        }
+
+        // V3 보스 디버그 키 체계:
+        // F8~F11 = 집행자, Shift+F8~F11 = 체르노빌, Ctrl+F8~F11 = JHL.
+        // JHL도 다른 보스와 같은 방식으로 포탈/인트로/페이즈 점프를 사용하며 F12 GUI는 사용하지 않는다.
+        bool control = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+        if (control && Input.GetKeyDown(KeyCode.F8))
+        {
+            StartCoroutine(DebugJumpToJHLPortalRoom());
+            return;
+        }
+        if (control && Input.GetKeyDown(KeyCode.F9))
+        {
+            StartCoroutine(DebugStartJHLBoss(1f, true));
+            return;
+        }
+        if (control && Input.GetKeyDown(KeyCode.F10))
+        {
+            StartCoroutine(DebugStartJHLBoss(0.69f, false));
+            return;
+        }
+        if (control && Input.GetKeyDown(KeyCode.F11))
+        {
+            StartCoroutine(DebugStartJHLBoss(0.39f, false));
+            return;
+        }
+
         // V9 보스 개발용 단축키. Release 빌드에서는 컴파일 자체에서 제외된다.
-        // F8~F11 = 집행자 / Shift+F8~F11 = 2보스 체르노빌.
         bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
         if (shift && Input.GetKeyDown(KeyCode.F8))
             StartCoroutine(DebugJumpToChernobylPortalRoom());
@@ -159,6 +241,18 @@ public class MapManager : MonoBehaviour
             StartCoroutine(DebugStartExecutorBoss(0.54f, false));
         else if (Input.GetKeyDown(KeyCode.F11))
             StartCoroutine(DebugStartExecutorBoss(0.14f, false));
+        else if (activeExecutorBoss != null && Input.GetKeyDown(KeyCode.PageUp))
+            activeExecutorBoss.DebugCyclePattern(1);
+        else if (activeExecutorBoss != null && Input.GetKeyDown(KeyCode.PageDown))
+            activeExecutorBoss.DebugCyclePattern(-1);
+        else if (activeExecutorBoss != null && Input.GetKeyDown(KeyCode.P))
+            activeExecutorBoss.DebugForcePattern();
+        else if (activeJHLBoss != null && Input.GetKeyDown(KeyCode.PageUp))
+            activeJHLBoss.DebugCyclePattern(1);
+        else if (activeJHLBoss != null && Input.GetKeyDown(KeyCode.PageDown))
+            activeJHLBoss.DebugCyclePattern(-1);
+        else if (activeJHLBoss != null && Input.GetKeyDown(KeyCode.P))
+            activeJHLBoss.DebugForcePattern();
 #endif
     }
 
@@ -167,6 +261,7 @@ public class MapManager : MonoBehaviour
     private IEnumerator DebugJumpToExecutorPortalRoom()
     {
         BeginTransitionLock();
+        BossMusicTransitionBridge.BeginPortalApproach(0.35f);
 
         ShopManager shop = ShopManager.Instance;
         if (shop != null && shop.IsOpen)
@@ -174,6 +269,7 @@ public class MapManager : MonoBehaviour
 
         currentStage = 1;
         secondBossDefeated = false;
+        thirdBossDefeated = false;
         if (currentPortalRoom == null)
             currentPortalRoom = CreatePortalRoom();
 
@@ -197,6 +293,7 @@ public class MapManager : MonoBehaviour
     private IEnumerator DebugStartExecutorBoss(float normalizedHealth, bool playIntro)
     {
         BeginTransitionLock();
+        BossMusicTransitionBridge.BeginBossTransition(0.25f);
 
         ShopManager shop = ShopManager.Instance;
         if (shop != null && shop.IsOpen)
@@ -204,6 +301,7 @@ public class MapManager : MonoBehaviour
 
         currentStage = 1;
         secondBossDefeated = false;
+        thirdBossDefeated = false;
         if (activeExecutorBoss != null)
         {
             Destroy(activeExecutorBoss.gameObject);
@@ -245,12 +343,14 @@ public class MapManager : MonoBehaviour
     private IEnumerator DebugJumpToChernobylPortalRoom()
     {
         BeginTransitionLock();
+        BossMusicTransitionBridge.BeginPortalApproach(0.35f);
         ShopManager shop = ShopManager.Instance;
         if (shop != null && shop.IsOpen) shop.CloseShop();
         currentStage = 2;
         highestNormalRoomNumber = 4;
         firstBossDefeated = true;
         secondBossDefeated = false;
+        thirdBossDefeated = false;
         if (currentPortalRoom != null) Destroy(currentPortalRoom.gameObject);
         currentPortalRoom = CreatePortalRoom();
         if (currentRoom != null) currentRoom.gameObject.SetActive(false);
@@ -268,11 +368,13 @@ public class MapManager : MonoBehaviour
     private IEnumerator DebugStartChernobylBoss(float normalizedHealth, bool playIntro)
     {
         BeginTransitionLock();
+        BossMusicTransitionBridge.BeginBossTransition(0.25f);
         ShopManager shop = ShopManager.Instance;
         if (shop != null && shop.IsOpen) shop.CloseShop();
         currentStage = 2;
         firstBossDefeated = true;
         secondBossDefeated = false;
+        thirdBossDefeated = false;
         if (activeChernobylBoss != null)
         {
             Destroy(activeChernobylBoss.gameObject);
@@ -303,6 +405,88 @@ public class MapManager : MonoBehaviour
         if (activeChernobylBoss == null) yield break;
         if (playIntro) activeChernobylBoss.BeginIntro();
         else activeChernobylBoss.DebugBeginCombatAtHealth(normalizedHealth);
+    }
+
+
+    private IEnumerator DebugJumpToJHLPortalRoom()
+    {
+        BeginTransitionLock();
+        BossMusicTransitionBridge.BeginPortalApproach(0.35f);
+        ShopManager shop = ShopManager.Instance;
+        if (shop != null && shop.IsOpen) shop.CloseShop();
+        currentStage = 3;
+        highestNormalRoomNumber = 4;
+        firstBossDefeated = true;
+        secondBossDefeated = true;
+        thirdBossDefeated = false;
+
+        if (activeJHLBoss != null)
+        {
+            Destroy(activeJHLBoss.gameObject);
+            activeJHLBoss = null;
+        }
+        if (currentPortalRoom != null) Destroy(currentPortalRoom.gameObject);
+        currentPortalRoom = CreatePortalRoom();
+        if (currentRoom != null) currentRoom.gameObject.SetActive(false);
+        currentRoom = currentPortalRoom;
+        currentRoom.gameObject.SetActive(true);
+        MovePlayerToStageStart(currentRoom);
+        ShowOnlyCurrentRoom();
+        Physics2D.SyncTransforms();
+        SetCameraBase(cameraRestPosition, true);
+        EndTransitionLock();
+        if (transitionUI != null) StartCoroutine(transitionUI.ShowRoomLabel(currentStage, currentRoom.RoomNumber));
+        yield break;
+    }
+
+    private IEnumerator DebugStartJHLBoss(float normalizedHealth, bool playIntro)
+    {
+        BeginTransitionLock();
+        BossMusicTransitionBridge.BeginBossTransition(0.25f);
+        ShopManager shop = ShopManager.Instance;
+        if (shop != null && shop.IsOpen) shop.CloseShop();
+        currentStage = 3;
+        firstBossDefeated = true;
+        secondBossDefeated = true;
+        thirdBossDefeated = false;
+
+        if (activeJHLBoss != null)
+        {
+            Destroy(activeJHLBoss.gameObject);
+            activeJHLBoss = null;
+        }
+        if (activeChernobylBoss != null)
+        {
+            Destroy(activeChernobylBoss.gameObject);
+            activeChernobylBoss = null;
+        }
+        if (activeExecutorBoss != null)
+        {
+            Destroy(activeExecutorBoss.gameObject);
+            activeExecutorBoss = null;
+        }
+        if (currentBossRoom != null)
+        {
+            if (currentRoom == currentBossRoom) currentRoom = null;
+            Destroy(currentBossRoom.gameObject);
+            currentBossRoom = null;
+            yield return null;
+        }
+
+        JHLBossHUD.CleanupAll();
+        currentBossRoom = CreateJHLBossRoom();
+        if (currentRoom != null) currentRoom.gameObject.SetActive(false);
+        currentRoom = currentBossRoom;
+        currentRoom.gameObject.SetActive(true);
+        MovePlayerToStageStart(currentRoom);
+        ShowOnlyCurrentRoom();
+        Physics2D.SyncTransforms();
+        SetCameraBase(cameraRestPosition, true);
+        activeJHLBoss = JHLBossRuntimeFactory.Create(currentBossRoom, this);
+        EndTransitionLock();
+        if (activeJHLBoss == null) yield break;
+        if (playIntro) activeJHLBoss.BeginIntro();
+        else activeJHLBoss.DebugBeginCombatAtHealth(normalizedHealth);
     }
 #endif
 
@@ -357,6 +541,8 @@ public class MapManager : MonoBehaviour
         if (shop != null && shop.IsOpen)
             return;
 
+        TeamGameSFX.PlayPortalEnter();
+
         if (routeStageOnePortalToExecutorBoss && currentStage == 1 && !firstBossDefeated)
         {
             StartCoroutine(TransitionToExecutorBossRoom());
@@ -369,16 +555,24 @@ public class MapManager : MonoBehaviour
             return;
         }
 
+        if (routeStageThreePortalToJHLBoss && currentStage == 3 && !thirdBossDefeated)
+        {
+            StartCoroutine(TransitionToJHLBossRoom());
+            return;
+        }
+
         StartCoroutine(TransitionToNextStage());
     }
 
     public void TryUseBossExitPortal()
     {
         bool defeatedCurrentBoss = (currentStage == 1 && firstBossDefeated) ||
-                                   (currentStage == 2 && secondBossDefeated);
+                                   (currentStage == 2 && secondBossDefeated) ||
+                                   (currentStage == 3 && thirdBossDefeated);
         if (transitionLocked || !defeatedCurrentBoss || currentBossRoom == null || currentRoom != currentBossRoom)
             return;
 
+        TeamGameSFX.PlayPortalEnter();
         StartCoroutine(TransitionToNextStage());
     }
 
@@ -392,6 +586,7 @@ public class MapManager : MonoBehaviour
         Transform point = bossRoom.PortalSpawn != null ? bossRoom.PortalSpawn : bossRoom.GetPortalArrivalSpawn();
         Vector3 position = point != null ? point.position : bossRoom.transform.position;
         ExecutorExitPortalTrigger.Create(this, position, bossRoom.transform);
+        TeamGameSFX.PlayPortalActivate();
     }
 
     public void NotifyChernobylDefeated(RoomController bossRoom)
@@ -404,6 +599,20 @@ public class MapManager : MonoBehaviour
         Transform point = bossRoom.PortalSpawn != null ? bossRoom.PortalSpawn : bossRoom.GetPortalArrivalSpawn();
         Vector3 position = point != null ? point.position : bossRoom.transform.position;
         ChernobylExitPortalTrigger.Create(this, position, bossRoom.transform);
+        TeamGameSFX.PlayPortalActivate();
+    }
+
+    public void NotifyJHLDefeated(RoomController bossRoom)
+    {
+        if (bossRoom == null || bossRoom != currentBossRoom || thirdBossDefeated)
+            return;
+
+        thirdBossDefeated = true;
+        activeJHLBoss = null;
+        Transform point = bossRoom.PortalSpawn != null ? bossRoom.PortalSpawn : bossRoom.GetPortalArrivalSpawn();
+        Vector3 position = point != null ? point.position : bossRoom.transform.position;
+        JHLExitPortalTrigger.Create(this, position, bossRoom.transform);
+        TeamGameSFX.PlayPortalActivate();
     }
 
     private RoomController CreatePortalRoom()
@@ -416,6 +625,7 @@ public class MapManager : MonoBehaviour
             SpawnPortal(portalRoom);
 
         portalRoom.ApplyPortalRoomState();
+        PortalRoomAtmosphereV11.Ensure(portalRoom);
         portalRoom.gameObject.SetActive(false);
         return portalRoom;
     }
@@ -455,6 +665,7 @@ public class MapManager : MonoBehaviour
             yield break;
 
         BeginTransitionLock();
+        BossMusicTransitionBridge.BeginBossTransition(0.75f);
         yield return AutoCollectCurrentRoomResources();
         yield return PlayExitTransition(GateDirection.None);
 
@@ -504,6 +715,7 @@ public class MapManager : MonoBehaviour
     {
         if (transitionLocked) yield break;
         BeginTransitionLock();
+        BossMusicTransitionBridge.BeginBossTransition(0.75f);
         yield return AutoCollectCurrentRoomResources();
         yield return PlayExitTransition(GateDirection.None);
 
@@ -526,6 +738,52 @@ public class MapManager : MonoBehaviour
         yield return new WaitForSecondsRealtime(Mathf.Max(0f, gateCooldown));
         EndTransitionLock();
         if (activeChernobylBoss != null) activeChernobylBoss.BeginIntro();
+    }
+
+    private RoomController CreateJHLBossRoom()
+    {
+        RoomController bossRoom = Instantiate(roomTemplate, stageRoomsRoot);
+        bossRoom.Setup(currentStage, Mathf.Max(6, jhlBossRoomNumber), false);
+        bossRoom.ClearConnections();
+        bossRoom.HasSpawnedEnemies = true;
+        GateTrigger[] gates = bossRoom.GetComponentsInChildren<GateTrigger>(true);
+        for (int i = 0; i < gates.Length; i++)
+            if (gates[i] != null) gates[i].enabled = false;
+        PortalTrigger[] inheritedPortals = bossRoom.GetComponentsInChildren<PortalTrigger>(true);
+        for (int i = 0; i < inheritedPortals.Length; i++)
+            if (inheritedPortals[i] != null) inheritedPortals[i].gameObject.SetActive(false);
+        bossRoom.gameObject.name = "Room_3_BOSS_JHL";
+        bossRoom.gameObject.SetActive(false);
+        return bossRoom;
+    }
+
+    private IEnumerator TransitionToJHLBossRoom()
+    {
+        if (transitionLocked) yield break;
+        BeginTransitionLock();
+        BossMusicTransitionBridge.BeginBossTransition(0.75f);
+        yield return AutoCollectCurrentRoomResources();
+        yield return PlayExitTransition(GateDirection.None);
+
+        if (currentBossRoom == null)
+            currentBossRoom = CreateJHLBossRoom();
+        if (currentRoom != null) currentRoom.gameObject.SetActive(false);
+        currentRoom = currentBossRoom;
+        currentRoom.gameObject.SetActive(true);
+        MovePlayerToStageStart(currentRoom);
+        ShowOnlyCurrentRoom();
+        Physics2D.SyncTransforms();
+        SetCameraBase(cameraRestPosition, true);
+
+        if (activeJHLBoss == null)
+            activeJHLBoss = JHLBossRuntimeFactory.Create(currentBossRoom, this);
+
+        if (blackHoldDuration > 0f)
+            yield return new WaitForSecondsRealtime(blackHoldDuration);
+        yield return PlayEnterTransition(GateDirection.None);
+        yield return new WaitForSecondsRealtime(Mathf.Max(0f, gateCooldown));
+        EndTransitionLock();
+        if (activeJHLBoss != null) activeJHLBoss.BeginIntro();
     }
 
     private void TrySpawnContentForCurrentRoom()
@@ -556,6 +814,8 @@ public class MapManager : MonoBehaviour
             yield break;
 
         BeginTransitionLock();
+        if (targetRoom.IsPortalRoom)
+            BossMusicTransitionBridge.BeginPortalApproach(0.95f);
         yield return AutoCollectCurrentRoomResources();
         yield return PlayExitTransition(exitDirection);
 
@@ -572,10 +832,15 @@ public class MapManager : MonoBehaviour
         if (blackHoldDuration > 0f)
             yield return new WaitForSecondsRealtime(blackHoldDuration);
 
+        if (currentRoom.IsPortalRoom)
+            TeamGameSFX.PlayPortalActivate();
         yield return PlayEnterTransition(exitDirection);
 
         if (transitionUI != null)
             StartCoroutine(transitionUI.ShowRoomLabel(currentStage, currentRoom.RoomNumber));
+
+        if (currentRoom.IsPortalRoom)
+            EnsurePortalAmmoSafety();
 
         if (currentRoom.IsPortalRoom && openShopOnPortalRoomEntry)
         {
@@ -591,9 +856,15 @@ public class MapManager : MonoBehaviour
     {
         if (transitionLocked) yield break;
         BeginTransitionLock();
+        BossMusicTransitionBridge.RestoreGameplay(0.85f);
         yield return AutoCollectCurrentRoomResources();
         yield return PlayExitTransition(GateDirection.None);
 
+        // V12 hard cleanup: a fast boss-exit interaction can destroy the room before the
+        // Chernobyl death coroutine reaches its HUD cleanup line. Remove any surviving boss
+        // HUD before the next stage is made visible.
+        ChernobylBossHUD.CleanupAll();
+        JHLBossHUD.CleanupAll();
         ClearCurrentStageRooms();
         currentStage++;
         highestNormalRoomNumber = 1;
@@ -601,6 +872,7 @@ public class MapManager : MonoBehaviour
         currentBossRoom = null;
         activeExecutorBoss = null;
         activeChernobylBoss = null;
+        activeJHLBoss = null;
 
         RoomController newStartRoom = Instantiate(roomTemplate, stageRoomsRoot);
         newStartRoom.Setup(currentStage, 1, false);
@@ -624,6 +896,15 @@ public class MapManager : MonoBehaviour
 
         yield return new WaitForSecondsRealtime(Mathf.Max(0f, gateCooldown));
         EndTransitionLock();
+    }
+
+    private void EnsurePortalAmmoSafety()
+    {
+        PlayerAmmoController playerAmmo = FindAnyObjectByType<PlayerAmmoController>();
+        if (playerAmmo == null) return;
+        const int minimumBossReadyEnergy = 12;
+        int missing = minimumBossReadyEnergy - playerAmmo.CurrentTotalAmmoEnergy;
+        if (missing > 0) playerAmmo.AddReserveAmmo(missing);
     }
 
     private void BeginTransitionLock()

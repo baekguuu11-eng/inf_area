@@ -87,7 +87,7 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
     private int attackOutputCount;
     private const int BossMaxHealth = 2400;
     private const float FinalStandHealthRatio = 0.15f;
-    private const float FinalStandArtilleryCooldown = 5.5f;
+    private const float FinalStandArtilleryCooldown = 7.0f;
     private float lastBurrowTime;
     private float nextFinalStandArtilleryAllowedTime;
     private int artilleryBurstSequence;
@@ -108,10 +108,35 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
     private float nextHeavyHitFeedbackTime;
     private float nextVisualHitReactionTime;
     private Vector3 hitReactionAnchorPosition;
+    private PatternKind debugSelectedPattern = PatternKind.Aimed;
+    private bool debugForceSelectedPattern;
 
     public EnemyHealth Health => health;
     public RoomController OwnerRoom => ownerRoom;
     public bool IsDead => dead;
+    public int DebugPhase => finalStandActive ? 3 : phase;
+    public string DebugStateName => state.ToString();
+    public string DebugLastPatternName => lastPattern.ToString();
+    public string DebugSelectedPatternName => debugSelectedPattern.ToString();
+
+    public void DebugCyclePattern(int delta)
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        Array values = Enum.GetValues(typeof(PatternKind));
+        int count = values.Length;
+        int current = (int)debugSelectedPattern;
+        current = (current + delta) % count;
+        if (current < 0) current += count;
+        debugSelectedPattern = (PatternKind)current;
+#endif
+    }
+
+    public void DebugForcePattern()
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (combatStarted && !dead) debugForceSelectedPattern = true;
+#endif
+    }
     public int ProjectileVisualStage => finalStandActive ? 3 : Mathf.Clamp(phase, 1, 2);
     public bool CanReceivePersistentDamage => !dead && combatStarted &&
         state != ExecutorState.Dormant && state != ExecutorState.Intro &&
@@ -410,6 +435,8 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
         // 8.2~8.9: 중간에서 멈추고 먼지가 안쪽으로 빨려 들어가는 압력 재축적.
         bossAudio.SetRumbleVolume(0.54f);
         ExecutorCombatEffects.SpawnInwardDust(this, transform.position, 18, 3.3f);
+        // V11: 팀 피드백 - 사용자 제공 돌출 표식을 실제 돌출 약 0.5초 전부터 보여 준다.
+        ExecutorCombatEffects.SpawnEmergenceImpactDecal(this, transform.position, 1.22f, 1.08f);
         yield return WaitIntroSeconds(0.58f, skipCheck);
         if (state != ExecutorState.Intro) yield break;
         bossAudio.StopRumble();
@@ -419,7 +446,6 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
         // 8.9~9.8: 최종 돌출. 기존 돌출 경고는 이 순간 제거하고,
         // 사용자 제공 충격 마커를 실제 돌출 순간에만 짧게 표시한다.
         RemoveGroundWarningMarks();
-        ExecutorCombatEffects.SpawnEmergenceImpactDecal(this, transform.position, 0.78f, 1.08f);
         bossAudio.PlayRiseImpact();
         ExecutorCombatEffects.SpawnDustBurst(this, transform.position, 40, 4.6f);
         ExecutorCombatEffects.SpawnRockBurst(this, transform.position, 24, 5.5f, 0.90f, 0.10f, 0.34f);
@@ -521,7 +547,7 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
             skipEnabled = true;
             hud.SetSkipVisible(true);
         }
-        return skipEnabled && Input.anyKeyDown;
+        return skipEnabled && Input.anyKeyDown && !Input.GetKeyDown(KeyCode.Escape);
     }
 
     private void SkipIntro()
@@ -591,12 +617,23 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
                 continue;
             }
 
-            PatternKind pattern = firstAttackPending ? PatternKind.Aimed : ChoosePattern();
+            PatternKind pattern;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (debugForceSelectedPattern)
+            {
+                pattern = debugSelectedPattern;
+                debugForceSelectedPattern = false;
+            }
+            else
+#endif
+            {
+                pattern = firstAttackPending ? PatternKind.Aimed : ChoosePattern();
+            }
             firstAttackPending = false;
             yield return RunPattern(pattern);
             if (dead) yield break;
             rangedPatternsSinceBurrow++;
-            yield return WaitCombatSeconds(0.14f);
+            yield return WaitCombatSeconds(finalStandActive ? 0.30f : (phase >= 2 ? 0.26f : 0.14f));
         }
     }
 
@@ -660,7 +697,7 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
                     : roll < 0.40f ? PatternKind.Spread
                     : roll < 0.60f ? PatternKind.CrossBarrage
                     : roll < 0.70f ? PatternKind.ChainArtillery
-                    : roll < 0.85f ? PatternKind.Artillery
+                    : roll < 0.90f ? PatternKind.Artillery
                     : barrageReady ? PatternKind.FinalStandArtillery
                     : PatternKind.Aimed;
             }
@@ -695,10 +732,10 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
     {
         state = ExecutorState.Attacking;
         int shots = phase == 1 ? 2 : 3;
-        float charge = phase == 1 ? 0.50f : 0.38f;
-        float interval = phase == 1 ? 0.25f : 0.16f;
-        float speed = phase == 1 ? 7f : 8.2f;
-        float recovery = phase == 1 ? 0.55f : 0.42f;
+        float charge = phase == 1 ? 0.50f : 0.44f;
+        float interval = phase == 1 ? 0.25f : 0.20f;
+        float speed = phase == 1 ? 7f : 7.7f;
+        float recovery = phase == 1 ? 0.55f : 0.52f;
 
         yield return ChargeRoutine(charge);
         for (int i = 0; i < shots && !dead; i++)
@@ -717,10 +754,12 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
     {
         state = ExecutorState.Attacking;
         int count = phase == 1 ? 5 : 7;
-        float totalAngle = phase == 1 ? 48f : 66f;
-        float charge = phase == 1 ? 0.60f : 0.48f;
-        float speed = phase == 1 ? 6.2f : 7.2f;
-        float recovery = phase == 1 ? 0.65f : 0.50f;
+        // V12: slightly wider multi-shot gaps. Damage and shot count stay the same;
+        // only dodge lanes become a little more readable.
+        float totalAngle = phase == 1 ? 54f : 78f;
+        float charge = phase == 1 ? 0.60f : 0.56f;
+        float speed = phase == 1 ? 6.2f : 6.6f;
+        float recovery = phase == 1 ? 0.65f : 0.64f;
 
         yield return ChargeRoutine(charge);
         Vector2 center = GetPlayerDirectionFromMuzzle();
@@ -744,9 +783,9 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
 
         Vector3 target = ClampArtilleryTarget(GetPlayerPosition());
         float precisionRadius = GetPrecisionArtilleryRadius();
-        ExecutorTelegraph telegraph = ExecutorTelegraph.Create(this, target, precisionRadius, 0.92f,
+        ExecutorTelegraph telegraph = ExecutorTelegraph.Create(this, target, precisionRadius, phase >= 2 ? 1.02f : 0.92f,
             new Color(1f, 0.12f, 0.02f, 0.17f), new Color(1f, 0.45f, 0.12f, 0.9f), "EXE_ArtilleryWarning");
-        yield return WaitCombatSeconds(0.62f);
+        yield return WaitCombatSeconds(phase >= 2 ? 0.72f : 0.62f);
         if (dead) yield break;
         yield return ExecutorArtilleryShell.Fall(this, target, phase == 2, bossAudio, () =>
         {
@@ -754,29 +793,29 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
             DetonateArtillery(target, precisionRadius, 1, true);
         });
         SetGlowStrength(0.15f);
-        yield return WaitCombatSeconds(0.70f);
+        yield return WaitCombatSeconds(phase >= 2 ? 0.82f : 0.70f);
         state = ExecutorState.Idle;
     }
 
     private IEnumerator CrossBarrageRoutine()
     {
         state = ExecutorState.Attacking;
-        yield return ChargeRoutine(0.48f);
+        yield return ChargeRoutine(0.56f);
         Vector2 center = GetPlayerDirectionFromMuzzle();
         if (bossAudio != null) bossAudio.PlaySpreadProjectile();
-        SpawnProjectile(Rotate(center, -16f), 7.2f, 1, true);
-        SpawnProjectile(center, 7.2f, 1, true);
-        SpawnProjectile(Rotate(center, 16f), 7.2f, 1, true);
+        SpawnProjectile(Rotate(center, -19f), 6.6f, 1, true);
+        SpawnProjectile(center, 6.6f, 1, true);
+        SpawnProjectile(Rotate(center, 19f), 6.6f, 1, true);
         yield return RecoilRoutine(0.35f);
 
         for (int i = 0; i < 2 && !dead; i++)
         {
             if (bossAudio != null) bossAudio.PlayAimedProjectile();
-            SpawnProjectile(GetPlayerDirectionFromMuzzle(), 8.2f, 1);
-            yield return RecoilRoutine(0.16f);
+            SpawnProjectile(GetPlayerDirectionFromMuzzle(), 7.7f, 1);
+            yield return RecoilRoutine(0.20f);
         }
         SetGlowStrength(0.15f);
-        yield return WaitCombatSeconds(0.65f);
+        yield return WaitCombatSeconds(0.78f);
         state = ExecutorState.Idle;
     }
 
@@ -806,13 +845,13 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
             PendingStrike strike = new PendingStrike
             {
                 Position = target,
-                DetonateAt = Time.time + 0.74f,
-                Telegraph = ExecutorTelegraph.Create(this, target, 1.0f, 0.74f,
+                DetonateAt = Time.time + 0.88f,
+                Telegraph = ExecutorTelegraph.Create(this, target, 1.0f, 0.88f,
                     new Color(1f, 0.08f, 0.02f, 0.18f), new Color(1f, 0.45f, 0.12f, 0.92f),
                     "EXE_ChainArtilleryWarning_" + i)
             };
             strikes.Add(strike);
-            if (i < 2) yield return WaitCombatSeconds(0.21f);
+            if (i < 2) yield return WaitCombatSeconds(0.24f);
         }
 
         for (int i = 0; i < strikes.Count && !dead; i++)
@@ -831,7 +870,7 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
         }
 
         SetGlowStrength(0.15f);
-        yield return WaitCombatSeconds(0.85f);
+        yield return WaitCombatSeconds(1.00f);
         state = ExecutorState.Idle;
     }
 
@@ -846,7 +885,11 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
         rangedPatternsSinceBurrow = 0;
         nextBurrowAllowedTime = Time.time + 6.5f;
 
-        if (hud != null) hud.ShowIntroMessage("최종 집행");
+        if (hud != null)
+        {
+            hud.SetFinalStandStyle();
+            StartCoroutine(hud.ShowFinalStandTransition(0.82f));
+        }
         if (bossAudio != null) bossAudio.PlayPhaseOverload();
         SetGlowStrength(1.25f);
         SetGroundSocketIntensity(1.55f);
@@ -869,7 +912,6 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
             yield return null;
         }
         if (dead) yield break;
-        if (hud != null) hud.ShowIntroMessage(string.Empty);
 
         yield return FinalStandArtilleryBarrageRoutine();
         nextFinalStandArtilleryAllowedTime = Time.time + FinalStandArtilleryCooldown;
@@ -907,21 +949,21 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
         {
             StartCoroutine(ExecutorArtilleryShell.LaunchUp(this, GetMuzzleWorldPosition(), true, bossAudio));
             attackOutputCount++;
-            yield return RecoilRoutine(0.085f);
+            yield return RecoilRoutine(0.095f);
 
             // 포탄이 위로 발사된 직후의 최신 플레이어 좌표를 읽는다.
             // 일부 탄만 짧게 이동을 예측해 계속 달리는 플레이어도 추적한다.
             float prediction = 0f;
-            if (i == 2) prediction = 0.18f;
-            else if (i == 4) prediction = 0.24f;
-            else if (i == 6) prediction = 0.30f;
-            else if (i == 7) prediction = 0.20f;
+            if (i == 2) prediction = 0.12f;
+            else if (i == 4) prediction = 0.16f;
+            else if (i == 6) prediction = 0.22f;
+            else if (i == 7) prediction = 0.14f;
 
             Vector3 target = prediction > 0f
                 ? ClampArtilleryTarget(GetPredictedPlayerPosition(prediction))
                 : ClampArtilleryTarget(GetPlayerPosition());
 
-            const float warningDuration = 0.92f;
+            const float warningDuration = 1.05f;
             PendingStrike strike = new PendingStrike
             {
                 Position = target,
@@ -932,7 +974,7 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
             };
             // 착탄은 독립 처리한다. 여덟 번째 발사 직후에는 착탄을 기다리지 않고 다음 패턴으로 복귀한다.
             StartCoroutine(ResolveFinalStandStrikeRoutine(strike));
-            yield return WaitCombatSeconds(0.095f);
+            yield return WaitCombatSeconds(0.12f);
         }
 
         yield return WaitCombatSeconds(0.06f);
@@ -961,7 +1003,7 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
 
         if (bossAudio != null) bossAudio.PlaySpreadProjectile();
         Vector3 origin = transform.position + Vector3.up * 0.78f;
-        SpawnRadialProjectiles(origin, 12, 6.25f, 1, 15f);
+        SpawnRadialProjectiles(origin, 12, 5.6f, 1, 15f);
         if (cameraDirector != null) cameraDirector.Punch(Vector2.down, 0.11f, 0.085f);
         if (GameFeelManager.Instance != null) GameFeelManager.Instance.Shake(0.12f, 0.075f);
         yield return RecoilRoutine(0.16f);
@@ -1091,12 +1133,18 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
                 ? new Color(0.54f, 0.05f, 0.04f, 0.88f)
                 : new Color(0.90f, 0.16f, 0.03f, 0.94f));
         float warningElapsed = 0f;
+        bool earlyImpactMarkSpawned = false;
         float nextWarningBurst = 0f;
         float nextWarningRock = 0.12f;
         while (warningElapsed < warningDuration && !dead)
         {
             warningElapsed += Time.deltaTime;
             float t = Mathf.Clamp01(warningElapsed / warningDuration);
+            if (!earlyImpactMarkSpawned && warningElapsed >= Mathf.Max(0.12f, warningDuration - 0.50f))
+            {
+                earlyImpactMarkSpawned = true;
+                ExecutorCombatEffects.SpawnEmergenceImpactDecal(this, transform.position, 1.05f, phase == 1 ? 1.00f : 1.10f);
+            }
             if (warningElapsed >= nextWarningBurst)
             {
                 nextWarningBurst += Mathf.Lerp(0.17f, 0.065f, t);
@@ -1122,7 +1170,6 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
         // 5) 폭발적 돌출: 경고 표시는 돌출과 동시에 사라지고 사용자 제공 마커가 잠깐 남는다.
         if (emergeWarningMark != null) Destroy(emergeWarningMark);
         RemoveGroundWarningMarks();
-        ExecutorCombatEffects.SpawnEmergenceImpactDecal(this, transform.position, 0.66f, phase == 1 ? 1.00f : 1.10f);
         state = ExecutorState.Emerging;
         if (bossAudio != null) bossAudio.PlayRiseImpact(phase == 1 ? 0.88f : 0.96f);
         ExecutorCombatEffects.SpawnDustBurst(this, transform.position, phase == 1 ? 32 : 40, phase == 1 ? 4.2f : 4.8f);
@@ -1540,12 +1587,18 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
         hud.ShowIntroMessage(string.Empty);
 
         float elapsed = 0f;
-        while (elapsed < 0.35f)
+        float nextDeathSpark = 0f;
+        while (elapsed < 0.42f)
         {
             elapsed += Time.unscaledDeltaTime;
             if (visualRoot != null)
                 visualRoot.localPosition = visualBaseLocalPosition + (Vector3)(UnityEngine.Random.insideUnitCircle * 0.045f);
             SetMachineLights(Mathf.PingPong(elapsed * 13f, 1f));
+            if (elapsed >= nextDeathSpark)
+            {
+                nextDeathSpark += 0.075f;
+                ExecutorCombatEffects.SpawnMetalSparks(this, transform.position + new Vector3(Random.Range(-0.42f, 0.42f), Random.Range(0.55f, 2.05f), 0f), 3);
+            }
             yield return null;
         }
 
@@ -1572,6 +1625,8 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
         if (bossAudio != null) bossAudio.PlayFinalShutdown();
         ExecutorCombatEffects.SpawnDustBurst(null, transform.position + Vector3.up * 0.4f, 10, 1.4f);
         if (GameFeelManager.Instance != null) GameFeelManager.Instance.Shake(0.22f, 0.08f);
+        CameraFeedbackController deathFeedback = CameraFeedbackController.Instance;
+        if (deathFeedback != null) deathFeedback.Impact(CameraImpactLevelV11.Boss, hitDirection, true);
 
         float settle = 0f;
         Quaternion startRotation = visualRoot != null ? visualRoot.localRotation : Quaternion.identity;
@@ -1594,7 +1649,7 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
 
         SpawnRewards();
         // 일반 몹과 같은 BytePickup / AmmoPickup이 흩어질 시간을 보장한 뒤 출구 포탈을 연다.
-        yield return new WaitForSecondsRealtime(0.9f);
+        yield return new WaitForSecondsRealtime(1.20f);
         if (mapManager != null)
             mapManager.NotifyExecutorDefeated(ownerRoom);
         if (hud != null)
@@ -1759,7 +1814,7 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
             angleOffset = (artilleryBurstSequence++ & 1) == 0 ? 0f : 45f;
 
         if (bossAudio != null) bossAudio.PlaySpreadProjectile();
-        SpawnRadialProjectiles(position, count, finalStandActive ? 5.75f : 5.45f, 1, angleOffset);
+        SpawnRadialProjectiles(position, count, finalStandActive ? 5.2f : 4.9f, 1, angleOffset);
         ExecutorCombatEffects.SpawnMetalSparks(this, position, finalStandActive ? 7 : 5);
     }
 

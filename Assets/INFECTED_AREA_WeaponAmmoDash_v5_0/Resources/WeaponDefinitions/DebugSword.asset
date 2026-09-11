@@ -195,15 +195,15 @@ MonoBehaviour:
   sweepThicknessPlayerRatio: 0.12
   visibleReachMultiplier: 1.1
   impactRadiusPlayerRatio: 0.12
-  damage: 24
-  attackInterval: 0.44
+  damage: 26
+  attackInterval: 0.42
   minimumAttackInterval: 0.18
   knockbackBonus: 0.1
   cameraKick: 0.04
   cameraShake: 0.025
   meleeWindup: 0.08
   meleeActiveTime: 0.08
-  meleeRecovery: 0.3
+  meleeRecovery: 0.27
   meleeRange: 0.72
   meleeAngle: 105
   trailWorldLength: 1.25

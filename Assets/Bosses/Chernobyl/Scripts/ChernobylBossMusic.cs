@@ -63,26 +63,28 @@ public sealed class ChernobylBossMusic : MonoBehaviour
                 }
             }
         }
-        if (gameplay != null && gameplay.volume > 0.01f)
-            gameplayRestoreVolume = gameplay.volume;
+        if (gameplay != null)
+        {
+            BossMusicTransitionBridge.RegisterGameplaySource(gameplay);
+            gameplayRestoreVolume = BossMusicTransitionBridge.RestoreVolume;
+        }
     }
 
     public void PrepareSilentIntro()
     {
         ResolveGameplay();
+        gameplayRestoreVolume = BossMusicTransitionBridge.RestoreVolume;
+        BossMusicTransitionBridge.ForceCutsceneSilence();
         if (fadeRoutine != null) StopCoroutine(fadeRoutine);
         if (phaseOne != null) { phaseOne.Stop(); phaseOne.volume = 0f; }
         if (phaseTwo != null) { phaseTwo.Stop(); phaseTwo.volume = 0f; }
-        if (gameplay != null)
-        {
-            if (gameplay.volume > 0.01f) gameplayRestoreVolume = gameplay.volume;
-            gameplay.volume = 0f;
-        }
+
     }
 
     public void PlayPhaseOne(float duration = 0.55f)
     {
         ResolveGameplay();
+        BossMusicTransitionBridge.ForceCutsceneSilence();
         if (fadeRoutine != null) StopCoroutine(fadeRoutine);
         if (phaseOne != null && phaseOne.clip != null && !phaseOne.isPlaying)
         {
@@ -115,6 +117,8 @@ public sealed class ChernobylBossMusic : MonoBehaviour
     public void CrossFadeBackToGameplay(float duration = 1.65f)
     {
         ResolveGameplay();
+        BossMusicTransitionBridge.CancelActiveFade();
+        gameplayRestoreVolume = BossMusicTransitionBridge.RestoreVolume;
         if (fadeRoutine != null) StopCoroutine(fadeRoutine);
         if (gameplay != null)
         {
@@ -128,6 +132,18 @@ public sealed class ChernobylBossMusic : MonoBehaviour
         }
         fadeRoutine = StartCoroutine(FadeMix(0f, 0f,
             Mathf.Clamp01(gameplayRestoreVolume > 0.01f ? gameplayRestoreVolume : 0.70f), duration, true));
+    }
+
+    public void RestoreGameplayImmediate()
+    {
+        if (fadeRoutine != null)
+        {
+            StopCoroutine(fadeRoutine);
+            fadeRoutine = null;
+        }
+        if (phaseOne != null) { phaseOne.Stop(); phaseOne.volume = 0f; }
+        if (phaseTwo != null) { phaseTwo.Stop(); phaseTwo.volume = 0f; }
+        BossMusicTransitionBridge.RestoreGameplayImmediate();
     }
 
     private IEnumerator FadeMix(float p1Target, float p2Target, float gameplayTarget, float duration, bool stopSilentBossTrack)

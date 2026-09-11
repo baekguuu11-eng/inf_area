@@ -50,6 +50,22 @@ public sealed class EnemySpawnEntrance : MonoBehaviour
         initialized = true;
     }
 
+    public void RefreshStageColorsFromCurrent()
+    {
+        int count = Mathf.Min(bodyRenderers.Count, originalColors.Count);
+        for (int i = 0; i < count; i++)
+        {
+            SpriteRenderer renderer = bodyRenderers[i];
+            if (renderer == null) continue;
+            Color staged = renderer.color;
+            Color original = originalColors[i];
+            original.r = staged.r;
+            original.g = staged.g;
+            original.b = staged.b;
+            originalColors[i] = original;
+        }
+    }
+
     private IEnumerator Start()
     {
         if (!initialized)

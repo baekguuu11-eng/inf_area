@@ -1,0 +1,58 @@
+INFECTED AREA V14 - EXECUTOR / CHIP / MELEE / SHOP / SETTINGS POLISH
+Base: V13.1 ChipByteRoomHotfix
+
+1) Executor difficulty target: roughly 4/5 -> 3/5
+- Phase 1 stays mostly unchanged.
+- Phase 2 receives longer warning/recovery windows and lower projectile/radial speeds.
+- Phase 2 spread angle is slightly wider so dodge lanes are clearer.
+- Chain artillery warnings/recovery are longer.
+- Final stand 8-shot barrage warning/firing gaps are longer, prediction is weaker,
+  radial projectile speed is lower, random barrage chance is reduced, cooldown 5.5s -> 7s.
+- Damage values and core pattern identities are retained.
+
+2) Executor multi-shot projectile size
+- Spread projectile visual + collision size reduced further.
+- Phase 1 spread: scale 0.43 -> 0.37, world hit radius 0.215 -> 0.185.
+- Phase 2/final spread: scale 0.40 -> 0.34, world hit radius 0.20 -> 0.17.
+- Aimed projectiles are unchanged.
+
+3) Melee balance
+- Sword: 24 -> 26 damage, slightly faster recovery.
+- Hammer: 52 -> 58 damage, faster windup/recovery and attack cycle.
+- Whip: 16 -> 17 damage, slightly faster cycle.
+- Firewall sword: 28 -> 30 damage, slightly faster recovery.
+- Whip applies movement-only slow: normal enemy 30% for 1.5s, tank 15% for 1.2s.
+  Re-hits refresh duration, slow does not stack.
+
+4) Chip rebalance + names
+1. 절단 증폭 칩: melee damage +20%
+2. 서보 오버클럭 칩: melee attack speed +15%
+3. 신장 프로토콜 칩: melee reach +15%
+4. 탄도 증폭 칩: ranged damage +18%
+5. 급속 순환 칩: ranged fire rate +12%
+6. 관통 연산 칩: +1 pierce
+7. 방벽 프로토콜 칩: incoming damage multiplier 0.82
+8. 생체 확장 칩: max HP +1
+9. 기동 최적화 칩: move speed +12%
+- Melee range chip now scales the visible melee weapon/whip from the grip, and the hit resolver
+  uses the same endpoint so visual range and actual range stay matched.
+- Developer weapon keys moved to Ctrl+1~8; normal 1~9 remain chip keys.
+
+5) Shop weapon presentation
+- Weapon descriptions now include a Korean unique-trait line.
+- Each weapon displays five approximate square ratings (1~5), no percentages.
+- Melee: 공격력 / 공격속도 / 사거리 / 공격범위 / 저지력.
+- Ranged: 공격력 / 연사력 / 사거리 / 정확도 / 탄약효율.
+- Shop chip names/descriptions/prices updated to the V14 balance.
+
+6) ESC pause/settings + live audio
+- ESC opens a Korean in-game pause/settings panel in GameScene.
+- Continue / master volume / BGM / SFX / fullscreen / restart / main menu.
+- Same PlayerPrefs keys as the main menu.
+- Global runtime audio controller applies BGM/SFX settings to gameplay, boss, weapon, enemy and UI AudioSources.
+- ESC is reserved for settings in GameScene instead of being consumed as a boss/cutscene skip key.
+
+VALIDATION
+- No Unity Editor executable is available in this environment, so Play Mode / actual Unity compile was not run.
+- Static C# delimiter/string/comment structure check: 147 files, 0 errors.
+- .meta GUID duplicate scan: 0 duplicates.

@@ -1,6 +1,14 @@
 using System.Collections;
 using UnityEngine;
 
+public enum CameraImpactLevelV11
+{
+    Small,
+    Medium,
+    Heavy,
+    Boss
+}
+
 [DisallowMultipleComponent]
 public class CameraFeedbackController : MonoBehaviour
 {
@@ -101,6 +109,31 @@ public class CameraFeedbackController : MonoBehaviour
         shakeMagnitude = Mathf.Clamp(Mathf.Max(shakeMagnitude, magnitude), 0f, maxShakeMagnitude);
         if (direction.sqrMagnitude > 0.0001f)
             directionalBias = direction.normalized;
+    }
+
+    /// <summary>
+    /// V11 공용 카메라 충격 등급. 무기/적/보스가 제각각 숫자를 쓰지 않고 네 단계 안에서 통일한다.
+    /// </summary>
+    public void Impact(CameraImpactLevelV11 level, Vector2 direction, bool withHitStop = false)
+    {
+        float duration;
+        float magnitude;
+        float stop;
+        switch (level)
+        {
+            case CameraImpactLevelV11.Boss:
+                duration = 0.22f; magnitude = 0.205f; stop = 0.040f; break;
+            case CameraImpactLevelV11.Heavy:
+                duration = 0.155f; magnitude = 0.135f; stop = 0.028f; break;
+            case CameraImpactLevelV11.Medium:
+                duration = 0.095f; magnitude = 0.075f; stop = 0.016f; break;
+            default:
+                duration = 0.050f; magnitude = 0.032f; stop = 0f; break;
+        }
+
+        Shake(duration, magnitude, direction);
+        if (withHitStop && stop > 0f)
+            HitStop(stop);
     }
 
     public void HitStop(float duration)

@@ -53,6 +53,10 @@ public sealed class PlayerWeaponInventory : MonoBehaviour
         if (debugHotkeysOnlyInEditorOrDevelopmentBuild && !Application.isEditor && !Debug.isDebugBuild)
             return;
 
+        // V14: 숫자 1~9는 실제 칩 장착 전용이다. 개발 무기 단축키는 Ctrl+1~8로 분리한다.
+        bool debugModifier = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+        if (!debugModifier) return;
+
         if (Input.GetKeyDown(KeyCode.Alpha1)) EquipForDebug("debug_sword");
         else if (Input.GetKeyDown(KeyCode.Alpha2)) EquipForDebug("debug_hammer");
         else if (Input.GetKeyDown(KeyCode.Alpha3)) EquipForDebug("debug_whip");

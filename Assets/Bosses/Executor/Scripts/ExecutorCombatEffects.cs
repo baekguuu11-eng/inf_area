@@ -3,6 +3,7 @@ using UnityEngine;
 
 public static class ExecutorCombatEffects
 {
+    private static float nextWallImpactCameraTime;
     public static void SpawnExplosion(ExecutorBossController owner, Vector3 position, float radius)
     {
         GameObject root = new GameObject("EXE_Explosion");
@@ -136,7 +137,22 @@ public static class ExecutorCombatEffects
         flashFade.Initialize(0.46f, 0.13f);
         Register(owner, flash);
 
-        int sparkCount = visualStage >= 3 ? 8 : visualStage == 2 ? 7 : 6;
+        if (Time.unscaledTime >= nextWallImpactCameraTime)
+        {
+            Camera camera = Camera.main;
+            if (camera != null)
+            {
+                Vector3 view = camera.WorldToViewportPoint(position);
+                if (view.z > 0f && view.x >= 0f && view.x <= 1f && view.y >= 0f && view.y <= 1f)
+                {
+                    nextWallImpactCameraTime = Time.unscaledTime + 0.065f;
+                    CameraFeedbackController feedback = CameraFeedbackController.Instance;
+                    if (feedback != null) feedback.Impact(CameraImpactLevelV11.Small, rebound, false);
+                }
+            }
+        }
+
+        int sparkCount = visualStage >= 3 ? 10 : visualStage == 2 ? 8 : 6;
         for (int i = 0; i < sparkCount; i++)
         {
             GameObject spark = new GameObject("EXE_WallImpactSpark");
@@ -183,7 +199,7 @@ public static class ExecutorCombatEffects
         root.transform.position = new Vector3(position.x, position.y, 0f);
         SpriteRenderer renderer = root.AddComponent<SpriteRenderer>();
         renderer.sprite = sprite;
-        renderer.color = Color.white;
+        renderer.color = new Color(1f, 1f, 1f, 0f);
         renderer.sortingOrder = 9;
 
         float targetWidth = 2.25f * Mathf.Max(0.75f, scaleMultiplier);
@@ -290,9 +306,13 @@ public sealed class ExecutorEmergenceImpactMark : MonoBehaviour
         if (renderer != null)
         {
             Color color = startColor;
-            float fadeStart = 0.48f;
-            color.a = t <= fadeStart ? 1f : 1f - Mathf.InverseLerp(fadeStart, 1f, t);
+            float fadeIn = Mathf.Clamp01(Mathf.InverseLerp(0f, 0.18f, t));
+            float pulse = 0.86f + (Mathf.Sin(t * Mathf.PI * 8f) * 0.5f + 0.5f) * 0.14f;
+            float fadeOut = t <= 0.66f ? 1f : 1f - Mathf.InverseLerp(0.66f, 1f, t);
+            color.a = fadeIn * fadeOut * pulse;
             renderer.color = color;
+            float scalePulse = 1f + Mathf.Sin(t * Mathf.PI * 6f) * 0.028f;
+            transform.localScale *= scalePulse;
         }
 
         if (t >= 1f)

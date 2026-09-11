@@ -343,8 +343,8 @@ public sealed class WeaponVisualController : MonoBehaviour
     {
         Vector2 grip = GetGripWorldPosition();
         Vector2 tip = GetAttackTipWorldPosition();
-        // V9: debug_whip은 스프라이트 자체를 실제 타격 거리만큼 늘린다.
-        // 따라서 채찍만큼은 추가 reach multiplier를 다시 곱하지 않아 실제 판정 거리는 V8과 동일하게 유지한다.
+        // V11: debug_whip은 ApplyPoseValues에서 스프라이트 자체가 visibleReachMultiplier만큼 늘어나므로
+        // 여기서 다시 곱하지 않는다. 즉 보이는 채찍 끝과 실제 타격 끝이 같은 좌표다.
         float multiplier = currentWeapon != null && currentWeapon.weaponId != "debug_whip"
             ? Mathf.Max(0.2f, currentWeapon.visibleReachMultiplier)
             : 1f;
@@ -353,8 +353,7 @@ public sealed class WeaponVisualController : MonoBehaviour
 
     private Vector2 GetDisplayedAttackTipWorldPosition()
     {
-        // 디버그 채찍의 판정은 visibleReachMultiplier를 사용해 실제 스프라이트 끝보다 멀리까지 뻗는다.
-        // 시각 효과도 동일한 끝점을 사용해 '보이는 범위 = 실제 타격 범위'가 되게 한다.
+        // V11: 채찍은 스프라이트 자체가 실제 판정 길이까지 늘어나므로 표시 끝점도 곧 실제 끝점이다.
         if (currentWeapon != null && currentWeapon.weaponId == "debug_whip")
             return GetAttackPointWorld(1f);
         return GetAttackTipWorldPosition();
@@ -422,12 +421,19 @@ public sealed class WeaponVisualController : MonoBehaviour
         DirectionalWeaponPose pose = currentWeapon.GetPose(CardinalDirection);
         float ratio = pose.visualLengthPlayerRatio > 0.01f ? pose.visualLengthPlayerRatio : currentWeapon.visualLengthPlayerRatio;
         float targetBodyLength = ResolvePlayerWorldHeight() * Mathf.Max(0.05f, ratio);
-        // V9: 디버그 채찍은 별도 사거리 표시선을 그리는 대신 실제 채찍 스프라이트 자체를
-        // 기존 판정 끝점까지 확대한다. visibleReachMultiplier는 이제 '보이는 채찍 길이'에만 사용된다.
+        // V14: 근접 사거리 칩은 판정만 늘리는 것이 아니라 그립을 기준으로 무기/채찍 자체를
+        // 같은 배율로 늘린다. GetAttackPointWorld가 이 실제 표시 끝점을 사용하므로 보이는 거리와
+        // 실제 타격 거리가 항상 일치한다.
+        if (currentWeapon.category == WeaponCategory.Melee && ChipSlotManager.Instance != null)
+            targetBodyLength *= Mathf.Max(1f, ChipSlotManager.Instance.MeleeRangeMultiplier);
+        // V11: 디버그 채찍은 별도 반원형 사거리 표시를 쓰지 않고 실제 스프라이트 자체를
+        // 기존 판정 끝점까지 확대한다. 보이는 끝과 실제 판정 끝은 동일한 좌표를 사용한다.
         if (currentWeapon.weaponId == "debug_whip")
             targetBodyLength *= Mathf.Max(1f, currentWeapon.visibleReachMultiplier);
         float worldBodyLengthAtScaleOne = currentWeapon.GetBodyPixelLength(firing) / Mathf.Max(1f, sprite.pixelsPerUnit);
         float scale = targetBodyLength / Mathf.Max(0.0001f, worldBodyLengthAtScaleOne);
+        // V11: 위 targetBodyLength에서 채찍 길이를 한 번만 확대한다.
+        // 그립은 아래에서 다시 고정되므로 늘어난 스프라이트가 손에서 판정 끝까지 이어진다.
         weaponRenderer.transform.localScale = Vector3.one * scale;
 
         Vector2 gripNormalized = currentWeapon.GetGripNormalized(firing) + pose.gripNormalizedOffset;

@@ -1,0 +1,52 @@
+INFECTED AREA V12 - Stage Evolution / Byte / Executor Ease / Boss HUD Cleanup
+Base: V11 System Polish
+Unity target: 6000.4.1f1
+
+1) BYTE REDESIGN
+- HUD Coin.png replaced with a 64x64 point-filtered cyan data-token / circuit-core icon.
+- GameScene ByteIcon now preserves aspect ratio.
+- Runtime BytePickup fallback changed from a plain glowing disc to a matching 20x20 digital token.
+- Physics, wall bounce, magnet collection, values, and currency logic are unchanged.
+
+2) EXECUTOR MULTI-SHOT DIFFICULTY EASE
+- Spread Phase 1 total fan angle: 48 -> 54 degrees.
+- Spread Phase 2 total fan angle: 66 -> 74 degrees.
+- Cross barrage side shots: +/-16 -> +/-19 degrees.
+- Spread projectile visual/collider sizes reduced by about 9-10%.
+- Shot count, damage, aimed projectiles, artillery and 8-shot artillery behavior are unchanged.
+Purpose: preserve threat while opening slightly wider dodge lanes.
+
+3) CHERNOBYL HUD LEAK FIX
+- ChernobylBossHUD is now parented to its boss RoomController.
+- TransitionToNextStage performs a hard ChernobylBossHUD cleanup before old stage rooms are destroyed.
+This covers the race where the player touches the exit portal before the death coroutine reaches Destroy(hud).
+
+4) NORMAL ENEMY STAGE EVOLUTION
+Stage 1 (1-x)
+- Original enemy behavior and palette.
+
+Stage 2 (2-x)
+- Visual: darker/cooler body palette; no HP inflation.
+- Melee: new follow-up lunge variant.
+- Ranged: new 3-way fan volley variant.
+- Tank: new warned slam-aftershock variant.
+- Bomber: new warned delayed echo-blast variant.
+
+Stage 3 (3-x)
+- Keeps Stage 2 pattern pool and darkens the palette again.
+- Melee: adds short warned arc-sweep variant.
+- Ranged: adds 3-shot pursuit/prediction burst variant.
+- Tank: adds warned second short charge after a successful first charge.
+- Bomber: adds split delayed echo-blast variant.
+
+Difficulty philosophy
+- Base enemy HP and existing attack damage were NOT globally increased.
+- New follow-up hazards use clear red warnings and mostly deal 1 damage.
+- Difficulty rises through new decisions/patterns and visual threat rather than bullet-sponging.
+- Stage 4+ currently receives a further darkened palette but does not add a third new pattern family yet; this can be extended after JHL/stage-3 progression is finalized.
+
+Validation performed in container
+- 141 C# files: brace/string/comment/preprocessor structural check passed.
+- .meta GUID duplicate check: 0 duplicates.
+- Coin.png image integrity passed.
+- Unity Editor compile / Play Mode was NOT available in this environment.

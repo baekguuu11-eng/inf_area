@@ -115,7 +115,7 @@ public class GameSceneIntroManager : MonoBehaviour
         if (!introRunning || isFinishing)
             return;
 
-        if (allowEscapeSkipAll && Input.GetKeyDown(KeyCode.Escape))
+        if (allowEscapeSkipAll && Input.GetKeyDown(KeyCode.Escape) && !GameplayPauseSettingsV14.EscapeIsReservedForPause)
         {
             SkipIntroImmediately();
             return;

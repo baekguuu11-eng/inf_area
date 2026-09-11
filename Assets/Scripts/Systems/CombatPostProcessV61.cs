@@ -202,6 +202,19 @@ public sealed class CombatPostProcessV61 : MonoBehaviour
             instance.BeginPulse(0.18f, 0.065f, 0.08f, 0.12f);
     }
 
+
+    public static void PulseShotgunClose()
+    {
+        if (instance != null)
+            instance.BeginPulse(0.18f, 0.020f, 0.055f, 0.075f);
+    }
+
+    public static void PulseHeal()
+    {
+        if (instance != null)
+            instance.BeginPulse(0.12f, 0.008f, 0.035f, 0.12f);
+    }
+
     private void BeginPulse(float bloomBoost, float chroma, float exposure, float duration)
     {
         pulseBloom = Mathf.Max(pulseBloom, bloomBoost);
