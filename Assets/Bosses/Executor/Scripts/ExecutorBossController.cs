@@ -187,6 +187,8 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
         }
 
         hud = ExecutorBossHUD.Create();
+        if (hud != null && ownerRoom != null)
+            hud.transform.SetParent(ownerRoom.transform, false);
         music = ExecutorBossMusic.Create(transform);
         bossAudio = ExecutorBossAudio.Create(transform);
         cutsceneIsolation = new ExecutorCutsceneIsolation();
@@ -1126,7 +1128,7 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
 
         if (bossAudio != null) bossAudio.StopUndergroundMovement();
 
-        // 3) 불규칙한 균열과 지면 소켓 자체가 돌출 경고가 된다. 포격용 조준경과 완전히 분리한다.
+        // 3) 불규칙한 균열 자체가 돌출 경고가 된다. 포격용 조준경과 완전히 분리한다.
         float warningDuration = phase == 1 ? 0.90f : 0.65f;
         GameObject emergeWarningMark = ExecutorCombatEffects.SpawnGroundCrack(this, transform.position, 1.22f, warningDuration + 0.72f,
             phase == 1
@@ -1583,6 +1585,7 @@ public sealed class ExecutorBossController : MonoBehaviour, IEnemyDeathOverride
         CleanupSpawnedCombatObjects();
         if (music != null) music.CrossFadeBackToGameplay(1.75f);
         hud.ReportHealth(0, health != null ? health.MaxHealth : BossMaxHealth, true);
+        hud.HideBossBarImmediate();
         hud.SetSkipVisible(false);
         hud.ShowIntroMessage(string.Empty);
 

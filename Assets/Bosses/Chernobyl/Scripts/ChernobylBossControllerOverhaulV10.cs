@@ -47,8 +47,11 @@ public sealed partial class ChernobylBossController
 
     private float nextHitFlashTimeV11;
     private Coroutine hitFeedbackRoutineV11;
+    private float sustainedHitFeedbackDamageV12;
+    private float sustainedHitFeedbackWindowUntilV12;
     private Vector3 visualBaseScaleV11 = Vector3.one;
     private System.IDisposable antiBurstInputLockV11;
+    private ChernobylGuardDirector guardDirectorV13;
 
     private int debugForcedPatternV11 = -1;
     private int debugForcedComboV11 = -1;
@@ -89,6 +92,10 @@ public sealed partial class ChernobylBossController
         // "grid visible while idle". Only attack-specific telegraphs are created now.
         arenaGridLinesV10.Clear();
         ClearAllGridWarningsV11();
+
+        guardDirectorV13 = GetComponent<ChernobylGuardDirector>();
+        if (guardDirectorV13 == null) guardDirectorV13 = gameObject.AddComponent<ChernobylGuardDirector>();
+        guardDirectorV13.Initialize(this, ownerRoom);
     }
 
     // Kept for binary/source compatibility, but deliberately unused in V11.
@@ -173,30 +180,33 @@ public sealed partial class ChernobylBossController
     private void TriggerHitFeedbackV11(int damage, Vector2 direction)
     {
         if (dead || state == BossState.Intro || state == BossState.Dormant) return;
-
-        int heavyThreshold = health != null ? Mathf.Max(20, Mathf.RoundToInt(health.MaxHealth * 0.009f)) : 24;
-        bool heavy = damage >= heavyThreshold;
-
-        if (Time.unscaledTime >= nextHitFlashTimeV11)
+        bool heavy = damage >= 24;
+        bool emit = Time.unscaledTime >= nextHitFlashTimeV11;
+        if (emit)
         {
-            nextHitFlashTimeV11 = Time.unscaledTime + (heavy ? 0.045f : 0.070f);
+            nextHitFlashTimeV11 = Time.unscaledTime + (heavy ? 0.10f : 0.075f);
             if (hitFeedbackRoutineV11 != null) StopCoroutine(hitFeedbackRoutineV11);
             hitFeedbackRoutineV11 = StartCoroutine(HitFeedbackRoutineV11(heavy));
+            ChernobylBossEffects.SpawnCoreSparks(health.LastDamageContext.HitPoint,
+                CurrentHazardColor(), heavy ? 9 : 4, heavy ? 3.0f : 2.0f);
         }
-
-        ChernobylBossEffects.SpawnCoreSparks(transform.position + Vector3.up * 0.08f,
-            CurrentHazardColor(), heavy ? 8 : 3, heavy ? 2.9f : 1.8f);
-        if (heavy) PlaySfx(heavyHitSfxV11, 0.32f, 0.94f);
-        else PlaySfx(hitSfxV11, 0.16f, Random.Range(0.97f, 1.04f));
-
-        if (heavy)
+        if (Time.unscaledTime >= nextHitSoundV15)
         {
-            if (GameFeelManager.Instance != null)
-                GameFeelManager.Instance.DoHitStop(damage >= heavyThreshold * 2 ? 0.030f : 0.020f);
-            CameraFeedbackController feedback = CameraFeedbackController.Instance;
-            if (feedback != null)
-                feedback.Impact(CameraImpactLevelV11.Small, direction.sqrMagnitude > 0.001f ? direction : Vector2.down, false);
-            if (cameraFxV10 != null) cameraFxV10.PulseExplosion(0.22f);
+            nextHitSoundV15 = Time.unscaledTime + (heavy ? 0.12f : 0.08f);
+            PlaySfx(heavy ? heavyHitSfxV11 : hitSfxV11, heavy ? 0.48f : 0.35f, heavy ? 0.92f : Random.Range(0.98f, 1.04f));
+        }
+        if (Time.time > sustainedHitFeedbackWindowUntilV12)
+        { sustainedHitFeedbackDamageV12 = 0f; sustainedHitFeedbackWindowUntilV12 = Time.time + 0.80f; }
+        sustainedHitFeedbackDamageV12 += damage;
+        bool burst = sustainedHitFeedbackDamageV12 >= 65f;
+        if ((heavy || burst) && Time.unscaledTime >= nextHeavyFeedbackV15)
+        {
+            nextHeavyFeedbackV15 = Time.unscaledTime + 0.20f;
+            sustainedHitFeedbackDamageV12 = 0f;
+            if (GameFeelManager.Instance != null) GameFeelManager.Instance.DoHitStop(heavy ? 0.025f : 0.014f);
+            if (CameraFeedbackController.Instance != null)
+                CameraFeedbackController.Instance.Impact(CameraImpactLevelV11.Small, direction, false);
+            if (cameraFxV10 != null) cameraFxV10.PulseExplosion(0.18f);
         }
     }
 
@@ -213,12 +223,12 @@ public sealed partial class ChernobylBossController
         }
 
         float elapsed = 0f;
-        float compress = heavy ? 0.972f : 0.986f;
-        float overshoot = heavy ? 1.010f : 1.005f;
-        while (elapsed < 0.125f && !dead)
+        float compress = heavy ? 0.955f : 0.978f;
+        float overshoot = heavy ? 1.016f : 1.007f;
+        while (elapsed < 0.145f && !dead)
         {
             elapsed += Time.unscaledDeltaTime;
-            float t = Mathf.Clamp01(elapsed / 0.125f);
+            float t = Mathf.Clamp01(elapsed / 0.145f);
             float scale;
             if (t < 0.36f) scale = Mathf.Lerp(1f, compress, t / 0.36f);
             else if (t < 0.68f) scale = Mathf.Lerp(compress, overshoot, (t - 0.36f) / 0.32f);
@@ -240,7 +250,7 @@ public sealed partial class ChernobylBossController
 
     private void RegisterSustainedHitV10(int damage)
     {
-        if (!combatStarted || dead) return;
+        if (!combatStarted || dead || guardSectionV15 || (openingV15 != null && openingV15.IsOpen)) return;
         lastSustainedHitTimeV10 = Time.time;
         lastAttackDistanceV10 = Vector2.Distance(GetPlayerPosition(), transform.position);
         sustainedDamageV11 += Mathf.Max(0, damage);
@@ -248,7 +258,7 @@ public sealed partial class ChernobylBossController
 
     private void UpdateSustainedPressureV10()
     {
-        if (!combatStarted || state != BossState.Combat || dead)
+        if (!combatStarted || state != BossState.Combat || dead || guardSectionV15 || (openingV15 != null && openingV15.IsOpen))
         {
             sustainedAttackTimeV10 = Mathf.MoveTowards(sustainedAttackTimeV10, 0f, Time.deltaTime * 2.0f);
             sustainedDamageV11 = Mathf.MoveTowards(sustainedDamageV11, 0f, Time.deltaTime * 90f);
@@ -264,8 +274,8 @@ public sealed partial class ChernobylBossController
             if (!recentlyHit) sustainedDamageV11 = Mathf.MoveTowards(sustainedDamageV11, 0f, Time.deltaTime * 65f);
         }
 
-        float timeThreshold = phase == 1 ? 7.6f : phase == 2 ? 6.1f : 4.8f;
-        float damageRatio = phase == 1 ? 0.135f : phase == 2 ? 0.112f : 0.092f;
+        float timeThreshold = phase == 1 ? 7.2f : phase == 2 ? 5.4f : 4.15f;
+        float damageRatio = phase == 1 ? 0.125f : phase == 2 ? 0.098f : 0.075f;
         float damageThreshold = health != null ? health.MaxHealth * damageRatio : BossMaxHealth * damageRatio;
 
         if (!counterResponseRequestedV10 && Time.time >= counterCooldownUntilV10 &&
@@ -299,7 +309,7 @@ public sealed partial class ChernobylBossController
         if (!counterResponseRequestedV10 || dead) yield break;
         ClearAllGridWarningsV11();
         counterResponseRequestedV10 = false;
-        counterCooldownUntilV10 = Time.time + (phase == 1 ? 8.2f : phase == 2 ? 6.8f : 5.4f);
+        counterCooldownUntilV10 = Time.time + (phase == 1 ? 7.8f : phase == 2 ? 5.9f : 4.65f);
         if (counterNearV10) yield return CorePurgeCounterRoutineV10();
         else yield return ContainmentCounterRoutineV10();
         ClearAllGridWarningsV11();
@@ -457,39 +467,16 @@ public sealed partial class ChernobylBossController
 
     private List<PatternKind> BuildPatternPoolV11()
     {
-        List<PatternKind> pool = new List<PatternKind>();
-        pool.AddRange(new[]
+        // V15: six recognizable attack families. Later pages evolve these decisions.
+        return new List<PatternKind>
         {
-            PatternKind.TargetBlast, PatternKind.CrossBlast, PatternKind.SparseGrid,
-            PatternKind.CheckerA, PatternKind.CheckerB,
-            PatternKind.SweepL2R, PatternKind.SweepR2L, PatternKind.SweepTopDown, PatternKind.SweepBottomUp,
-            PatternKind.OuterCollapse, PatternKind.CenterEvacuation, PatternKind.TwinTarget,
-            PatternKind.GapSweep, PatternKind.SplitField
-        });
-
-        if (phase >= 2)
-        {
-            pool.AddRange(new[]
-            {
-                PatternKind.ChainGrid, PatternKind.CoreShockwave,
-                PatternKind.CompressHorizontal, PatternKind.ExpandHorizontal,
-                PatternKind.CompressVertical, PatternKind.ExpandVertical,
-                PatternKind.ChainInvert, PatternKind.SafeShift,
-                PatternKind.DelayedTiles, PatternKind.DelayedCross,
-                PatternKind.MovingSafeLane, PatternKind.CornerQuarantine,
-                PatternKind.RadiationRing, PatternKind.CorridorCrush, PatternKind.GridChase
-            });
-        }
-        if (phase >= 3)
-        {
-            pool.AddRange(new[]
-            {
-                PatternKind.MeltdownGrid, PatternKind.RotatingLines, PatternKind.RotatingSafeSector,
-                PatternKind.SpiralGrid, PatternKind.SafeZoneRelay, PatternKind.DelayedCascade,
-                PatternKind.ReactorPulse, PatternKind.SectorCollapse
-            });
-        }
-        return pool;
+            phase == 1 ? PatternKind.TargetBlast : PatternKind.TwinTarget,
+            PatternKind.CrossBlast,
+            phase == 1 ? PatternKind.CheckerA : PatternKind.ChainInvert,
+            PatternKind.GapSweep,
+            PatternKind.SafeShift,
+            PatternKind.CoreShockwave
+        };
     }
 
     private PatternKind WeightedPatternChoiceV11(List<PatternKind> candidates)
@@ -536,7 +523,9 @@ public sealed partial class ChernobylBossController
     private bool ShouldRunComboV11()
     {
         if (debugIgnoreCooldownV11) return false;
-        float chance = phase == 1 ? 0.32f : phase == 2 ? 0.52f : 0.68f;
+        // V12: Chernobyl's identity is chained space control. Later pages should
+        // be dominated by deliberate sequences rather than isolated random tiles.
+        float chance = phase == 1 ? 0.34f : phase == 2 ? 0.70f : 0.88f;
         return Random.value < chance;
     }
 
@@ -555,28 +544,37 @@ public sealed partial class ChernobylBossController
 
     private List<ComboKindV11> GetComboPoolV11()
     {
-        List<ComboKindV11> pool = new List<ComboKindV11>();
-        pool.Add(ComboKindV11.P1_OuterTarget);
-        pool.Add(ComboKindV11.P1_CrossGap);
-        pool.Add(ComboKindV11.P1_CheckerInvert);
-        if (phase >= 2)
+        // V12: page-exclusive combo pools. Tutorial chains disappear once the
+        // player reaches later pages instead of diluting the difficulty.
+        if (phase <= 1)
         {
-            pool.Add(ComboKindV11.P2_OuterCrossTarget);
-            pool.Add(ComboKindV11.P2_SafeSweep);
-            pool.Add(ComboKindV11.P2_CompressShockwave);
-            pool.Add(ComboKindV11.P2_CheckerDelayed);
-            pool.Add(ComboKindV11.P2_LaneTarget);
+            return new List<ComboKindV11>
+            {
+                ComboKindV11.P1_OuterTarget,
+                ComboKindV11.P1_CrossGap,
+                ComboKindV11.P1_CheckerInvert
+            };
         }
-        if (phase >= 3)
+        if (phase == 2)
         {
-            pool.Add(ComboKindV11.P3_ReactorCycle);
-            pool.Add(ComboKindV11.P3_MeltdownCorridor);
-            pool.Add(ComboKindV11.P3_TimeControl);
-            pool.Add(ComboKindV11.P3_SafeRelay);
-            pool.Add(ComboKindV11.P3_SpiralMeltdown);
-            pool.Add(ComboKindV11.P3_RotatingPressure);
+            return new List<ComboKindV11>
+            {
+                ComboKindV11.P2_OuterCrossTarget,
+                ComboKindV11.P2_SafeSweep,
+                ComboKindV11.P2_CompressShockwave,
+                ComboKindV11.P2_CheckerDelayed,
+                ComboKindV11.P2_LaneTarget
+            };
         }
-        return pool;
+        return new List<ComboKindV11>
+        {
+            ComboKindV11.P3_ReactorCycle,
+            ComboKindV11.P3_MeltdownCorridor,
+            ComboKindV11.P3_TimeControl,
+            ComboKindV11.P3_SafeRelay,
+            ComboKindV11.P3_SpiralMeltdown,
+            ComboKindV11.P3_RotatingPressure
+        };
     }
 
     private IEnumerator RunComboV11(ComboKindV11 combo)
@@ -586,64 +584,64 @@ public sealed partial class ChernobylBossController
         switch (combo)
         {
             case ComboKindV11.P1_OuterTarget:
-                yield return RunComboPatternV11(PatternKind.OuterCollapse, 0.34f);
+                yield return RunComboPatternV11(PatternKind.OuterCollapse, 0.18f);
                 yield return RunComboPatternV11(PatternKind.TargetBlast, 0f);
                 break;
             case ComboKindV11.P1_CrossGap:
-                yield return RunComboPatternV11(PatternKind.CrossBlast, 0.32f);
+                yield return RunComboPatternV11(PatternKind.CrossBlast, 0.16f);
                 yield return RunComboPatternV11(PatternKind.GapSweep, 0f);
                 break;
             case ComboKindV11.P1_CheckerInvert:
-                yield return RunComboPatternV11(PatternKind.CheckerA, 0.26f);
+                yield return RunComboPatternV11(PatternKind.CheckerA, 0.14f);
                 yield return RunComboPatternV11(PatternKind.CheckerB, 0f);
                 break;
             case ComboKindV11.P2_OuterCrossTarget:
-                yield return RunComboPatternV11(PatternKind.OuterCollapse, 0.24f);
-                yield return RunComboPatternV11(PatternKind.CrossBlast, 0.22f);
+                yield return RunComboPatternV11(PatternKind.OuterCollapse, 0.10f);
+                yield return RunComboPatternV11(PatternKind.CrossBlast, 0.08f);
                 yield return RunComboPatternV11(PatternKind.TargetBlast, 0f);
                 break;
             case ComboKindV11.P2_SafeSweep:
-                yield return RunComboPatternV11(PatternKind.SafeShift, 0.22f);
+                yield return RunComboPatternV11(PatternKind.SafeShift, 0.09f);
                 yield return RunComboPatternV11(Random.value < 0.5f ? PatternKind.SweepL2R : PatternKind.SweepR2L, 0f);
                 break;
             case ComboKindV11.P2_CompressShockwave:
-                yield return RunComboPatternV11(PatternKind.CompressHorizontal, 0.30f);
+                yield return RunComboPatternV11(PatternKind.CompressHorizontal, 0.10f);
                 yield return RunComboPatternV11(PatternKind.CoreShockwave, 0f);
                 break;
             case ComboKindV11.P2_CheckerDelayed:
-                yield return RunComboPatternV11(PatternKind.ChainInvert, 0.24f);
+                yield return RunComboPatternV11(PatternKind.ChainInvert, 0.08f);
                 yield return RunComboPatternV11(PatternKind.DelayedTiles, 0f);
                 break;
             case ComboKindV11.P2_LaneTarget:
-                yield return RunComboPatternV11(PatternKind.MovingSafeLane, 0.24f);
+                yield return RunComboPatternV11(PatternKind.MovingSafeLane, 0.08f);
                 yield return RunComboPatternV11(PatternKind.TwinTarget, 0f);
                 break;
             case ComboKindV11.P3_ReactorCycle:
-                yield return RunComboPatternV11(PatternKind.CoreShockwave, 0.20f);
-                yield return RunComboPatternV11(PatternKind.OuterCollapse, 0.20f);
+                yield return RunComboPatternV11(PatternKind.CoreShockwave, 0.06f);
+                yield return RunComboPatternV11(PatternKind.OuterCollapse, 0.06f);
                 yield return RunComboPatternV11(PatternKind.DelayedCross, 0f);
                 break;
             case ComboKindV11.P3_MeltdownCorridor:
-                yield return RunComboPatternV11(PatternKind.CorridorCrush, 0.18f);
-                yield return RunComboPatternV11(PatternKind.RotatingLines, 0.18f);
+                yield return RunComboPatternV11(PatternKind.CorridorCrush, 0.05f);
+                yield return RunComboPatternV11(PatternKind.RotatingLines, 0.05f);
                 yield return RunComboPatternV11(PatternKind.TargetBlast, 0f);
                 break;
             case ComboKindV11.P3_TimeControl:
-                yield return RunComboPatternV11(PatternKind.ChainInvert, 0.18f);
+                yield return RunComboPatternV11(PatternKind.ChainInvert, 0.05f);
                 yield return RunComboPatternV11(PatternKind.DelayedCascade, 0f);
                 break;
             case ComboKindV11.P3_SafeRelay:
-                yield return RunComboPatternV11(PatternKind.SafeZoneRelay, 0.20f);
+                yield return RunComboPatternV11(PatternKind.SafeZoneRelay, 0.05f);
                 yield return RunComboPatternV11(PatternKind.CoreShockwave, 0f);
                 break;
             case ComboKindV11.P3_SpiralMeltdown:
-                yield return RunComboPatternV11(PatternKind.SpiralGrid, 0.18f);
-                yield return RunComboPatternV11(PatternKind.RadiationRing, 0.18f);
+                yield return RunComboPatternV11(PatternKind.SpiralGrid, 0.05f);
+                yield return RunComboPatternV11(PatternKind.RadiationRing, 0.05f);
                 yield return RunComboPatternV11(PatternKind.CrossBlast, 0f);
                 break;
             case ComboKindV11.P3_RotatingPressure:
-                yield return RunComboPatternV11(PatternKind.RotatingSafeSector, 0.18f);
-                yield return RunComboPatternV11(PatternKind.RotatingLines, 0.18f);
+                yield return RunComboPatternV11(PatternKind.RotatingSafeSector, 0.05f);
+                yield return RunComboPatternV11(PatternKind.RotatingLines, 0.05f);
                 yield return RunComboPatternV11(PatternKind.GridChase, 0f);
                 break;
         }
@@ -661,6 +659,11 @@ public sealed partial class ChernobylBossController
 
     private void ResetDirectorV11()
     {
+        if (openingV15 != null) openingV15.ResetCombat();
+        attacksSinceGuardsV15 = attacksSinceComboV15 = 0;
+        guardSectionV15 = false;
+        if (guardDirectorV13 != null) guardDirectorV13.RecallForRecoveryV15();
+        ClearGuardHazardsV15();
         recentPatternHistoryV10.Clear();
         recentComboHistoryV11.Clear();
         sustainedAttackTimeV10 = 0f;
@@ -942,20 +945,24 @@ public sealed partial class ChernobylBossController
     private IEnumerator SafeShiftRoutineV10()
     {
         List<GridCell> cells = BuildFixedGridV10();
-        int cols, rows;
-        GetGridDimensionsV11(out cols, out rows);
+        int cols, rows; GetGridDimensionsV11(out cols, out rows);
         List<int[]> candidates = BuildSafeBlocksV11(cols, rows, 2, 2);
-        if (candidates.Count == 0) yield break;
-
-        float warning = phase == 1 ? 1.02f : phase == 2 ? 0.90f : 0.72f;
-        int firstIndex = ChooseReachableSafeSetV11(cells, candidates, -1, GetPlayerPosition(), BasicReachDistanceV11(warning));
-        yield return DetonateAllExceptSafeV11(cells, candidates[firstIndex], warning);
-        if (dead) yield break;
-        yield return WaitCombatSeconds(phase == 2 ? 0.28f : 0.22f);
-
-        float secondWarning = Mathf.Max(0.66f, warning - 0.10f);
-        int secondIndex = ChooseReachableSafeSetV11(cells, candidates, firstIndex, GetPlayerPosition(), BasicReachDistanceV11(secondWarning));
-        yield return DetonateAllExceptSafeV11(cells, candidates[secondIndex], secondWarning);
+        int previous = -1;
+        int waves = phase == 1 ? 1 : 2;
+        float warning = phase == 1 ? 1.25f : phase == 2 ? 1.12f : 1.02f;
+        for (int i = 0; i < waves && !dead; i++)
+        {
+            int selected;
+            if (!TryChooseSafeBlockV15(cells, candidates, previous, warning, out selected))
+            {
+                // No collision-free reachable block: never turn this into a forced hit.
+                yield return ExecuteCircleTargetV11(GetPlayerPosition(), 0.95f, 1.05f, 0.50f);
+                yield break;
+            }
+            yield return DetonateAllExceptSafeV11(cells, candidates[selected], warning);
+            previous = selected;
+            if (i + 1 < waves) yield return WaitCombatSeconds(0.38f);
+        }
     }
 
     private List<int[]> BuildSafeBlocksV11(int cols, int rows, int blockW, int blockH)
@@ -1123,31 +1130,21 @@ public sealed partial class ChernobylBossController
     private IEnumerator GapSweepRoutineV11()
     {
         List<GridCell> cells = BuildFixedGridV10();
-        int cols, rows;
-        GetGridDimensionsV11(out cols, out rows);
-        bool horizontalTravel = Random.value < 0.5f;
-        bool forward = Random.value < 0.5f;
-        int gap = horizontalTravel ? Random.Range(0, rows) : Random.Range(0, cols);
-        float warning = phase == 1 ? 0.92f : phase == 2 ? 0.74f : 0.62f;
-        int steps = horizontalTravel ? cols : rows;
-        for (int s = 0; s < steps && !dead; s++)
+        int cols, rows; GetGridDimensionsV11(out cols, out rows);
+        int pCol, pRow; WorldToGridV11(GetPlayerPosition(), cols, rows, out pCol, out pRow);
+        bool fromLeft = pCol >= cols / 2;
+        // One stable two-row corridor for the whole sweep, never a randomly shifting gap.
+        int gap = Mathf.Clamp(pRow, 0, Mathf.Max(0, rows - 2));
+        int bands = phase == 1 ? 2 : 3;
+        for (int step = 0; step < bands && !dead; step++)
         {
-            int line = forward ? s : steps - 1 - s;
+            int band = fromLeft ? step : bands - 1 - step;
             List<GridCell> hazards = new List<GridCell>();
-            if (horizontalTravel)
-            {
-                for (int y = 0; y < rows; y++) if (y != gap) hazards.Add(cells[y * cols + line]);
-                if (phase >= 2 && s < steps - 1 && Random.value < 0.55f)
-                    gap = Mathf.Clamp(gap + (Random.value < 0.5f ? -1 : 1), 0, rows - 1);
-            }
-            else
-            {
-                for (int x = 0; x < cols; x++) if (x != gap) hazards.Add(cells[line * cols + x]);
-                if (phase >= 2 && s < steps - 1 && Random.value < 0.55f)
-                    gap = Mathf.Clamp(gap + (Random.value < 0.5f ? -1 : 1), 0, cols - 1);
-            }
-            yield return TelegraphAndDetonateCells(hazards, warning, CurrentHazardColor());
-            if (!dead) yield return WaitCombatSeconds(0.08f);
+            for (int y = 0; y < rows; y++)
+                for (int x = 0; x < cols; x++)
+                    if (x * bands / cols == band && (y < gap || y > gap + 1)) hazards.Add(cells[y * cols + x]);
+            yield return TelegraphAndDetonateCells(hazards, phase == 1 ? 0.95f : 0.85f, CurrentHazardColor());
+            yield return WaitCombatSeconds(0.16f);
         }
     }
 

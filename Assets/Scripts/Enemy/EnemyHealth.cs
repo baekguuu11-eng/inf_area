@@ -55,6 +55,8 @@ public class EnemyHealth : MonoBehaviour
     private DamageContext lastDamageContext;
     private Transform rootTransform;
     private ByteDropper byteDropper;
+    private BossOpeningWindowV15 bossOpeningV15;
+    private bool resolvedBossOpeningV15;
 
     public int CurrentHealth => currentHealth;
     public int MaxHealth => maxHealth;
@@ -131,6 +133,14 @@ public class EnemyHealth : MonoBehaviour
         if (context.HitPoint == Vector2.zero)
             context.HitPoint = transform.position;
 
+        // Only the two revised bosses opt into this component. Ordinary enemies are unchanged.
+        if (!resolvedBossOpeningV15)
+        {
+            bossOpeningV15 = GetComponent<BossOpeningWindowV15>();
+            resolvedBossOpeningV15 = true;
+        }
+        if (bossOpeningV15 != null)
+            context.Damage = bossOpeningV15.ResolveDamage(context.Damage, context.HitKind);
         lastDamageContext = context;
         int appliedDamage = Mathf.Min(context.Damage, currentHealth);
         currentHealth -= appliedDamage;
@@ -201,6 +211,10 @@ public class EnemyHealth : MonoBehaviour
         isDead = true;
         deathPending = false;
         DisableCombatComponents(true);
+
+        ChernobylGuardUnit chernobylGuard = rootTransform.GetComponent<ChernobylGuardUnit>();
+        if (chernobylGuard != null)
+            chernobylGuard.ScheduleDeathBurst(context.Direction);
 
         if (byteDropper != null)
             byteDropper.DropBytes(rootTransform.position);

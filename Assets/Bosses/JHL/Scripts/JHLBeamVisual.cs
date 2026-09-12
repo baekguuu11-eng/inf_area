@@ -37,21 +37,15 @@ public sealed class JHLBeamVisual : MonoBehaviour
     private void Update()
     {
         if (!active) return;
-
         elapsed += Time.deltaTime;
-        float t = Mathf.Clamp01(elapsed / life);
-        float attack = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 0.075f));
-        float sustain = 1f;
-        float release = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((t - 0.76f) / 0.24f));
-        float envelope = Mathf.Clamp01(attack * sustain * release);
-        float micro = 0.97f + Mathf.Sin(elapsed * 57f) * 0.018f + Mathf.Sin(elapsed * 101f) * 0.012f;
+        // Damage remains live until controller cleanup: never visually shrink a live hitbox.
         Vector3 scale = transform.localScale;
-        scale.y = baseWidth * Mathf.Max(0.06f, envelope * micro);
+        scale.y = baseWidth;
         transform.localScale = scale;
-
-        SetAlpha(outer, 0.46f * envelope);
-        SetAlpha(middle, 0.78f * envelope);
-        SetAlpha(core, 1.00f * envelope);
+        float pulse = 0.94f + Mathf.Sin(elapsed * 45f) * 0.06f;
+        SetAlpha(outer, 0.55f);
+        SetAlpha(middle, 0.80f * pulse);
+        SetAlpha(core, pulse);
     }
 
     private static void SetAlpha(SpriteRenderer rendererRef, float alpha)

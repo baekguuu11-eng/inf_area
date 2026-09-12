@@ -26,6 +26,30 @@ public static class ChernobylBossRuntimeFactory
         Transform visualRoot = visualObject.transform;
         List<SpriteRenderer> structure = new List<SpriteRenderer>();
 
+        SpriteRenderer core;
+        GameObject ringObject;
+        Sprite bodySprite, ringSprite, coreSprite;
+        if (ChernobylArtV16.TryLoad(out bodySprite, out ringSprite, out coreSprite))
+        {
+            GameObject bodyObject = new GameObject("BodyV16");
+            bodyObject.transform.SetParent(visualRoot, false);
+            bodyObject.transform.localPosition = new Vector3(0f, 0.085f, 0f);
+            SpriteRenderer body = bodyObject.AddComponent<SpriteRenderer>();
+            body.sprite = bodySprite; body.sortingOrder = 10; structure.Add(body);
+            ringObject = new GameObject("RingV16");
+            ringObject.transform.SetParent(visualRoot, false);
+            ringObject.transform.localPosition = new Vector3(0f, 0.10f, 0f);
+            SpriteRenderer ring = ringObject.AddComponent<SpriteRenderer>();
+            ring.sprite = ringSprite; ring.sortingOrder = 17; structure.Add(ring);
+            GameObject coreObject = new GameObject("CoreV16");
+            coreObject.transform.SetParent(visualRoot, false);
+            coreObject.transform.localPosition = new Vector3(0f, 0.10f, 0f);
+            core = coreObject.AddComponent<SpriteRenderer>();
+            core.sprite = coreSprite; core.sortingOrder = 18;
+            core.color = new Color(0.30f, 0.95f, 0.36f, 1f);
+        }
+        else
+        {
         // V9 2보스는 외부 이미지 없이 흰색 런타임 스프라이트만 조합한다.
         CreateRect("RearPlate", visualRoot, new Vector2(1.92f, 1.55f), new Vector2(0f, 0f),
             new Color(0.82f, 0.86f, 0.86f, 1f), 10, structure);
@@ -58,7 +82,7 @@ public static class ChernobylBossRuntimeFactory
                 new Color(0.98f, 0.99f, 0.98f, 1f), 13, structure);
         }
 
-        GameObject ringObject = new GameObject("CoreOuterRing");
+        ringObject = new GameObject("CoreOuterRing");
         ringObject.transform.SetParent(visualRoot, false);
         ringObject.transform.localPosition = new Vector3(0f, 0.10f, 0f);
         SpriteRenderer outerRing = ringObject.AddComponent<SpriteRenderer>();
@@ -81,7 +105,7 @@ public static class ChernobylBossRuntimeFactory
         GameObject coreObject = new GameObject("Core");
         coreObject.transform.SetParent(visualRoot, false);
         coreObject.transform.localPosition = new Vector3(0f, 0.10f, 0f);
-        SpriteRenderer core = coreObject.AddComponent<SpriteRenderer>();
+        core = coreObject.AddComponent<SpriteRenderer>();
         core.sprite = ChernobylRuntimeSprites.FilledCircle;
         core.color = new Color(0.30f, 0.95f, 0.36f, 1f);
         core.sortingOrder = 18;
@@ -95,6 +119,8 @@ public static class ChernobylBossRuntimeFactory
         glyph.sortingOrder = 19;
         coreDiamond.transform.localScale = Vector3.one * 0.55f;
         structure.Add(glyph);
+
+        }
 
         // 바닥에 별도 받침/그림자 이미지는 사용하지 않는다.
         GameObject hurtboxObject = new GameObject("BodyHurtbox");
