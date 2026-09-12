@@ -53,6 +53,41 @@ public sealed class JHLCombatEffects : MonoBehaviour
         return root;
     }
 
+    public GameObject SpawnFaceHit(Vector2 position, bool heavy)
+    {
+        GameObject root = new GameObject(heavy ? "JHL_FaceHeavyHitFX" : "JHL_FaceHitFX");
+        root.transform.position = position;
+
+        float radius = heavy ? 0.46f : 0.28f;
+        Color ringColor = heavy
+            ? new Color(1f, 0.24f, 0.88f, 0.92f)
+            : new Color(0.30f, 0.90f, 1f, 0.82f);
+        CreateRing(root.transform, "SignalRing", radius, ringColor, 46, 0f);
+
+        int fragments = heavy ? 8 : 4;
+        for (int i = 0; i < fragments; i++)
+        {
+            GameObject slice = new GameObject("SignalSlice");
+            slice.transform.SetParent(root.transform, false);
+            SpriteRenderer sr = slice.AddComponent<SpriteRenderer>();
+            sr.sprite = JHLRuntimeSprites.WhitePixel;
+            sr.sortingOrder = 47;
+            sr.color = (i & 1) == 0
+                ? new Color(0.26f, 0.94f, 1f, 0.92f)
+                : new Color(1f, 0.25f, 0.84f, 0.88f);
+            float width = Random.Range(heavy ? 0.22f : 0.13f, heavy ? 0.46f : 0.28f);
+            float height = Random.Range(0.025f, 0.055f);
+            slice.transform.localScale = new Vector3(width, height, 1f);
+            slice.transform.localPosition = new Vector3(Random.Range(-0.15f, 0.15f), Random.Range(-0.14f, 0.14f), 0f);
+            JHLPixelDebris motion = slice.AddComponent<JHLPixelDebris>();
+            Vector2 dir = new Vector2(Random.value < 0.5f ? -1f : 1f, Random.Range(-0.18f, 0.18f)).normalized;
+            motion.Initialize(dir * Random.Range(heavy ? 2.2f : 1.4f, heavy ? 4.4f : 2.8f), Random.Range(0.12f, heavy ? 0.24f : 0.18f));
+        }
+
+        Destroy(root, heavy ? 0.34f : 0.25f);
+        return root;
+    }
+
     public GameObject SpawnCharge(Transform origin, float duration, float targetSize, Color color)
     {
         if (origin == null) return null;

@@ -46,9 +46,23 @@ public enum JHLPatternKind
 }
 
 [DisallowMultipleComponent]
-public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
+public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverride
 {
     private enum BossState { Dormant, Intro, Combat, Transition, DebugPattern, Dead }
+
+    // V12: layered attack presets combine independent Hand / Face-Energy / Space
+    // channels. This gives JHL actual simultaneous pressure instead of inflating
+    // the pattern count with sequential variants of the same attack.
+    private enum LayeredComboV12
+    {
+        SweepAim,
+        CompressionFan,
+        GateBombardment,
+        ScissorRapidLaser,
+        GateCurtain,
+        CrossPunchSplit,
+        CompressionTracking
+    }
 
     private const int BossMaxHealth = 3000;
     private const float PhaseTwoRatio = 0.70f;
@@ -126,6 +140,9 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
     private Coroutine antiPressureInterruptRoutine;
     private Coroutine auxiliaryPatternRoutine;
     private float lastLayoutAspect = -1f;
+    private int lastLayeredComboV12 = -1;
+    private Coroutine faceHitFeedbackRoutineV12;
+    private float nextFaceHitFeedbackTimeV12;
 
     public EnemyHealth Health => health;
     public RoomController OwnerRoom => ownerRoom;
@@ -201,7 +218,10 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
         playerHealth = FindAnyObjectByType<PlayerHealth>();
         player = playerHealth != null ? playerHealth.transform : null;
         playerBody = player != null ? player.GetComponent<Rigidbody2D>() : null;
+        // V16: JHL can be attacked continuously; no opening multiplier or bracket UI.
         hud = JHLBossHUD.Create();
+        if (hud != null && ownerRoom != null)
+            hud.transform.SetParent(ownerRoom.transform, false);
         cameraFx = JHLCameraFX.CreateOrGet();
         patternDirector = GetComponent<JHLPatternDirector>();
         if (patternDirector == null) patternDirector = gameObject.AddComponent<JHLPatternDirector>();
@@ -412,8 +432,8 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
             hud.HideCinematicTitle();
             hud.SetSkipVisible(false);
             hud.SetCinematicBarsImmediate(false);
-            hud.ReportHealth(health != null ? health.CurrentHealth : BossMaxHealth, health != null ? health.MaxHealth : BossMaxHealth, true);
-            hud.ShowBossBar(true);
+            StartCoroutine(hud.RevealBossBar(health != null ? health.CurrentHealth : BossMaxHealth,
+                health != null ? health.MaxHealth : BossMaxHealth, 0.48f));
         }
         if (cutsceneIsolation != null) cutsceneIsolation.Restore();
         if (cameraDirector != null) cameraDirector.SnapToCombat();
@@ -486,6 +506,8 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
         antiPressureCooldownUntil = 0f;
         recentPatterns.Clear();
         if (patternDirector != null) patternDirector.ResetHistory();
+        if (openingV15 != null) openingV15.ResetCombat();
+        attacksSinceComboV15 = 0;
         combatStarted = true;
         state = BossState.Combat;
         RecalculateScreenHomes(phase);
@@ -584,13 +606,13 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
 
     private IEnumerator CombatLoop()
     {
-        yield return new WaitForSeconds(0.48f);
-        while (!dead && health != null && !health.IsDead)
+        yield return new WaitForSeconds(0.42f);
+        while (!dead && health != null && !health.IsDead && (playerHealth == null || !playerHealth.IsDead))
         {
             RecalculateScreenHomes(phase);
             yield return HandlePendingPhaseTransitions();
             if (dead) yield break;
-
+            bool pressurePair = false;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (debugForceSelectedPattern)
             {
@@ -599,32 +621,151 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
             }
             else
 #endif
-            if (antiPressurePending && Time.time >= antiPressureCooldownUntil)
+            if (phase >= 3 && health.NormalizedHealth <= 0.15f && !fullAccessUsed)
+                currentPattern = JHLPatternKind.FullAccess;
+            else if (antiPressurePending && Time.time >= antiPressureCooldownUntil)
             {
-                currentPattern = antiPressurePattern;
+                currentPattern = IsPlayerInFaceMeleeZone() ? JHLPatternKind.RoarRepulse : JHLPatternKind.RemoteSuppression;
                 antiPressurePending = false;
-                meleePressureDamage = 0f;
-                rangedPressureDamage = 0f;
-                antiPressureCooldownUntil = Time.time + 7.5f;
+                meleePressureDamage = rangedPressureDamage = 0f;
+                antiPressureCooldownUntil = Time.time + (phase == 1 ? 8f : phase == 2 ? 7f : 6f);
             }
             else
             {
                 currentPattern = SelectPattern();
+                pressurePair = phase >= 2 && attacksSinceComboV15 >= (phase == 2 ? 2 : 1);
             }
-            lastPatternName = currentPattern.ToString();
-            RememberPattern(currentPattern);
             patternRunning = true;
             state = BossState.Combat;
-            yield return RunPattern(currentPattern);
-            SetHandsSolid(false);
+            if (pressurePair)
+            {
+                // One hand channel + stationary, clearly announced face-channel attack.
+                currentPattern = JHLPatternKind.HandSweep;
+                lastPatternName = "V16 SWEEP + LOCKED AIM";
+                RememberPattern(currentPattern);
+                auxiliaryPatternRoutine = StartCoroutine(PressureAimV16());
+                yield return HandSweepRoutine(Random.value < 0.5f, 0.95f, 1);
+                while (!dead && auxiliaryPatternRoutine != null) yield return null;
+                attacksSinceComboV15 = 0;
+            }
+            else
+            {
+                lastPatternName = currentPattern.ToString();
+                RememberPattern(currentPattern);
+                yield return RunPattern(currentPattern);
+                attacksSinceComboV15++;
+            }
             patternRunning = false;
             if (dead) yield break;
-
-            float returnTime = phase == 1 ? 0.42f : phase == 2 ? 0.34f : 0.27f;
-            yield return ReturnPartsToHomeAnimated(returnTime);
-            float recovery = phase == 1 ? 0.52f : phase == 2 ? 0.38f : 0.27f;
-            yield return new WaitForSeconds(recovery);
+            // Residual finger bullets keep their declared lifetime; only the counter clears hazards.
+            SetHandsSolid(false);
+            SetTrails(false, false);
+            float gap = phase == 1 ? 0.48f : phase == 2 ? 0.34f : 0.24f;
+            if (currentPattern == JHLPatternKind.MassiveCentralBeam) gap += 0.28f;
+            if (currentPattern == JHLPatternKind.FullAccess) gap = 0.85f;
+            yield return ReturnPartsToHomeAnimated(gap);
         }
+        CleanupSpawnedObjects();
+        SetHandsSolid(false);
+        SetTrails(false, false);
+        ReleaseInputLock();
+    }
+
+    private bool ShouldRunLayeredComboV12()
+    {
+        if (phase < 2 || dead || state == BossState.Transition) return false;
+        // Phase 2 teaches two-channel overlap. Phase 3 makes it the default rhythm
+        // while keeping each component's existing telegraph intact.
+        return Random.value < (phase == 2 ? 0.44f : 0.74f);
+    }
+
+    private IEnumerator RunLayeredComboV12()
+    {
+        LayeredComboV12[] phaseTwo =
+        {
+            LayeredComboV12.SweepAim,
+            LayeredComboV12.CompressionFan,
+            LayeredComboV12.GateBombardment
+        };
+        LayeredComboV12[] phaseThree =
+        {
+            LayeredComboV12.SweepAim,
+            LayeredComboV12.GateBombardment,
+            LayeredComboV12.ScissorRapidLaser,
+            LayeredComboV12.GateCurtain,
+            LayeredComboV12.CrossPunchSplit,
+            LayeredComboV12.CompressionTracking
+        };
+
+        LayeredComboV12[] pool = phase == 2 ? phaseTwo : phaseThree;
+        int pick = Random.Range(0, pool.Length);
+        if (pool.Length > 1 && (int)pool[pick] == lastLayeredComboV12)
+            pick = (pick + Random.Range(1, pool.Length)) % pool.Length;
+        LayeredComboV12 combo = pool[pick];
+        lastLayeredComboV12 = (int)combo;
+
+        JHLPatternKind primary;
+        JHLPatternKind secondary;
+        float delay;
+
+        switch (combo)
+        {
+            case LayeredComboV12.CompressionFan:
+                primary = JHLPatternKind.Compression;
+                secondary = JHLPatternKind.ProjectileFan;
+                delay = 0.34f;
+                break;
+            case LayeredComboV12.GateBombardment:
+                primary = JHLPatternKind.MovingGate;
+                secondary = JHLPatternKind.PredictiveBombardment;
+                delay = 0.38f;
+                break;
+            case LayeredComboV12.ScissorRapidLaser:
+                primary = JHLPatternKind.ScissorSweep;
+                secondary = JHLPatternKind.RapidLaserBurst;
+                delay = 0.18f;
+                break;
+            case LayeredComboV12.GateCurtain:
+                primary = JHLPatternKind.MovingGate;
+                secondary = JHLPatternKind.LaserCurtain;
+                delay = 0.26f;
+                break;
+            case LayeredComboV12.CrossPunchSplit:
+                primary = JHLPatternKind.DiagonalCrossPunch;
+                secondary = JHLPatternKind.SplitBeam;
+                delay = 0.20f;
+                break;
+            case LayeredComboV12.CompressionTracking:
+                primary = JHLPatternKind.Compression;
+                secondary = JHLPatternKind.TrackingThinBeam;
+                delay = 0.28f;
+                break;
+            default:
+                primary = JHLPatternKind.HandSweep;
+                secondary = JHLPatternKind.TripleAimLaser;
+                delay = 0.22f;
+                break;
+        }
+
+        currentPattern = primary;
+        lastPatternName = "LAYERED " + combo + " [" + primary + " + " + secondary + "]";
+        RememberPattern(primary);
+        RememberPattern(secondary);
+
+        auxiliaryPatternRoutine = StartCoroutine(RunAuxiliaryPatternV12(secondary, delay));
+        yield return RunPattern(primary);
+
+        // The primary can finish before the face/energy channel. Do not snap the
+        // hands home or begin another pattern until both channels are complete.
+        while (!dead && auxiliaryPatternRoutine != null)
+            yield return null;
+    }
+
+    private IEnumerator RunAuxiliaryPatternV12(JHLPatternKind pattern, float delay)
+    {
+        if (delay > 0f) yield return new WaitForSeconds(delay);
+        if (!dead) yield return RunPattern(pattern);
+        auxiliaryPatternRoutine = null;
     }
 
     private IEnumerator HandlePendingPhaseTransitions()
@@ -746,7 +887,7 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
             case JHLPatternKind.PrisonBarrage: yield return PrisonBarrageRoutine(); break;
             case JHLPatternKind.CompressionBurst: yield return CompressionBurstRoutine(); break;
             case JHLPatternKind.MassiveCentralBeam: yield return MassiveCentralBeamRoutine(); break;
-            case JHLPatternKind.TrackingThinBeam: yield return TrackingBeamRoutine(3.5f, 58f, 0.62f); break;
+            case JHLPatternKind.TrackingThinBeam: yield return TrackingBeamRoutine(2.4f, 42f, 0.9f); break;
             case JHLPatternKind.SplitBeam: yield return SplitBeamRoutine(); break;
             case JHLPatternKind.LaserCurtain: yield return LaserCurtainRoutine(); break;
             case JHLPatternKind.SpiralBeam: yield return SpiralBeamRoutine(); break;
@@ -769,6 +910,7 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
     {
         if (motion == null || player == null) yield break;
 
+        warning = Mathf.Max(warning, phase == 1 ? 0.85f : phase == 2 ? 0.75f : 0.68f);
         Vector2 target = ClampToArena(player.position, 0.92f);
         float slamRadius = Mathf.Clamp(handSize.x * 0.16f, 0.78f, 1.18f);
         GameObject telegraph = CreateCircleTelegraph(target, slamRadius, new Color(1f, 0.08f, 0.25f, 0.24f), warning);
@@ -787,7 +929,6 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
         motion.SetTarget(prep + Vector3.up * 0.22f, JHLPartMotionState.Anticipation);
         motion.AddVelocityImpulse(Vector2.up * 1.1f);
         yield return new WaitForSeconds(warning * 0.38f);
-        DestroyTracked(telegraph);
 
         SetTrailForMotion(motion, true);
         motion.SetMotionProfile(10.5f, 0.42f, 62f);
@@ -796,7 +937,15 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
         motion.SetTarget(new Vector3(target.x, target.y, 0f), JHLPartMotionState.Attack);
         motion.AddVelocityImpulse(Vector2.down * 2.2f);
         // V11: damage is tied to the hand reaching the impact point, not a guessed timer.
-        yield return motion.WaitForSettle(0.30f, 0.10f);
+        yield return motion.WaitForSettle(0.65f, 0.10f);
+        DestroyTracked(telegraph);
+        if (motion.DistanceToTarget > 0.12f)
+        {
+            SetTrailForMotion(motion, false);
+            motion.SetScaleMultiplier(Vector3.one);
+            motion.SetTarget(HomeFor(motion), JHLPartMotionState.Recovery);
+            yield break;
+        }
 
         DamagePlayerCircle(target, slamRadius, damage);
         SpawnImpact(target, slamRadius * 0.92f);
@@ -819,6 +968,7 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
 
     private IEnumerator HandSweepRoutine(bool leftToRight, float warning, int damage)
     {
+        warning = Mathf.Max(warning, 0.95f);
         Bounds b = GetCombatBounds();
         float y = player != null ? Mathf.Clamp(player.position.y, b.min.y + 0.9f, b.max.y - 0.9f) : b.center.y;
         Vector2 center = new Vector2(b.center.x, y);
@@ -853,10 +1003,11 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
         motion.SetTarget(end, JHLPartMotionState.Attack);
         motion.AddVelocityImpulse(Vector2.right * (sign * 4.5f));
 
-        float duration = phase >= 2 ? 0.36f : 0.44f;
+        float duration = 1.4f;
+        if (bossAudio != null) bossAudio.PlaySweep();
         float elapsed = 0f;
         bool damaged = false;
-        while (elapsed < duration)
+        while (elapsed < duration && !dead && motion.DistanceToTarget > 0.12f)
         {
             elapsed += Time.deltaTime;
 
@@ -872,7 +1023,6 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
 
         CameraFeedbackController feedback = CameraFeedbackController.Instance;
         if (feedback != null) feedback.Shake(0.16f, 0.060f, leftToRight ? Vector2.right : Vector2.left);
-        if (bossAudio != null) bossAudio.PlaySweep();
         if (cameraFx != null) cameraFx.PulseLight(0.72f);
         motion.AddVelocityImpulse(Vector2.right * (sign * 2.0f));
         yield return new WaitForSeconds(0.07f);
@@ -886,11 +1036,12 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
     private IEnumerator StraightLaserRoutine(float warning, float width, int damage)
     {
         if (face == null || player == null) yield break;
+        warning = Mathf.Max(warning, 0.60f);
         Vector2 origin = faceFireOrigin != null ? faceFireOrigin.position : face.position;
         Vector2 dir = ((Vector2)player.position - origin).normalized;
         if (dir.sqrMagnitude < 0.001f) dir = Vector2.down;
         float length = BeamLengthToArena(origin, dir);
-        GameObject telegraph = CreateLineTelegraph(origin, dir, length, width * 0.35f, new Color(1f, 0.08f, 0.30f, 0.26f), warning);
+        GameObject telegraph = CreateLineTelegraph(origin, dir, length, width, new Color(1f, 0.08f, 0.30f, 0.26f), warning);
         if (combatEffects != null) combatEffects.SpawnCharge(faceFireOrigin != null ? faceFireOrigin : face, warning, Mathf.Max(0.20f, width * 1.7f), new Color(1f, 0.72f, 0.95f, 0.95f));
         if (bossAudio != null) bossAudio.PlayBeamCharge();
 
@@ -905,8 +1056,7 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
         yield return new WaitForSeconds(warning);
         DestroyTracked(telegraph);
 
-        origin = faceFireOrigin != null ? faceFireOrigin.position : face.position;
-        length = BeamLengthToArena(origin, dir);
+        // Use exactly the world geometry declared by the warning.
         GameObject beam = CreateBeam(origin, dir, length, width, 0.34f, new Color(1f, 0.14f, 0.44f, 0.68f), Color.white);
         if (bossAudio != null) bossAudio.PlayBeamFire();
         faceMotion.SetScaleMultiplier(new Vector3(1.01f, 1.04f, 1f));
@@ -980,77 +1130,43 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
     {
         if (leftMotion == null || rightMotion == null) yield break;
         Bounds b = GetCombatBounds();
-        GetCameraFrame(out Vector3 camCenter, out float halfW, out _);
-        float laneY = player != null ? Mathf.Clamp(player.position.y, b.min.y + 1f, b.max.y - 1f) : b.center.y;
-        Vector3 leftStart = new Vector3(camCenter.x - halfW - handSize.x * 0.18f, laneY, 0f);
-        Vector3 rightStart = new Vector3(camCenter.x + halfW + handSize.x * 0.18f, laneY, 0f);
-        float minimumSafeWidth = aggressive ? 2.25f : 3.05f;
-        float halfHandWidth = handSize.x * 0.5f;
-        Vector3 leftEnd = new Vector3(camCenter.x - (minimumSafeWidth * 0.5f + halfHandWidth), laneY, 0f);
-        Vector3 rightEnd = new Vector3(camCenter.x + (minimumSafeWidth * 0.5f + halfHandWidth), laneY, 0f);
-        debugSafeWidth = minimumSafeWidth;
-        Vector2 warningCenter = new Vector2(camCenter.x, laneY);
-        Vector2 warningSize = new Vector2(halfW * 2f, Mathf.Max(1.60f, handSize.y * 0.92f));
-        float warningDuration = aggressive ? 1.15f : 1.45f;
-        GameObject warning = CreateRectTelegraph(warningCenter, warningSize, 0f, new Color(1f, 0.05f, 0.22f, 0.20f), warningDuration);
+        float y = player != null ? Mathf.Clamp(player.position.y, b.min.y + 1f, b.max.y - 1f) : b.center.y;
+        Vector2 center = new Vector2(b.center.x, y);
+        Vector2 lane = new Vector2(b.size.x + handSize.x, handSize.y * 1.08f);
+        // Leave the horizontal lane above/below; only the actual moving hands deal damage.
+        GameObject warning = CreateRectTelegraph(center, lane, 0f, new Color(1f, 0.08f, 0.25f, 0.24f), 1.35f);
         if (bossAudio != null) bossAudio.PlayCompression();
-
-        leftMotion.SetMotionProfile(3.8f, 1.08f, 34f);
-        rightMotion.SetMotionProfile(3.8f, 1.08f, 34f);
-        leftMotion.SetTarget(leftStart, JHLPartMotionState.Anticipation);
-        rightMotion.SetTarget(rightStart, JHLPartMotionState.Anticipation);
-        // Do not turn the hands solid while they are still flying into their staging positions.
-        yield return WaitForPartsSettle(leftMotion, rightMotion, 0.78f, 0.12f);
-
+        SetHandsSolid(false);
+        leftMotion.SetKinematicProfile(34f, 100f, 120f);
+        rightMotion.SetKinematicProfile(34f, 100f, 120f);
+        leftMotion.SetTarget(new Vector3(b.min.x - handSize.x * 0.55f, y, 0f), JHLPartMotionState.Anticipation);
+        rightMotion.SetTarget(new Vector3(b.max.x + handSize.x * 0.55f, y, 0f), JHLPartMotionState.Anticipation);
+        yield return new WaitForSeconds(1.35f);
+        DestroyTracked(warning);
+        if (leftMotion.DistanceToTarget > 0.2f || rightMotion.DistanceToTarget > 0.2f) yield break;
         SetHandsSolid(true);
-        leftMotion.SetMotionProfile(1.35f, 0.86f, aggressive ? 10f : 8f);
-        rightMotion.SetMotionProfile(1.35f, 0.86f, aggressive ? 10f : 8f);
-        leftMotion.SetTarget(leftEnd, JHLPartMotionState.Attack);
-        rightMotion.SetTarget(rightEnd, JHLPartMotionState.Attack);
-        leftMotion.SetScaleMultiplier(new Vector3(1.03f, 0.97f, 1f));
-        rightMotion.SetScaleMultiplier(new Vector3(1.03f, 0.97f, 1f));
-
-        float approach = aggressive ? 1.05f : 1.32f;
+        SetTrails(true, true);
+        leftMotion.SetKinematicProfile(18f, 65f, 100f);
+        rightMotion.SetKinematicProfile(18f, 65f, 100f);
+        leftMotion.SetTarget(new Vector3(center.x - handSize.x * 0.45f, y, 0f), JHLPartMotionState.Attack);
+        rightMotion.SetTarget(new Vector3(center.x + handSize.x * 0.45f, y, 0f), JHLPartMotionState.Attack);
         float elapsed = 0f;
-        while (elapsed < approach)
+        bool hit = false;
+        while (elapsed < 1.4f && !dead)
         {
             elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / approach);
-            float leftEdge = leftMotion.transform.position.x + halfHandWidth;
-            float rightEdge = rightMotion.transform.position.x - halfHandWidth;
-            debugSafeWidth = Mathf.Max(0f, rightEdge - leftEdge);
-            if (cameraFx != null) cameraFx.SetPressure(Mathf.Lerp(0.18f, aggressive ? 0.82f : 0.62f, t));
+            if (!hit) hit = TryDamagePlayerFromHandContact(leftHand, aggressive ? 2 : 1) ||
+                TryDamagePlayerFromHandContact(rightHand, aggressive ? 2 : 1);
+            if (leftMotion.DistanceToTarget < 0.12f && rightMotion.DistanceToTarget < 0.12f) break;
             yield return null;
         }
-
-        DestroyTracked(warning);
-        leftMotion.SetMotionProfile(8.5f, 0.92f, 64f);
-        rightMotion.SetMotionProfile(8.5f, 0.92f, 64f);
-        Vector3 crushLeft = new Vector3(camCenter.x - 0.22f, laneY, 0f);
-        Vector3 crushRight = new Vector3(camCenter.x + 0.22f, laneY, 0f);
-        leftMotion.SetTarget(crushLeft, JHLPartMotionState.Attack);
-        rightMotion.SetTarget(crushRight, JHLPartMotionState.Attack);
-        leftMotion.AddVelocityImpulse(Vector2.right * 3.0f);
-        rightMotion.AddVelocityImpulse(Vector2.left * 3.0f);
-        SetTrails(true, true);
-        yield return new WaitForSeconds(aggressive ? 0.105f : 0.13f);
-
-        DamagePlayerBox(warningCenter, warningSize, 0f, aggressive ? 2 : 1);
-        SpawnImpact(warningCenter, Mathf.Max(1.2f, handSize.y * 0.65f));
-        leftMotion.SetScaleMultiplier(new Vector3(0.95f, 1.05f, 1f));
-        rightMotion.SetScaleMultiplier(new Vector3(0.95f, 1.05f, 1f));
-        leftMotion.AddVelocityImpulse(Vector2.left * 3.8f);
-        rightMotion.AddVelocityImpulse(Vector2.right * 3.8f);
-        CameraFeedbackController feedback = CameraFeedbackController.Instance;
-        if (feedback != null) feedback.Impact(CameraImpactLevelV11.Boss, Vector2.down, false);
-        if (cameraFx != null) cameraFx.PulseHeavy(1f);
-        yield return new WaitForSeconds(0.13f);
-        SetTrails(false, false);
+        if (!dead && leftMotion.DistanceToTarget < 0.2f && rightMotion.DistanceToTarget < 0.2f)
+        {
+            SpawnImpact(center, 1.2f);
+            if (bossAudio != null) bossAudio.PlayHandImpact();
+        }
         SetHandsSolid(false);
-        leftMotion.SetScaleMultiplier(Vector3.one);
-        rightMotion.SetScaleMultiplier(Vector3.one);
-        if (cameraFx != null) cameraFx.SetPressure(0f);
-        debugSafeWidth = -1f;
+        SetTrails(false, false);
     }
 
     private IEnumerator HandPrisonRoutine()
@@ -1119,8 +1235,7 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
         yield return new WaitForSeconds(warning);
         DestroyTracked(marker);
 
-        origin = faceFireOrigin != null ? faceFireOrigin.position : face.position;
-        length = Mathf.Max(2f, origin.y - (center.y - halfH) + 0.5f);
+        // Preserve warning origin/length during firing.
         GameObject beam = CreateBeam(origin, dir, length, width, 0.78f, new Color(1f, 0.08f, 0.34f, 0.68f), Color.white);
         if (bossAudio != null) bossAudio.PlayBeamFire();
         faceMotion.SetScaleMultiplier(new Vector3(1.04f, 1.03f, 1f));
@@ -1151,7 +1266,7 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
         if (dir.sqrMagnitude < 0.001f) dir = Vector2.down;
         float length = BeamLengthToArena(origin, dir);
         const float trackingBeamWidth = 0.69f;
-        GameObject marker = CreateLineTelegraph(origin, dir, length, trackingBeamWidth * 0.82f, new Color(1f, 0.08f, 0.32f, 0.25f), warning);
+        GameObject marker = CreateLineTelegraph(origin, dir, length, trackingBeamWidth, new Color(1f, 0.08f, 0.32f, 0.25f), warning);
         if (combatEffects != null) combatEffects.SpawnCharge(faceFireOrigin != null ? faceFireOrigin : face, warning, 0.34f, new Color(0.84f, 0.78f, 1f, 0.95f));
         if (bossAudio != null) bossAudio.PlayBeamCharge();
         faceMotion.SetScaleMultiplier(new Vector3(1.02f, 0.97f, 1f));
@@ -1798,9 +1913,8 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
     private IEnumerator RoarRepulseRoutine()
     {
         if (player == null || playerBody == null || faceMotion == null) yield break;
-        PlayerDashController dash = player.GetComponent<PlayerDashController>();
-        if (dash != null) dash.CancelForExternalForce();
-        inputLock = GameInputState.Acquire("JHLRoarRepulse");
+        CleanupSpawnedObjects();
+        SetHandsSolid(false);
         faceMotion.SetMotionProfile(3.2f,1.12f,26f);
         faceMotion.SetScaleMultiplier(new Vector3(0.94f,1.07f,1f));
         faceMotion.SetTarget(faceHome + Vector3.up * 0.35f, JHLPartMotionState.Anticipation);
@@ -1809,6 +1923,10 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
         if (cameraFx != null){cameraFx.SetCharge(0.8f);cameraFx.SetFraming(0.035f);}
         yield return new WaitForSeconds(0.48f);
 
+        if (dead || playerHealth == null || playerHealth.IsDead) yield break;
+        PlayerDashController dash = player.GetComponent<PlayerDashController>();
+        if (dash != null) dash.CancelForExternalForce();
+        inputLock = GameInputState.Acquire("JHLRoarRepulse");
         Vector2 start = playerBody.position;
         Vector2 away = start - (Vector2)face.position;
         if (away.sqrMagnitude < 0.001f) away = Vector2.down;
@@ -1825,16 +1943,16 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
 
         float elapsed=0f;
         const float pushDuration=0.34f;
-        while(elapsed<pushDuration && playerBody!=null)
+        while(elapsed<pushDuration && playerBody!=null && !dead && !playerHealth.IsDead)
         {
-            elapsed += Time.fixedUnscaledDeltaTime;
+            elapsed += Time.fixedDeltaTime;
             float t=Mathf.Clamp01(elapsed/pushDuration);
             float eased=1f-Mathf.Pow(1f-t,3f);
             playerBody.MovePosition(Vector2.Lerp(start,target,eased));
             playerBody.linearVelocity=Vector2.zero;
             yield return new WaitForFixedUpdate();
         }
-        if(playerBody!=null){playerBody.position=target;playerBody.linearVelocity=Vector2.zero;}
+        if(playerBody!=null && !dead && !playerHealth.IsDead){playerBody.position=target;playerBody.linearVelocity=Vector2.zero;}
         faceMotion.SetScaleMultiplier(Vector3.one);
         faceMotion.SetTarget(faceHome,JHLPartMotionState.Recovery);
         if(cameraFx!=null)cameraFx.SetFraming(0f);
@@ -1844,33 +1962,13 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
 
     private IEnumerator RemoteSuppressionRoutine()
     {
-        if (player == null) yield break;
-        // Long-range pressure counter: rapid predictive lock-on beams force the shooter to move.
-        int shots = phase >= 3 ? 6 : 5;
+        CleanupSpawnedObjects();
         if (bossAudio != null) bossAudio.PlayRemoteLock();
-        if (bossAudio != null) bossAudio.PlayBeamCharge();
-        for(int i=0;i<shots;i++)
+        for (int i = 0; i < 3 && !dead; i++)
         {
-            if(player==null)break;
-            Vector2 origin=faceFireOrigin!=null?faceFireOrigin.position:face.position;
-            Vector2 velocity=playerBody!=null?playerBody.linearVelocity:Vector2.zero;
-            Vector2 predicted=(Vector2)player.position+velocity*(0.18f+i*0.025f);
-            Vector2 dir=(predicted-origin).normalized;
-            float length=BeamLengthToArena(origin,dir);
-            float width=0.52f;
-            GameObject warning=CreateLineTelegraph(origin,dir,length,width*0.75f,new Color(1f,0.06f,0.28f,0.24f),0.30f);
-            yield return new WaitForSeconds(0.30f);
-            DestroyTracked(warning);
-            origin=faceFireOrigin!=null?faceFireOrigin.position:face.position;
-            length=BeamLengthToArena(origin,dir);
-            GameObject beam=CreateBeam(origin,dir,length,width,0.16f,new Color(0.78f,0.12f,1f,0.64f),Color.white);
-            if (bossAudio != null) bossAudio.PlayBeamFire();
-            faceMotion.AddVelocityImpulse(-dir*1.0f);
-            yield return SustainStaticBeamDamage(origin, dir, length, width, 1, 0.16f);
-            DestroyTracked(beam);
-            yield return new WaitForSeconds(0.055f);
+            yield return StraightLaserRoutine(phase >= 3 ? 0.60f : 0.72f, 0.52f, 1);
+            yield return new WaitForSeconds(0.10f);
         }
-        yield return ProjectileFanRoutine();
     }
 
     private static Vector2 RotateVector(Vector2 vector, float degrees)
@@ -1894,86 +1992,14 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
     private IEnumerator FullAccessRoutine()
     {
         fullAccessUsed = true;
-        if (face == null || leftMotion == null || rightMotion == null) yield break;
-        if (bossAudio != null) bossAudio.PlayFullAccess();
-        GetCameraFrame(out Vector3 center, out float halfW, out float halfH);
         if (hud != null) hud.ShowPhase("FULL ACCESS");
-
-        if (cameraFx != null)
-        {
-            cameraFx.SetPressure(0.86f);
-            cameraFx.SetFraming(0.075f);
-            cameraFx.PulseTransition(3);
-        }
-
-        faceMotion.SetMotionProfile(3.0f, 1.08f, 30f);
-        faceMotion.SetTarget(center + Vector3.up * halfH * 0.50f, JHLPartMotionState.Attack);
-        faceMotion.SetScaleMultiplier(new Vector3(1.05f, 1.03f, 1f));
-        leftMotion.SetMotionProfile(3.4f, 1.06f, 38f);
-        rightMotion.SetMotionProfile(3.4f, 1.06f, 38f);
-        leftMotion.SetTarget(center + new Vector3(-halfW * 0.78f, 0f, 0f), JHLPartMotionState.Attack);
-        rightMotion.SetTarget(center + new Vector3(halfW * 0.78f, 0f, 0f), JHLPartMotionState.Attack);
-        leftMotion.SetScaleMultiplier(new Vector3(1.04f, 1.04f, 1f));
-        rightMotion.SetScaleMultiplier(new Vector3(1.04f, 1.04f, 1f));
-        leftMotion.AddAngularImpulse(18f);
-        rightMotion.AddAngularImpulse(-18f);
-        yield return new WaitForSeconds(0.72f);
-
-        float[] sequence = { -90f, -112f, -68f, -132f, -48f };
-        for (int i = 0; i < sequence.Length; i++)
-        {
-            faceMotion.AddAngularImpulse(i % 2 == 0 ? 8f : -8f);
-            yield return BeamBurstAtAngle(sequence[i], 0.30f, 0.20f, 1);
-            yield return new WaitForSeconds(0.07f);
-        }
-
-        if (player != null)
-        {
-            Vector2 centerTarget = ClampToArena(player.position, 0.75f);
-            Vector2 leftTarget = centerTarget + Vector2.left * Mathf.Max(0.72f, handSize.x * 0.22f);
-            Vector2 rightTarget = centerTarget + Vector2.right * Mathf.Max(0.72f, handSize.x * 0.22f);
-            float fullSlamRadius = Mathf.Clamp(handSize.x * 0.17f, 0.90f, 1.26f);
-            GameObject a = CreateCircleTelegraph(leftTarget, fullSlamRadius, new Color(1f, 0.04f, 0.22f, 0.28f), 0.58f);
-            GameObject c = CreateCircleTelegraph(rightTarget, fullSlamRadius, new Color(1f, 0.04f, 0.22f, 0.28f), 0.58f);
-
-            leftMotion.SetTarget(new Vector3(leftTarget.x - 1.2f, leftTarget.y + 1.8f, 0f), JHLPartMotionState.Anticipation);
-            rightMotion.SetTarget(new Vector3(rightTarget.x + 1.2f, rightTarget.y + 1.8f, 0f), JHLPartMotionState.Anticipation);
-            yield return new WaitForSeconds(0.58f);
-            DestroyTracked(a);
-            DestroyTracked(c);
-
-            SetTrails(true, true);
-            leftMotion.SetMotionProfile(8.8f, 0.92f, 66f);
-            rightMotion.SetMotionProfile(8.8f, 0.92f, 66f);
-            leftMotion.SetTarget(leftTarget, JHLPartMotionState.Attack);
-            rightMotion.SetTarget(rightTarget, JHLPartMotionState.Attack);
-            leftMotion.AddVelocityImpulse(new Vector2(2.5f, -3.0f));
-            rightMotion.AddVelocityImpulse(new Vector2(-2.5f, -3.0f));
-            yield return WaitForPartsSettle(leftMotion, rightMotion, 0.34f, 0.11f);
-            DamagePlayerCircle(leftTarget, fullSlamRadius, 2);
-            DamagePlayerCircle(rightTarget, fullSlamRadius, 2);
-            if (bossAudio != null) bossAudio.PlayHandImpact();
-            SpawnImpact(centerTarget, Mathf.Max(1.8f, handSize.x * 0.52f));
-            leftMotion.AddVelocityImpulse(new Vector2(-3.2f, 3.8f));
-            rightMotion.AddVelocityImpulse(new Vector2(3.2f, 3.8f));
-        }
-
-        SetTrails(false, false);
-        CameraFeedbackController feedback = CameraFeedbackController.Instance;
-        if (feedback != null) feedback.Impact(CameraImpactLevelV11.Boss, Vector2.down, true);
-        if (cameraFx != null)
-        {
-            cameraFx.PulseHeavy(1f);
-            cameraFx.SetPressure(0f);
-        }
-        yield return new WaitForSeconds(0.62f);
-
-        RecalculateScreenHomes(phase);
-        SetHomeTargets(JHLPartMotionState.Recovery);
-        faceMotion.SetScaleMultiplier(Vector3.one);
-        leftMotion.SetScaleMultiplier(Vector3.one);
-        rightMotion.SetScaleMultiplier(Vector3.one);
-        if (cameraFx != null) cameraFx.SetFraming(0f);
+        if (bossAudio != null) bossAudio.PlayFullAccess();
+        yield return ReturnPartsToHomeAnimated(0.8f);
+        yield return HandSlamRoutine(leftMotion, 0.95f, 2);
+        yield return new WaitForSeconds(0.25f);
+        if (!dead) yield return HandSlamRoutine(rightMotion, 0.85f, 2);
+        yield return new WaitForSeconds(0.40f);
+        if (!dead) yield return MassiveCentralBeamRoutine();
         if (hud != null) hud.ShowPhase(string.Empty);
     }
 
@@ -2004,6 +2030,7 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
     {
         if (requestedHealth != health || dead) return false;
         dead = true;
+        if (openingV15 != null) openingV15.ResetCombat();
         state = BossState.Dead;
         patternRunning = false;
         StopAllCoroutines();
@@ -2023,6 +2050,7 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
         if (hud != null)
         {
             hud.ReportHealth(0, health != null ? health.MaxHealth : BossMaxHealth, true);
+            hud.HideBossBarImmediate();
             hud.ShowPhase("ACCESS REVOKED");
         }
 
@@ -2090,69 +2118,61 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
 
     private void OnBossDamaged(EnemyHealth sender, int damage, Vector2 direction)
     {
-        if (hud != null && health != null)
-            hud.ReportHealth(health.CurrentHealth, health.MaxHealth, false);
-
-        Vector2 hitPoint = health != null ? health.LastDamageContext.HitPoint : (Vector2)transform.position;
-        JHLPartMotion closest = ClosestMotion(hitPoint);
-        if (closest != null)
+        if (hud != null && health != null) hud.ReportHealth(health.CurrentHealth, health.MaxHealth, false);
+        if (dead || health == null || health.IsDead) return;
+        RegisterPressureV16(damage);
+        bool heavy = damage >= 24;
+        Vector2 hitPoint = health.LastDamageContext.HitPoint;
+        if (Time.unscaledTime >= nextFaceHitFeedbackTimeV12)
         {
-            Vector2 impulse = direction.sqrMagnitude > 0.001f ? direction.normalized * 1.6f : Vector2.down * 1.2f;
-            closest.AddVelocityImpulse(impulse);
-            closest.AddAngularImpulse(Random.Range(-10f, 10f));
+            nextFaceHitFeedbackTimeV12 = Time.unscaledTime + (heavy ? 0.10f : 0.075f);
+            if (bossAudio != null) bossAudio.PlayHit(heavy);
+            if (combatEffects != null) RegisterSpawnedObject(combatEffects.SpawnFaceHit(hitPoint, heavy));
+            if (faceHitFeedbackRoutineV12 != null) StopCoroutine(faceHitFeedbackRoutineV12);
+            faceHitFeedbackRoutineV12 = StartCoroutine(FaceHitFeedbackV12(heavy));
         }
-        if (bossAudio != null) bossAudio.PlayHit();
-
-        if (combatStarted && !dead && state == BossState.Combat && Time.time >= antiPressureCooldownUntil && health != null)
-        {
-            if (Time.time > pressureWindowUntil)
-            {
-                meleePressureDamage = 0f;
-                rangedPressureDamage = 0f;
-                pressureWindowUntil = Time.time + 2.55f;
-            }
-
-            EnemyHitKind hitKind = health.LastDamageContext.HitKind;
-            if (hitKind == EnemyHitKind.Ranged) rangedPressureDamage += damage;
-            else if (hitKind == EnemyHitKind.Melee) meleePressureDamage += damage;
-
-            float meleeThreshold = health.MaxHealth * 0.035f;
-            float rangedThreshold = health.MaxHealth * 0.050f;
-            if (!antiPressurePending && meleePressureDamage >= meleeThreshold && IsPlayerInFaceMeleeZone())
-            {
-                RequestAntiPressureCounter(JHLPatternKind.RoarRepulse);
-            }
-            else if (!antiPressurePending && rangedPressureDamage >= rangedThreshold && !IsPlayerInFaceMeleeZone())
-            {
-                RequestAntiPressureCounter(JHLPatternKind.RemoteSuppression);
-            }
-        }
-
-        if (Time.time > staggerWindowUntil) { staggerDamage = 0f; staggerWindowUntil = Time.time + 1.15f; }
+        if (Time.time > staggerWindowUntil) { staggerDamage = 0f; staggerWindowUntil = Time.time + 0.8f; }
         staggerDamage += damage;
-        if (staggerDamage >= 8f && faceMotion != null)
+        if ((heavy || staggerDamage >= 65f) && Time.unscaledTime >= nextImpactV15)
         {
-            faceMotion.AddVelocityImpulse(direction.sqrMagnitude > 0.001f ? direction.normalized * 2.3f : Vector2.down * 1.8f);
-            faceMotion.SetScaleMultiplier(new Vector3(1.025f, 0.975f, 1f));
+            nextImpactV15 = Time.unscaledTime + 0.20f;
             staggerDamage = 0f;
-            staggerWindowUntil = Time.time + 1.15f;
+            if (GameFeelManager.Instance != null) GameFeelManager.Instance.DoHitStop(heavy ? 0.025f : 0.014f);
+            if (cameraFx != null) cameraFx.PulseLight(0.23f);
+            CameraFeedbackController feedback = CameraFeedbackController.Instance;
+            if (feedback != null) feedback.Impact(CameraImpactLevelV11.Small, direction, false);
         }
-        if (cameraFx != null) cameraFx.PulseLight(0.22f);
+    }
+
+    private IEnumerator FaceHitFeedbackV12(bool heavy)
+    {
+        SpriteRenderer faceRenderer = face != null ? face.GetComponentInChildren<SpriteRenderer>() : null;
+        if (faceRenderer == null) yield break;
+
+        Color original = new Color(1f, 1f, 1f, faceRenderer.color.a);
+        float duration = heavy ? 0.085f : 0.050f;
+        float elapsed = 0f;
+        while (elapsed < duration && !dead)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            // Digital boss: use cyan/magenta signal tearing instead of a generic white flash.
+            Color glitchA = new Color(0.42f, 0.94f, 1f, original.a);
+            Color glitchB = new Color(1f, 0.32f, 0.88f, original.a);
+            Color target = Mathf.FloorToInt(t * 6f) % 2 == 0 ? glitchA : glitchB;
+            faceRenderer.color = Color.Lerp(target, original, t);
+            yield return null;
+        }
+        if (faceRenderer != null) faceRenderer.color = original;
+        faceHitFeedbackRoutineV12 = null;
     }
 
     private void RequestAntiPressureCounter(JHLPatternKind pattern)
     {
-        antiPressurePattern = pattern;
+        if (dead || Time.time < antiPressureCooldownUntil || antiPressurePending) return;
         antiPressurePending = true;
-
-        if (dead || state != BossState.Combat || Time.time < antiPressureCooldownUntil)
-            return;
-        if (!patternRunning)
-            return; // CombatLoop will consume the queued counter on its next selection.
-        if (currentPattern == JHLPatternKind.FullAccess || currentPattern == JHLPatternKind.RoarRepulse || currentPattern == JHLPatternKind.RemoteSuppression)
-            return;
-        if (antiPressureInterruptRoutine == null)
-            antiPressureInterruptRoutine = StartCoroutine(InterruptForAntiPressure(pattern));
+        antiPressurePattern = pattern;
+        // Finish the current committed attack; never cancel its warning into another hit.
     }
 
     /// <summary>
@@ -2543,7 +2563,7 @@ public sealed class JHLBossController : MonoBehaviour, IEnemyDeathOverride
     private void RecalculateScreenHomes(int targetPhase)
     {
         GetCameraFrame(out Vector3 center, out float halfW, out float halfH);
-        float faceY = targetPhase <= 1 ? 0.72f : targetPhase == 2 ? 0.64f : 0.56f;
+        float faceY = 0.72f;
         float handX = targetPhase <= 1 ? 1.03f : targetPhase == 2 ? 0.89f : 0.75f;
         float handY = targetPhase <= 1 ? -0.06f : targetPhase == 2 ? -0.01f : 0.03f;
         faceHome = center + new Vector3(0f, halfH * faceY, 0f);

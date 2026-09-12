@@ -32,8 +32,21 @@ public sealed class ExecutorBossHUD : MonoBehaviour
     private bool bossBarVisible;
     private float skipPulseTime;
 
+
+    public static void CleanupAll()
+    {
+        ExecutorBossHUD[] all = UnityEngine.Object.FindObjectsByType<ExecutorBossHUD>(FindObjectsInactive.Include);
+        for (int i = 0; i < all.Length; i++)
+        {
+            if (all[i] == null) continue;
+            all[i].HideAllImmediate();
+            UnityEngine.Object.Destroy(all[i].gameObject);
+        }
+    }
+
     public static ExecutorBossHUD Create()
     {
+        BossHUDGlobalCleanup.CleanupAll();
         GameObject root = new GameObject("BossHUDCanvas");
         Canvas canvas = root.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -362,6 +375,13 @@ public sealed class ExecutorBossHUD : MonoBehaviour
         if (barContent != null) barContent.gameObject.SetActive(true);
         ApplyFill(currentFill, currentRatio);
         ApplyFill(delayedFill, delayedRatio);
+    }
+
+    public void HideBossBarImmediate()
+    {
+        bossBarVisible = false;
+        if (bossName != null) bossName.gameObject.SetActive(false);
+        if (barContent != null) barContent.gameObject.SetActive(false);
     }
 
     public IEnumerator RevealBossBar(int current, int maximum, float duration)

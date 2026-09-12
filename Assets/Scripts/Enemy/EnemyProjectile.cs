@@ -6,6 +6,7 @@ public class EnemyProjectile : MonoBehaviour
     private void Awake(){body=GetComponent<Rigidbody2D>();body.gravityScale=0;body.freezeRotation=true;body.collisionDetectionMode=CollisionDetectionMode2D.Continuous;body.interpolation=RigidbodyInterpolation2D.Interpolate;Collider2D c=GetComponent<Collider2D>();c.isTrigger=true;RuntimeProjectileVisual.Ensure(gameObject,false);RuntimeProjectileVisual.ConfigureCollider(c,false);}
     private void Start(){Destroy(gameObject,Mathf.Max(.1f,lifetime));}
     public void Setup(Vector2 direction,float speed,int dmg){damage=Mathf.Max(1,dmg);Vector2 d=direction.sqrMagnitude>.001f?direction.normalized:Vector2.down;body.linearVelocity=d*Mathf.Max(.1f,speed);transform.rotation=Quaternion.Euler(0,0,Mathf.Atan2(d.y,d.x)*Mathf.Rad2Deg);}
+    public void SetTint(Color color){Transform v=transform.Find("ProjectileVisual");if(v!=null){SpriteRenderer r=v.GetComponent<SpriteRenderer>();if(r!=null)r.color=color;}Transform o=transform.Find("ProjectileOutline");if(o!=null){SpriteRenderer r=o.GetComponent<SpriteRenderer>();if(r!=null)r.color=new Color(0.03f,0.12f,0.025f,0.96f);}}
     private void OnTriggerEnter2D(Collider2D collision)
     {
         if(consumed||collision==null||collision.GetComponentInParent<EnemyHealth>()!=null)return;

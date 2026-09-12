@@ -299,7 +299,11 @@ public sealed class EnemyRangedAI : MonoBehaviour
         GameObject projectileObject = Instantiate(projectilePrefab, firePoint.position, Quaternion.identity);
         EnemyProjectile projectile = projectileObject.GetComponent<EnemyProjectile>();
         if (projectile != null)
+        {
             projectile.Setup(direction, projectileSpeed, projectileDamage);
+            ChernobylGuardUnit guard = GetComponent<ChernobylGuardUnit>();
+            if (guard != null) projectile.SetTint(guard.ProjectileColor);
+        }
     }
 
     private bool ShouldInterrupt()
