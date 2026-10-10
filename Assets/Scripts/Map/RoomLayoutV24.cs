@@ -7,6 +7,8 @@ public sealed class RoomLayoutV24 : MonoBehaviour
 {
     private static readonly Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();
     private Bounds combatBounds;
+    private int layoutStage;
+    public Vector3 CameraCenter => layoutStage >= 2 ? combatBounds.center : VisualBounds.center;
     private SpriteRenderer background;
     public Bounds CombatBounds => combatBounds;
     public Bounds VisualBounds => background != null ? background.bounds : combatBounds;
@@ -52,11 +54,12 @@ public sealed class RoomLayoutV24 : MonoBehaviour
     private void Build(RoomController room)
     {
         int stage = room.StageNumber;
+        layoutStage = stage;
         Vector2 size = stage == 1 ? new Vector2(18.3f, 8f) : stage == 2 ? new Vector2(18f, 9f) : new Vector2(18.8f, 9f);
         // Measured wall-foot rectangles in the supplied images (bottom-left UV origin).
         Rect floor = stage == 1 ? Rect.MinMaxRect(.045f, .11f, .955f, .85f)
-            : stage == 2 ? Rect.MinMaxRect(.076f, .16f, .924f, .825f)
-            : Rect.MinMaxRect(.105f, .15f, .895f, .75f);
+            : stage == 2 ? Rect.MinMaxRect(.1705f, .2487f, .8313f, .7705f)
+            : Rect.MinMaxRect(.219f, .283f, .779f, .760f);
         Vector3 center = room.EnemySpawnArea != null ? room.EnemySpawnArea.bounds.center : room.transform.position;
         center.z = 0f;
         combatBounds = new Bounds(center, new Vector3(size.x, size.y, 1f));
@@ -130,7 +133,9 @@ public sealed class RoomLayoutV24 : MonoBehaviour
     public float FitCamera(float aspect)
     {
         Bounds visual = VisualBounds;
-        return Mathf.Max(visual.extents.y, visual.extents.x / Mathf.Max(.1f, aspect)) + .25f;
+        if (layoutStage < 2) return Mathf.Max(visual.extents.y, visual.extents.x / Mathf.Max(.1f, aspect)) + .25f;
+        // Fit combat area, NOT the complete expanded facility art. Extra art covers motion.
+        return Mathf.Max(combatBounds.extents.y + .9f, (combatBounds.extents.x + .9f) / Mathf.Max(.1f, aspect));
     }
     private void OnDrawGizmosSelected()
     {

@@ -225,7 +225,7 @@ public class MapManager : MonoBehaviour
         }
         if (control && Input.GetKeyDown(KeyCode.F11))
         {
-            StartCoroutine(DebugStartJHLBoss(0.39f, false));
+            StartCoroutine(DebugStartJHLBoss(0.34f, false));
             return;
         }
 
@@ -1062,7 +1062,7 @@ public class MapManager : MonoBehaviour
             {
                 if (pixelPerfectV24 != null) pixelPerfectV24.enabled = false;
                 Vector3 offset = position - cameraRestPosition;
-                position = layout.VisualBounds.center + offset;
+                position = layout.CameraCenter + offset;
                 position.z = cameraRestPosition.z;
                 mainCamera.orthographicSize = layout.FitCamera(mainCamera.aspect);
             }

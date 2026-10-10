@@ -1,0 +1,2 @@
+V25 atlas: generated for this project. Sprite rectangles isolate eight cells; runtime Sprite.Create preserves original PNG.
+V25 audio: original deterministic synthesized effects (48 kHz mono PCM). No third-party samples.

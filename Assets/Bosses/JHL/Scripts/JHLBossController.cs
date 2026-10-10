@@ -144,12 +144,19 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
     private Coroutine faceHitFeedbackRoutineV12;
     private float nextFaceHitFeedbackTimeV12;
 
+    private JHLCombatV25 combatV25;
+    public void InitializeV25(JHLCombatV25 combat)
+    {
+        combatV25 = combat; health = combat.Health; ownerRoom = combat.Room;
+        arenaBounds = ownerRoom.EnemySpawnArea; face = combat.Face;
+        leftHand = combat.Left; rightHand = combat.Right;
+    }
     public EnemyHealth Health => health;
     public RoomController OwnerRoom => ownerRoom;
-    public int Phase => phase;
-    public bool IsDead => dead;
+    public int Phase => combatV25 != null ? combatV25.Phase : phase;
+    public bool IsDead => combatV25 != null ? combatV25.IsDead : dead;
     public string DebugStateName => state.ToString();
-    public string DebugCurrentPatternName => patternRunning ? currentPattern.ToString() : "-";
+    public string DebugCurrentPatternName => combatV25 != null ? combatV25.Pattern : patternRunning ? currentPattern.ToString() : "-";
     public string DebugLastPatternName => lastPatternName;
     public string DebugSelectedPatternName => debugSelectedPattern.ToString();
     public BoxCollider2D ArenaBounds => arenaBounds;
@@ -253,6 +260,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     private void LateUpdate()
     {
+        if (combatV25 != null) return;
         if (dead || faceMotion == null || leftMotion == null || rightMotion == null) return;
         Camera cam = Camera.main;
         if (cam == null || !cam.orthographic) return;
@@ -289,6 +297,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     private void OnDestroy()
     {
+        if (combatV25 != null) return;
         if (health != null) health.Damaged -= OnBossDamaged;
         if (antiPressureInterruptRoutine != null) StopCoroutine(antiPressureInterruptRoutine);
         if (auxiliaryPatternRoutine != null) StopCoroutine(auxiliaryPatternRoutine);
@@ -303,6 +312,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     public void BeginIntro()
     {
+        if (combatV25 != null) { combatV25.Begin(); return; }
         if (dead || combatStarted || state != BossState.Dormant) return;
         StartCoroutine(IntroRoutine());
     }
@@ -457,6 +467,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     public void DebugCyclePattern(int delta)
     {
+        if (combatV25 != null) { combatV25.DebugCycle(delta); return; }
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Array values = Enum.GetValues(typeof(JHLPatternKind));
         int count = values.Length;
@@ -469,6 +480,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     public void DebugForcePattern()
     {
+        if (combatV25 != null) { combatV25.DebugForce(); return; }
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (combatStarted && !dead) debugForceSelectedPattern = true;
 #endif
@@ -476,12 +488,14 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     public void DebugBeginCombatAtHealth(float normalizedHealth)
     {
+        if (combatV25 != null) { combatV25.DebugStart(normalizedHealth); return; }
         if (dead) return;
         DebugResetCombat(normalizedHealth, normalizedHealth <= PhaseThreeRatio ? 3 : normalizedHealth <= PhaseTwoRatio ? 2 : 1);
     }
 
     public void DebugResetCombat(float normalizedHealth, int requestedPhase)
     {
+        if (combatV25 != null) { combatV25.DebugStart(normalizedHealth); return; }
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (dead || health == null) return;
         StopAllCoroutines();
@@ -537,6 +551,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     public void DebugForcePattern(JHLPatternKind pattern)
     {
+        if (combatV25 != null) { combatV25.DebugForce(); return; }
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (dead || !combatStarted) return;
         if (combatRoutine != null) StopCoroutine(combatRoutine);
@@ -562,6 +577,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     public void DebugForceCleanup()
     {
+        if (combatV25 != null) return;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         StopAllCoroutines();
         patternRunning = false;
@@ -2035,6 +2051,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     public bool HandleRequestedDeath(EnemyHealth requestedHealth, Vector2 hitDirection, EnemyHitKind hitKind)
     {
+        if (combatV25 != null) return combatV25.Die(hitDirection);
         if (requestedHealth != health || dead) return false;
         dead = true;
         if (openingV15 != null) openingV15.ResetCombat();

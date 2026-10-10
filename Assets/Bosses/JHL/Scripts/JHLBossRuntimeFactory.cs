@@ -8,131 +8,16 @@ public static class JHLBossRuntimeFactory
     public static JHLBossController Create(RoomController room, MapManager mapManager)
     {
         if (room == null) return null;
-
-        BoxCollider2D arena = room.EnemySpawnArea;
-        Bounds bounds = ResolveRoomCombatBounds(room, arena);
-        Camera cam = Camera.main;
-        float screenHeight = cam != null && cam.orthographic ? cam.orthographicSize * 2f : Mathf.Max(8f, bounds.size.y);
-        float screenWidth = cam != null && cam.orthographic ? screenHeight * cam.aspect : Mathf.Max(14f, bounds.size.x);
-
-        if (RoomLayoutV24.TryGetBounds(room, out Bounds fixedFrame))
-        { screenWidth = fixedFrame.size.x; screenHeight = fixedFrame.size.y; }
-
-        // V4 screen-first layout: the boss is the arena, not an object sitting inside it.
-        // Placeholder art stays intentionally primitive: a wide white face block and two oversized white circular hands.
-        Vector2 faceSize = new Vector2(screenWidth * 0.50f, screenHeight * 0.30f);
-        Vector2 handSize = new Vector2(screenWidth * 0.38f, screenHeight * 0.45f);
-
-        GameObject root = new GameObject("Boss_JHL");
-        root.transform.SetParent(room.transform, true);
-        root.transform.position = bounds.center;
-        root.transform.position = new Vector3(root.transform.position.x, root.transform.position.y, 0f);
-
-        int enemyLayer = LayerMask.NameToLayer("Enemy");
-        if (enemyLayer >= 0) root.layer = enemyLayer;
-
+        GameObject root = new GameObject("Boss_JHL_V25");
+        root.transform.SetParent(room.transform, false);
+        root.transform.position = room.EnemySpawnArea.bounds.center;
+        root.layer = LayerMask.NameToLayer("Enemy");
         EnemyHealth health = root.AddComponent<EnemyHealth>();
-        JHLBossController controller = root.AddComponent<JHLBossController>();
-        JHLCombatEffects combatEffects = JHLCombatEffects.Create(root);
-
-        GameObject visualRootObject = new GameObject("VisualRoot");
-        visualRootObject.transform.SetParent(root.transform, false);
-        Transform visualRoot = visualRootObject.transform;
-
-        List<SpriteRenderer> allRenderers = new List<SpriteRenderer>();
-
-        Transform face = BuildWhitePart(
-            visualRoot,
-            "Face",
-            JHLRuntimeSprites.WhitePixel,
-            faceSize,
-            enemyLayer,
-            30,
-            allRenderers,
-            out Transform faceVisual,
-            out BoxCollider2D faceHurtbox);
-
-        Transform leftHand = BuildWhitePart(
-            visualRoot,
-            "LeftHand",
-            JHLRuntimeSprites.FilledCircle,
-            handSize,
-            enemyLayer,
-            31,
-            allRenderers,
-            out Transform leftVisual,
-            out BoxCollider2D leftHurtbox);
-
-        Transform rightHand = BuildWhitePart(
-            visualRoot,
-            "RightHand",
-            JHLRuntimeSprites.FilledCircle,
-            handSize,
-            enemyLayer,
-            31,
-            allRenderers,
-            out Transform rightVisual,
-            out BoxCollider2D rightHurtbox);
-
-        AddSolidHandBarrier(leftHand, handSize);
-        AddSolidHandBarrier(rightHand, handSize);
-
-        Transform faceFireOrigin = CreateMarker(face, "FaceFireOrigin", new Vector3(0f, -faceSize.y * 0.48f, 0f));
-        Transform leftFingerTip = CreateMarker(leftHand, "FingerFireOrigin", new Vector3(handSize.x * 0.42f, 0f, 0f));
-        Transform rightFingerTip = CreateMarker(rightHand, "FingerFireOrigin", new Vector3(-handSize.x * 0.42f, 0f, 0f));
-
-        JHLArticulatedHandV18.Build(leftHand, leftVisual, true, allRenderers, leftFingerTip);
-        JHLArticulatedHandV18.Build(rightHand, rightVisual, false, allRenderers, rightFingerTip);
-
-        JHLPartMotion faceMotion = face.gameObject.AddComponent<JHLPartMotion>();
-        JHLPartMotion leftMotion = leftHand.gameObject.AddComponent<JHLPartMotion>();
-        JHLPartMotion rightMotion = rightHand.gameObject.AddComponent<JHLPartMotion>();
-
-        Vector3 cameraCenter = cam != null ? cam.transform.position : bounds.center;
-        cameraCenter.z = 0f;
-        float halfW = screenWidth * 0.5f;
-        float halfH = screenHeight * 0.5f;
-        Vector3 faceStart = cameraCenter + new Vector3(0f, halfH + faceSize.y, 0f);
-        Vector3 leftStart = cameraCenter + new Vector3(-halfW - handSize.x, -halfH * 0.05f, 0f);
-        Vector3 rightStart = cameraCenter + new Vector3(halfW + handSize.x, -halfH * 0.05f, 0f);
-
-        faceMotion.Initialize(faceVisual, faceStart, faceVisual.localScale);
-        leftMotion.Initialize(leftVisual, leftStart, leftVisual.localScale);
-        rightMotion.Initialize(rightVisual, rightStart, rightVisual.localScale);
-
-        // Heavy defaults. Pattern code can temporarily raise speed/acceleration for attacks.
-        faceMotion.SetKinematicProfile(15f, 45f, 72f);
-        leftMotion.SetKinematicProfile(22f, 62f, 92f);
-        rightMotion.SetKinematicProfile(23f, 66f, 96f);
-        faceMotion.SetRotationProfile(2.6f, 1.25f);
-        leftMotion.SetRotationProfile(3.1f, 1.25f);
-        rightMotion.SetRotationProfile(3.25f, 1.25f);
-
-        health.SetMaxHealth(BossMaxHealth, true);
-        controller.Initialize(
-            mapManager,
-            room,
-            arena,
-            health,
-            visualRoot,
-            face,
-            leftHand,
-            rightHand,
-            faceFireOrigin,
-            leftFingerTip,
-            rightFingerTip,
-            faceHurtbox,
-            leftHurtbox,
-            rightHurtbox,
-            faceMotion,
-            leftMotion,
-            rightMotion,
-            faceSize,
-            handSize,
-            allRenderers.ToArray(),
-            combatEffects);
-
-        return controller;
+        JHLBossController bridge = root.AddComponent<JHLBossController>();
+        JHLCombatV25 combat = root.AddComponent<JHLCombatV25>();
+        combat.Initialize(mapManager, room, health);
+        bridge.InitializeV25(combat);
+        return bridge;
     }
 
     private static Bounds ResolveRoomCombatBounds(RoomController room, BoxCollider2D fallback)

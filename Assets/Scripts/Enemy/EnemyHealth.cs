@@ -129,6 +129,8 @@ public class EnemyHealth : MonoBehaviour
     {
         if (isDead || deathPending || context.Damage <= 0)
             return false;
+        JHLCombatV25 jhl = GetComponent<JHLCombatV25>();
+        if (jhl != null && !jhl.FilterDamage(ref context)) return false;
         ChernobylBossController reactor = GetComponent<ChernobylBossController>();
         if (reactor != null && !reactor.AllowDamageV19(context)) return false;
 
