@@ -49,38 +49,12 @@ public sealed class JHLBossAudio : MonoBehaviour
         oneShot.playOnAwake = false;
         oneShot.loop = false;
         oneShot.spatialBlend = 0f;
-        oneShot.ignoreListenerPause = true;
+        oneShot.ignoreListenerPause = false;
         oneShot.priority = 64;
 
-        const string root = "Bosses/JHL/";
-        introFace = Resources.Load<AudioClip>(root + "JHL_IntroFace");
-        introHand = Resources.Load<AudioClip>(root + "JHL_IntroHand");
-        handWindup = Resources.Load<AudioClip>(root + "JHL_HandWindup");
-        handImpact = Resources.Load<AudioClip>(root + "JHL_HandImpact");
-        sweep = Resources.Load<AudioClip>(root + "JHL_Sweep");
-        beamCharge = Resources.Load<AudioClip>(root + "JHL_BeamCharge");
-        beamFire = Resources.Load<AudioClip>(root + "JHL_BeamFire");
-        compression = Resources.Load<AudioClip>(root + "JHL_Compression");
-        phaseChange = Resources.Load<AudioClip>(root + "JHL_PhaseChange");
-        fullAccess = Resources.Load<AudioClip>(root + "JHL_FullAccess");
-        hit = Resources.Load<AudioClip>(root + "JHL_Hit");
-        death = Resources.Load<AudioClip>(root + "JHL_Death");
-        handWallLock = Resources.Load<AudioClip>(root + "JHL_HandWallLock");
-        roar = Resources.Load<AudioClip>(root + "JHL_Roar");
-        remoteLock = Resources.Load<AudioClip>(root + "JHL_RemoteLock");
-        projectile = Resources.Load<AudioClip>(root + "JHL_Projectile");
+        // V21: retired teammate/ExternalAudioV18 boss sounds explicitly removed.
+        // No fallback to unrelated Chernobyl effects; dedicated JHL replacements pending.
 
-        // V12: future team-made SFX can be dropped in as _01/_02/_03 variants
-        // without changing gameplay code. Legacy single-clip names remain fallbacks.
-        const string sfx = "Bosses/JHL/SFX/";
-        faceHitVariants = LoadVariants(sfx, "JHL_FaceHit");
-        heavyHitVariants = LoadVariants(sfx, "JHL_HeavyHit");
-        handWindupVariants = LoadVariants(sfx, "JHL_Hand_Windup");
-        handImpactVariants = LoadVariants(sfx, "JHL_Hand_Slam");
-        sweepVariants = LoadVariants(sfx, "JHL_Hand_Sweep");
-        projectileVariants = LoadVariants(sfx, "JHL_Projectile");
-        beamChargeVariants = LoadVariants(sfx, "JHL_Laser_Charge");
-        beamFireVariants = LoadVariants(sfx, "JHL_Laser_Fire");
     }
 
     public void PlayIntroFace() => Play(introFace, 0.70f, 0.98f, 1.01f);

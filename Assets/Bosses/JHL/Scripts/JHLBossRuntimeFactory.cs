@@ -15,6 +15,9 @@ public static class JHLBossRuntimeFactory
         float screenHeight = cam != null && cam.orthographic ? cam.orthographicSize * 2f : Mathf.Max(8f, bounds.size.y);
         float screenWidth = cam != null && cam.orthographic ? screenHeight * cam.aspect : Mathf.Max(14f, bounds.size.x);
 
+        if (RoomLayoutV24.TryGetBounds(room, out Bounds fixedFrame))
+        { screenWidth = fixedFrame.size.x; screenHeight = fixedFrame.size.y; }
+
         // V4 screen-first layout: the boss is the arena, not an object sitting inside it.
         // Placeholder art stays intentionally primitive: a wide white face block and two oversized white circular hands.
         Vector2 faceSize = new Vector2(screenWidth * 0.50f, screenHeight * 0.30f);
@@ -78,6 +81,9 @@ public static class JHLBossRuntimeFactory
         Transform leftFingerTip = CreateMarker(leftHand, "FingerFireOrigin", new Vector3(handSize.x * 0.42f, 0f, 0f));
         Transform rightFingerTip = CreateMarker(rightHand, "FingerFireOrigin", new Vector3(-handSize.x * 0.42f, 0f, 0f));
 
+        JHLArticulatedHandV18.Build(leftHand, leftVisual, true, allRenderers, leftFingerTip);
+        JHLArticulatedHandV18.Build(rightHand, rightVisual, false, allRenderers, rightFingerTip);
+
         JHLPartMotion faceMotion = face.gameObject.AddComponent<JHLPartMotion>();
         JHLPartMotion leftMotion = leftHand.gameObject.AddComponent<JHLPartMotion>();
         JHLPartMotion rightMotion = rightHand.gameObject.AddComponent<JHLPartMotion>();
@@ -131,6 +137,7 @@ public static class JHLBossRuntimeFactory
 
     private static Bounds ResolveRoomCombatBounds(RoomController room, BoxCollider2D fallback)
     {
+        if (RoomLayoutV24.TryGetBounds(room, out Bounds layoutBounds)) return layoutBounds;
         if (room != null)
         {
             Transform left = room.GetSpawnPoint(GateDirection.Left);

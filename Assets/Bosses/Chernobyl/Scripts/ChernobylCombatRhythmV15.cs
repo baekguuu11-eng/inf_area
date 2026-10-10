@@ -44,7 +44,8 @@ public sealed partial class ChernobylBossController
         // Dedicated guard section: only a single locked target circle supports the guards.
         // No dense grid, no third attack channel, no reinforcement stacking.
         yield return WaitCombatSeconds(1.05f);
-        float endsAt = Time.time + (phase == 1 ? 8f : 9f);
+        int initialGuards = guardDirectorV13.ActiveGuardCount;
+        float endsAt = Time.time + 18f; // failsafe only, not the optimal way to finish
         float nextTarget = Time.time + 1.8f;
         while (!dead && guardDirectorV13.ActiveGuardCount > 0 && Time.time < endsAt &&
             !transitionRequested && !meltdownRequested && (playerHealth == null || !playerHealth.IsDead))
@@ -56,10 +57,17 @@ public sealed partial class ChernobylBossController
             }
             yield return null;
         }
+        bool defeated = initialGuards > 0 && guardDirectorV13.ActiveGuardCount == 0;
         guardDirectorV13.RecallForRecoveryV15();
         // Let declared death bursts finish, then remove only this boss room's remaining hazards.
         yield return WaitCombatSeconds(0.9f);
         ClearGuardHazardsV15();
+        if (defeated && !dead && !transitionRequested && !meltdownRequested)
+        {
+            ChernobylBossEffects.SpawnCoreSparks(transform.position, Color.white, 18, 2.8f);
+            PlaySfx(overloadSfx, 0.5f, 0.86f);
+            yield return WaitCombatSeconds(0.7f);
+        }
         guardSectionV15 = false;
     }
 

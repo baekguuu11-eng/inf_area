@@ -72,7 +72,7 @@ public class ByteDropper : MonoBehaviour
 
             BytePickup pickup = CreatePickup(spawnPosition);
             if (pickup != null)
-                pickup.Initialize(valuePerByte, currencyManager, scatterRadius, ownerRoom);
+                pickup.Initialize(ChipSlotManager.Instance!=null?ChipSlotManager.Instance.BonusBytesV22(valuePerByte):valuePerByte, currencyManager, scatterRadius, ownerRoom);
         }
     }
 

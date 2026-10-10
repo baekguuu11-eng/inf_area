@@ -64,6 +64,7 @@ public class ShopManager : MonoBehaviour
         Instance = this;
         if (playerHealth == null) playerHealth = FindAnyObjectByType<PlayerHealth>();
         EnsureDefaultItems();
+        RebuildChipsV22();
         if (autoBuildMissingUI && !HasCompleteUI()) BuildRuntimeUI();
         WireButtons();
         presentationV13 = GetComponent<ShopPresentationV13>();
@@ -107,7 +108,7 @@ public class ShopManager : MonoBehaviour
             if (isOpen) CloseShop(); else OpenShop();
         }
 #endif
-        if (isOpen && Input.GetKeyDown(KeyCode.Escape)) CloseShop();
+        if (isOpen && !ChipPanelV22.CapturesInput && Input.GetKeyDown(KeyCode.Escape)) CloseShop();
     }
 
     public void OpenShop()
@@ -161,7 +162,7 @@ public class ShopManager : MonoBehaviour
         else if (item.itemType == ShopItemType.Chip)
         {
             ChipSlotManager chips = ChipSlotManager.Instance;
-            if (chips != null && chips.OwnsChip(item.chipType))
+            if (chips == null || chips.OwnsChip(item.chipType))
                 return false;
         }
         return true;
@@ -170,6 +171,17 @@ public class ShopManager : MonoBehaviour
     public bool TryPurchase(ShopItem item, ShopCardUI card)
     {
         if (item == null || ByteCurrencyManager.Instance == null || !CanPurchase(item)) return false;
+        if(item.itemType==ShopItemType.Chip && ChipSlotManager.Instance!=null && ChipSlotManager.Instance.SlotsFull)
+        {
+            ChipPanelV22.OpenReplacement(ChipSlotManager.Instance,item.chipType,index=>
+            {
+                if(!isOpen || !CanPurchase(item)) return;
+                if(!ByteCurrencyManager.Instance.SpendBytes(item.price)) return;
+                ChipSlotManager.Instance.PurchaseChipToSlot(item.chipType,index);
+                if(card!=null) card.SetSoldOut(); RefreshCurrencyText(); RefreshCardAffordability();
+            });
+            return false;
+        }
         if (!ByteCurrencyManager.Instance.SpendBytes(item.price))
         {
             RefreshCurrencyText();
@@ -209,17 +221,6 @@ public class ShopManager : MonoBehaviour
         {
             NewItem("소형 복구 패치", "체력을 1 회복합니다.", 8, ShopItemType.HealSmall),
             NewItem("고급 복구 패치", "체력을 2 회복합니다.", 14, ShopItemType.HealLarge),
-            // 1~9 number-key chip system. These are the real gameplay chips used by
-            // ChipSlotManager rather than disconnected generic shop buffs.
-            NewChipItem("[1] 절단 증폭 칩", "근접 무기의 출력 제한을 완화합니다.\n효과: 근접 공격력 +20%", 12, ChipSlotManager.ChipType.MeleeDamage),
-            NewChipItem("[2] 서보 오버클럭 칩", "근접 구동계의 반응 속도를 높입니다.\n효과: 근접 공격속도 +15%", 12, ChipSlotManager.ChipType.MeleeAttackSpeed),
-            NewChipItem("[3] 신장 프로토콜 칩", "근접 무기의 유효 공격 길이를 확장합니다.\n효과: 근접 사거리 +15%", 13, ChipSlotManager.ChipType.MeleeRange),
-            NewChipItem("[4] 탄도 증폭 칩", "발사체 출력 계산을 강화합니다.\n효과: 원거리 공격력 +18%", 14, ChipSlotManager.ChipType.RangedDamage),
-            NewChipItem("[5] 급속 순환 칩", "무기 순환 시간을 단축합니다.\n효과: 원거리 연사속도 +12%", 13, ChipSlotManager.ChipType.RangedAttackSpeed),
-            NewChipItem("[6] 관통 연산 칩", "충돌 연산을 재구성해 발사체가 적을 한 번 더 통과합니다.\n효과: 관통 +1회", 18, ChipSlotManager.ChipType.RangedPierce),
-            NewChipItem("[7] 방벽 프로토콜 칩", "피격 데이터를 분산해 피해를 줄입니다.\n효과: 받는 피해 18% 감소", 17, ChipSlotManager.ChipType.Defense),
-            NewChipItem("[8] 생체 확장 칩", "손상 허용치를 한 단계 확장합니다.\n효과: 최대 체력 +1", 18, ChipSlotManager.ChipType.MaxHealth),
-            NewChipItem("[9] 기동 최적화 칩", "이동 제어 연산을 최적화합니다.\n효과: 이동속도 +12%", 14, ChipSlotManager.ChipType.MoveSpeed),
             NewWeaponItem("중량 해머", "느리지만 강력한 피해와 높은 저지력을 가진 근접 무기입니다.", 22, "debug_hammer"),
             NewWeaponItem("데이터 채찍", "긴 공격 범위로 다수의 적을 견제하며 적중한 적의 이동을 잠시 늦춥니다.", 20, "debug_whip"),
             NewWeaponItem("방화벽 검", "넓은 참격과 지속 피해를 남기는 특수 근접 무기입니다.", 26, "firewall_sword"),
@@ -227,6 +228,13 @@ public class ShopManager : MonoBehaviour
             NewWeaponItem("샷건", "근거리에서 압도적인 순간 화력을 발휘합니다.", 26, "shotgun"),
             NewWeaponItem("레이저 건", "높은 정확도와 직선 관통 능력을 가진 에너지 화기입니다.", 30, "laser_gun")
         };
+    }
+
+    private void RebuildChipsV22()
+    {
+        itemPool.RemoveAll(item=>item.itemType==ShopItemType.Chip);
+        foreach(var type in ChipCatalogV22.Types)
+            itemPool.Add(NewChipItem("["+(System.Array.IndexOf(ChipCatalogV22.Types,type)+1)+"] "+ChipCatalogV22.Name(type),ChipCatalogV22.Description(type),ChipCatalogV22.Price(type),type));
     }
 
     private ShopItem NewItem(string title, string desc, int price, ShopItemType type)

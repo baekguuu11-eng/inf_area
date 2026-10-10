@@ -1,0 +1,66 @@
+{
+  "source_order": [
+    "A_short_weapon_impac_#2-1790929411362.wav",
+    "A_short_weapon_impac_#3-1790929418399.wav",
+    "A_direct_hit_damagin_#3-1790929647156.wav",
+    "A_compact_explosion__#1-1790929985166.wav",
+    "Steel_heavy_door_ope_#1-1790930242973.wav",
+    "A_seamless_loop_of_h_#1-1790930278852.wav",
+    "overheated_reactor_i_#2-1790930360219.wav",
+    "physical_shockwave_#3-1790930437436.wav",
+    "The_final_destructio_#2-1790930482702.wav"
+  ],
+  "outputs": [
+    {
+      "file": "ArmorA.wav",
+      "seconds": 0.48,
+      "peak": 0.55
+    },
+    {
+      "file": "ArmorB.wav",
+      "seconds": 0.48,
+      "peak": 0.55
+    },
+    {
+      "file": "CoreHit.wav",
+      "seconds": 0.55,
+      "peak": 0.7
+    },
+    {
+      "file": "GridBlast.wav",
+      "seconds": 0.55,
+      "peak": 0.72
+    },
+    {
+      "file": "HatchOpen.wav",
+      "seconds": 0.55,
+      "peak": 0.66
+    },
+    {
+      "file": "HatchClose.wav",
+      "seconds": 0.3,
+      "peak": 0.6
+    },
+    {
+      "file": "SteamLoop.wav",
+      "seconds": 1.2,
+      "crossfade_seconds": 0.1
+    },
+    {
+      "file": "Restart.wav",
+      "seconds": 0.9,
+      "peak": 0.72
+    },
+    {
+      "file": "ShockwaveMix.wav",
+      "seconds": 0.98,
+      "peak": 0.82
+    },
+    {
+      "file": "Death.wav",
+      "seconds": 1.5,
+      "peak": 0.85
+    }
+  ],
+  "note": "User supplied AI-generated sources; rights not independently verified. No new synthetic sounds."
+}

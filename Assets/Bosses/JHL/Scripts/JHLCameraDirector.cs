@@ -15,12 +15,14 @@ public sealed class JHLCameraDirector : MonoBehaviour
     private Vector3 directedBaseWorldPosition;
     private Bounds roomVisualBounds;
     private bool hasRoomVisualBounds;
+    private bool usesLayoutV24;
 
     public float CombatOrthoSize => combatOrthoSize;
     public Vector3 CombatWorldPosition => combatWorldPosition;
 
     public void ConfigureRoomBounds(RoomController room)
     {
+        usesLayoutV24 = room != null && room.GetComponent<RoomLayoutV24>() != null;
         hasRoomVisualBounds = false;
         if (room == null) return;
 
@@ -157,11 +159,13 @@ public sealed class JHLCameraDirector : MonoBehaviour
 
     public void RestorePixelPerfect()
     {
+        if (usesLayoutV24) return; // MapManager owns restoration across room transitions.
         if (pixelPerfectCamera != null) pixelPerfectCamera.enabled = pixelPerfectWasEnabled;
     }
 
     private float ClampOrthoSize(float requestedSize)
     {
+        if (usesLayoutV24) return requestedSize;
         if (!hasRoomVisualBounds || targetCamera == null) return requestedSize;
         float aspect = Mathf.Max(0.1f, targetCamera.aspect);
         float maxSize = Mathf.Max(0.1f, Mathf.Min(roomVisualBounds.extents.y, roomVisualBounds.extents.x / aspect));

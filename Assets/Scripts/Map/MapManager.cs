@@ -64,6 +64,9 @@ public class MapManager : MonoBehaviour
     private int highestNormalRoomNumber = 1;
     private bool transitionLocked;
     private Vector3 cameraRestPosition;
+    private float normalOrthoV24;
+    private Behaviour pixelPerfectV24;
+    private bool normalPixelPerfectV24;
     private GameFeelManager cameraEffects;
     private IDisposable transitionInputLock;
 
@@ -91,6 +94,9 @@ public class MapManager : MonoBehaviour
         if (mainCamera != null)
         {
             cameraRestPosition = mainCamera.transform.position;
+            normalOrthoV24 = mainCamera.orthographicSize;
+            foreach (Behaviour b in mainCamera.GetComponents<Behaviour>())
+                if (b.GetType().Name == "PixelPerfectCamera") { pixelPerfectV24 = b; normalPixelPerfectV24 = b.enabled; }
             cameraEffects = mainCamera.GetComponent<GameFeelManager>();
         }
 
@@ -992,6 +998,7 @@ public class MapManager : MonoBehaviour
     private void ShowOnlyCurrentRoom()
     {
         if (stageRoomsRoot == null || currentRoom == null) return;
+        if(ChipSlotManager.Instance!=null) ChipSlotManager.Instance.VisitRoomV22(currentRoom);
         for (int i = 0; i < stageRoomsRoot.childCount; i++)
         {
             Transform child = stageRoomsRoot.GetChild(i);
@@ -1043,6 +1050,28 @@ public class MapManager : MonoBehaviour
 
     private void SetCameraBase(Vector3 position, bool snap)
     {
+        RoomLayoutV24 layout = currentRoom != null ? currentRoom.GetComponent<RoomLayoutV24>() : null;
+        if (mainCamera != null)
+        {
+            if (layout == null || currentRoom.StageNumber != 2)
+            {
+                ChernobylCameraFX oldFx = mainCamera.GetComponent<ChernobylCameraFX>();
+                if (oldFx != null) oldFx.EndBoss();
+            }
+            if (layout != null)
+            {
+                if (pixelPerfectV24 != null) pixelPerfectV24.enabled = false;
+                Vector3 offset = position - cameraRestPosition;
+                position = layout.VisualBounds.center + offset;
+                position.z = cameraRestPosition.z;
+                mainCamera.orthographicSize = layout.FitCamera(mainCamera.aspect);
+            }
+            else
+            {
+                if (pixelPerfectV24 != null) pixelPerfectV24.enabled = normalPixelPerfectV24;
+                if (normalOrthoV24 > 0f) mainCamera.orthographicSize = normalOrthoV24;
+            }
+        }
         if (cameraEffects != null)
             cameraEffects.SetBaseWorldPosition(position, snap);
         else if (mainCamera != null)

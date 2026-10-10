@@ -50,6 +50,7 @@ public class RoomController : MonoBehaviour
         AutoFindReferences();
         EnsureSpawnPoints();
         ApplyPortalRoomState();
+        RoomLayoutV24.Apply(this);
     }
 
     public void ClearConnections()

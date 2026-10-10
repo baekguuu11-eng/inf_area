@@ -16,6 +16,7 @@ public sealed class ExecutorCameraDirector : MonoBehaviour
 
     private Bounds roomVisualBounds;
     private bool hasRoomVisualBounds;
+    private bool usesLayoutV24;
 
     public float CombatOrthoSize => combatOrthoSize;
     public Vector3 CombatWorldPosition => combatWorldPosition;
@@ -25,6 +26,7 @@ public sealed class ExecutorCameraDirector : MonoBehaviour
     /// </summary>
     public void ConfigureRoomBounds(RoomController room)
     {
+        usesLayoutV24 = room != null && room.GetComponent<RoomLayoutV24>() != null;
         hasRoomVisualBounds = false;
         if (room == null)
             return;
@@ -167,12 +169,14 @@ public sealed class ExecutorCameraDirector : MonoBehaviour
 
     public void RestorePixelPerfect()
     {
+        if (usesLayoutV24) return; // MapManager owns restoration across room transitions.
         if (pixelPerfectCamera != null)
             pixelPerfectCamera.enabled = pixelPerfectWasEnabled;
     }
 
     private float ClampOrthoSize(float requestedSize)
     {
+        if (usesLayoutV24) return requestedSize;
         if (!hasRoomVisualBounds || targetCamera == null)
             return requestedSize;
 

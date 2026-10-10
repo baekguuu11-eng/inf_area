@@ -1,0 +1,69 @@
+{
+  "baseline": "V23.1",
+  "changed": [
+    "Assets/Bosses/Executor/Scripts/ExecutorCameraDirector.cs",
+    "Assets/Bosses/Chernobyl/Scripts/ChernobylBossController.cs",
+    "Assets/Bosses/Chernobyl/Scripts/ChernobylCameraFX.cs",
+    "Assets/Bosses/Chernobyl/Scripts/ChernobylGuardDirector.cs",
+    "Assets/Bosses/JHL/Scripts/JHLCameraDirector.cs",
+    "Assets/Bosses/JHL/Scripts/JHLBossController.cs",
+    "Assets/Bosses/JHL/Scripts/JHLBossRuntimeFactory.cs",
+    "Assets/Scripts/Map/MapManager.cs",
+    "Assets/Scripts/Map/RoomController.cs"
+  ],
+  "added": [
+    "Assets/Resources/RoomsV24.meta",
+    "Assets/Resources/RoomsV24/Core.png.meta",
+    "Assets/Resources/RoomsV24/Executor.png.meta",
+    "Assets/Resources/RoomsV24/JHL.png",
+    "Assets/Resources/RoomsV24/Tutorial.png",
+    "Assets/Resources/RoomsV24/Tutorial.png.meta",
+    "Assets/Resources/RoomsV24/Chernobyl.png.meta",
+    "Assets/Resources/RoomsV24/Network.png.meta",
+    "Assets/Resources/RoomsV24/Power.png.meta",
+    "Assets/Resources/RoomsV24/JHL.png.meta",
+    "Assets/Resources/RoomsV24/Executor.png",
+    "Assets/Resources/RoomsV24/Core.png",
+    "Assets/Resources/RoomsV24/Network.png",
+    "Assets/Resources/RoomsV24/Power.png",
+    "Assets/Resources/RoomsV24/Chernobyl.png",
+    "Assets/Scripts/Map/RoomLayoutV24.cs",
+    "Assets/Scripts/Map/RoomLayoutV24.cs.meta"
+  ],
+  "images": {
+    "JHL.png": [
+      1672,
+      941
+    ],
+    "Tutorial.png": [
+      1672,
+      941
+    ],
+    "Executor.png": [
+      1893,
+      831
+    ],
+    "Core.png": [
+      1672,
+      941
+    ],
+    "Network.png": [
+      1672,
+      941
+    ],
+    "Power.png": [
+      1672,
+      941
+    ],
+    "Chernobyl.png": [
+      1672,
+      941
+    ]
+  },
+  "syntax": "PASS: all C# after editor/development and release conditional preprocessing",
+  "geometry_math": "PASS: art registration, entry coordinates, camera fit at 4:3 / 16:9 / 21:9",
+  "unchanged": "V23.1 difficulty tuning, player, weapons, boss art/audio, music",
+  "unity_compile": "NOT RUN: Unity/C# compiler unavailable",
+  "play_mode": "NOT RUN",
+  "notes": "Room border coordinates manually registered to generated artwork. Validate physics, near-wall readability and balance in Unity."
+}

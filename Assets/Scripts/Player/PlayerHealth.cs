@@ -68,6 +68,8 @@ public class PlayerHealth : MonoBehaviour
 
         audioSource.playOnAwake = false;
         audioSource.spatialBlend = 0f;
+        AudioClip suppliedHit=Resources.Load<AudioClip>("CombatSFX/UserPlayerV23/PlayerHit");
+        if(suppliedHit!=null) {hurtSound=suppliedHit;hurtVolume=.50f;randomizeHurtPitch=false;}
     }
 
     private void Start()
@@ -110,7 +112,7 @@ public class PlayerHealth : MonoBehaviour
         if (force)
             currentHealth = currentHealth <= 0 ? maxHealth : Mathf.Clamp(currentHealth, 0, maxHealth);
         else if (maxHealth > previousMax)
-            currentHealth = Mathf.Min(maxHealth, currentHealth + (maxHealth - previousMax));
+            currentHealth = Mathf.Min(maxHealth, currentHealth); // V22: capacity changes never heal.
         else
             currentHealth = Mathf.Min(currentHealth, maxHealth);
 

@@ -17,6 +17,13 @@ public sealed class PlayerAmmoController : MonoBehaviour
     private Coroutine reloadRoutine;
     private WeaponDefinition reloadWeapon;
     private int reserveAmmo;
+    private int savedQuartersV22;
+    private int ShotCostV22(WeaponDefinition weapon)
+    {
+        int cost=Mathf.Max(1,weapon.ammoCostPerShot);
+        if(ChipSlotManager.Instance==null || !ChipSlotManager.Instance.IsChipEquipped(ChipSlotManager.ChipType.AmmoEfficiency)) return cost;
+        return cost-(savedQuartersV22+cost)/4;
+    }
     private float reloadProgress;
 
     public int ReserveAmmo => reserveAmmo;
@@ -101,30 +108,36 @@ public sealed class PlayerAmmoController : MonoBehaviour
     {
         if (weapon == null || weapon.category != WeaponCategory.Ranged)
             return 0;
-        return GetMagazineEnergy(weapon) / Mathf.Max(1, weapon.ammoCostPerShot);
+        int energy=GetMagazineEnergy(weapon), count=0, credit=savedQuartersV22;
+        bool efficient=ChipSlotManager.Instance!=null && ChipSlotManager.Instance.IsChipEquipped(ChipSlotManager.ChipType.AmmoEfficiency);
+        int baseCost=Mathf.Max(1,weapon.ammoCostPerShot);
+        while(count<10000) { int cost=efficient?baseCost-(credit+baseCost)/4:baseCost; if(energy<cost) break; energy-=cost; if(efficient) credit=(credit+baseCost)%4; count++; }
+        return count;
     }
 
     public bool CanFire(WeaponDefinition weapon)
     {
         if (weapon == null || weapon.category != WeaponCategory.Ranged || IsReloading)
             return false;
-        return GetMagazineEnergy(weapon) >= Mathf.Max(1, weapon.ammoCostPerShot);
+        return GetMagazineEnergy(weapon) >= ShotCostV22(weapon);
     }
 
     public bool TryConsumeShot(WeaponDefinition weapon)
     {
         if (!CanFire(weapon))
         {
-            if (weapon != null && GetMagazineEnergy(weapon) < Mathf.Max(1, weapon.ammoCostPerShot))
+            if (weapon != null && GetMagazineEnergy(weapon) < ShotCostV22(weapon))
                 RequestReload(weapon, true);
             return false;
         }
 
-        int cost = Mathf.Max(1, weapon.ammoCostPerShot);
+        int cost = ShotCostV22(weapon);
+        if(ChipSlotManager.Instance!=null && ChipSlotManager.Instance.IsChipEquipped(ChipSlotManager.ChipType.AmmoEfficiency))
+            savedQuartersV22=(savedQuartersV22+Mathf.Max(1,weapon.ammoCostPerShot))%4;
         magazineEnergy[weapon.weaponId] = Mathf.Max(0, magazineEnergy[weapon.weaponId] - cost);
         AmmoChanged?.Invoke();
 
-        if (magazineEnergy[weapon.weaponId] < cost && reserveAmmo > 0)
+        if (magazineEnergy[weapon.weaponId] < ShotCostV22(weapon) && reserveAmmo > 0)
             RequestReload(weapon, true);
 
         return true;

@@ -15,9 +15,11 @@ public struct DamageContext
     public Vector2 HitPoint;
     public EnemyHitKind HitKind;
     public float KnockbackBonus;
+    public bool ChipSecondary;
 
     public DamageContext(int damage, Vector2 direction, Vector2 hitPoint, EnemyHitKind hitKind, float knockbackBonus = 0f)
     {
+        ChipSecondary = false;
         Damage = damage;
         Direction = direction;
         HitPoint = hitPoint;
@@ -121,10 +123,14 @@ public class EnemyHealth : MonoBehaviour
         TakeDamage(DamageContext.Simple(damage, hitDirection, hitKind, (Vector2)transform.position));
     }
 
-    public void TakeDamage(DamageContext context)
+    public void TakeDamage(DamageContext context) { TryTakeDamage(context); }
+
+    public bool TryTakeDamage(DamageContext context)
     {
         if (isDead || deathPending || context.Damage <= 0)
-            return;
+            return false;
+        ChernobylBossController reactor = GetComponent<ChernobylBossController>();
+        if (reactor != null && !reactor.AllowDamageV19(context)) return false;
 
         if (context.Direction.sqrMagnitude <= 0.0001f)
             context.Direction = Vector2.down;
@@ -146,6 +152,7 @@ public class EnemyHealth : MonoBehaviour
         currentHealth -= appliedDamage;
         Damaged?.Invoke(this, appliedDamage, context.Direction);
 
+        if(ChipSlotManager.Instance!=null) ChipSlotManager.Instance.EnemyHitV22(this,context,IsMajorBossRoot());
         bool lethal = currentHealth <= 0;
         if (combatFeedback == null)
             combatFeedback = rootTransform.GetComponentInChildren<EnemyCombatFeedback>(true);
@@ -156,6 +163,7 @@ public class EnemyHealth : MonoBehaviour
 
         if (lethal)
             RequestDeath();
+        return true;
     }
 
     private void RequestDeath()
@@ -210,6 +218,7 @@ public class EnemyHealth : MonoBehaviour
 
         isDead = true;
         deathPending = false;
+        if(ChipSlotManager.Instance!=null) ChipSlotManager.Instance.EnemyKilledV22(this,context,IsMajorBossRoot());
         DisableCombatComponents(true);
 
         ChernobylGuardUnit chernobylGuard = rootTransform.GetComponent<ChernobylGuardUnit>();

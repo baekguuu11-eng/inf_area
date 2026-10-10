@@ -21,18 +21,21 @@ public static class ExecutorRuntimeSprites
 
     public static Sprite LoadBody()
     {
+        Sprite supplied=ExecutorArtV22.Get(0); if(supplied!=null) return supplied;
         Sprite sprite = Resources.Load<Sprite>("Bosses/Executor/ExecutorBody");
         return sprite != null ? sprite : RuntimePixelSpriteFactory.GetWhitePixelSprite();
     }
 
     public static Sprite LoadBodyPhase2()
     {
+        Sprite supplied=ExecutorArtV22.Get(1); if(supplied!=null) return supplied;
         Sprite sprite = Resources.Load<Sprite>("Bosses/Executor/ExecutorBody_Phase2");
         return sprite != null ? sprite : LoadBody();
     }
 
     public static Sprite LoadBodyFinal()
     {
+        Sprite supplied=ExecutorArtV22.Get(2); if(supplied!=null) return supplied;
         Sprite sprite = Resources.Load<Sprite>("Bosses/Executor/ExecutorBody_Final");
         return sprite != null ? sprite : LoadBodyPhase2();
     }
