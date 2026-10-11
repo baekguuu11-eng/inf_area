@@ -21,7 +21,7 @@ public sealed partial class JHLBossController
         if (meleePressureDamage >= health.MaxHealth * 0.055f)
             RequestAntiPressureCounter(JHLPatternKind.RoarRepulse);
         else if (rangedPressureDamage >= health.MaxHealth * 0.08f)
-            RequestAntiPressureCounter(JHLPatternKind.RemoteSuppression);
+            RequestAntiPressureCounter(JHLPatternKind.RoarRepulse);
     }
 
     private IEnumerator PressureAimV16()

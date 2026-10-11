@@ -94,8 +94,8 @@ public sealed partial class ChernobylBossController
         ClearAllGridWarningsV11();
 
         guardDirectorV13 = GetComponent<ChernobylGuardDirector>();
-        if (guardDirectorV13 == null) guardDirectorV13 = gameObject.AddComponent<ChernobylGuardDirector>();
-        guardDirectorV13.Initialize(this, ownerRoom);
+        if (guardDirectorV13 != null) guardDirectorV13.ShutdownAllGuards();
+        guardDirectorV13 = null;
     }
 
     // Kept for binary/source compatibility, but deliberately unused in V11.
@@ -310,8 +310,9 @@ public sealed partial class ChernobylBossController
         ClearAllGridWarningsV11();
         counterResponseRequestedV10 = false;
         counterCooldownUntilV10 = Time.time + (phase == 1 ? 7.8f : phase == 2 ? 5.9f : 4.65f);
-        if (counterNearV10) yield return CorePurgeCounterRoutineV10();
-        else yield return ContainmentCounterRoutineV10();
+        // Reward pressure before the directional defensive response. No forced displacement.
+        yield return WaitCombatSeconds(0.32f);
+        yield return DirectionalVentRoutineV17(false);
         ClearAllGridWarningsV11();
     }
 
@@ -359,7 +360,7 @@ public sealed partial class ChernobylBossController
         float elapsed = 0f;
         while (elapsed < duration && !dead && playerHealth != null && !playerHealth.IsDead)
         {
-            elapsed += Time.fixedUnscaledDeltaTime;
+            elapsed += Time.fixedDeltaTime;
             float t = Mathf.Clamp01(elapsed / Mathf.Max(0.05f, duration));
             float eased = 1f - Mathf.Pow(1f - t, 3f);
             rb.MovePosition(Vector2.Lerp(start, target, eased));
@@ -439,6 +440,18 @@ public sealed partial class ChernobylBossController
     private PatternKind ChoosePatternV10()
     {
         List<PatternKind> pool = BuildPatternPoolV11();
+        if (patternPhaseV17 != phase)
+        {
+            patternPhaseV17 = phase;
+            introductionsV17.Clear();
+            if (phase == 1) introductionsV17.Enqueue(PatternKind.BaitVolleyV17);
+            if (phase == 2) { introductionsV17.Enqueue(PatternKind.DelayedCross); introductionsV17.Enqueue(PatternKind.RotatingLines); introductionsV17.Enqueue(PatternKind.GridChase); introductionsV17.Enqueue(PatternKind.SplitField); }
+            if (phase >= 3) { introductionsV17.Enqueue(PatternKind.CrossVentV17); introductionsV17.Enqueue(PatternKind.FinalOverloadV17); introductionsV17.Enqueue(PatternKind.DelayedCascade); introductionsV17.Enqueue(PatternKind.SpiralGrid); }
+        }
+        if (introductionsV17.Count > 0)
+        {
+            PatternKind intro = introductionsV17.Dequeue(); RememberPatternV11(intro); return intro;
+        }
         PatternKind last = recentPatternHistoryV10.Count > 0
             ? recentPatternHistoryV10[recentPatternHistoryV10.Count - 1]
             : PatternKind.SparseGrid;
@@ -458,7 +471,8 @@ public sealed partial class ChernobylBossController
             for (int i = 0; i < pool.Count; i++)
                 if (pool[i] != last && !recentPatternHistoryV10.Contains(pool[i])) filtered.Add(pool[i]);
         }
-        if (filtered.Count == 0) filtered.AddRange(pool);
+        if (filtered.Count == 0)
+            foreach (PatternKind item in pool) if (item != last) filtered.Add(item);
 
         PatternKind chosen = WeightedPatternChoiceV11(filtered);
         RememberPatternV11(chosen);
@@ -467,16 +481,15 @@ public sealed partial class ChernobylBossController
 
     private List<PatternKind> BuildPatternPoolV11()
     {
-        // V15: six recognizable attack families. Later pages evolve these decisions.
-        return new List<PatternKind>
-        {
-            phase == 1 ? PatternKind.TargetBlast : PatternKind.TwinTarget,
-            PatternKind.CrossBlast,
-            phase == 1 ? PatternKind.CheckerA : PatternKind.ChainInvert,
-            PatternKind.GapSweep,
-            PatternKind.SafeShift,
-            PatternKind.CoreShockwave
-        };
+        List<PatternKind> pool = new List<PatternKind> {
+            PatternKind.BaitVolleyV17, PatternKind.CoreRadiationV17, PatternKind.PipeCascadeV17,
+            PatternKind.DirectionalVentV17, PatternKind.CrossBlast, PatternKind.GapSweep,
+            PatternKind.TwinTarget, PatternKind.RadiationRing };
+        if (phase >= 2) pool.AddRange(new[] { PatternKind.DelayedCross, PatternKind.RotatingLines,
+            PatternKind.GridChase, PatternKind.SplitField });
+        if (phase >= 3) pool.AddRange(new[] { PatternKind.CrossVentV17, PatternKind.FinalOverloadV17,
+            PatternKind.DelayedCascade, PatternKind.SpiralGrid });
+        return pool;
     }
 
     private PatternKind WeightedPatternChoiceV11(List<PatternKind> candidates)
@@ -659,7 +672,9 @@ public sealed partial class ChernobylBossController
 
     private void ResetDirectorV11()
     {
+        ResetThermalV19();
         if (openingV15 != null) openingV15.ResetCombat();
+        patternPhaseV17 = 0; introductionsV17.Clear();
         attacksSinceGuardsV15 = attacksSinceComboV15 = 0;
         guardSectionV15 = false;
         if (guardDirectorV13 != null) guardDirectorV13.RecallForRecoveryV15();
@@ -734,6 +749,12 @@ public sealed partial class ChernobylBossController
         ClearAllGridWarningsV11();
         switch (pattern)
         {
+            case PatternKind.BaitVolleyV17: yield return BaitVolleyRoutineV17(); break;
+            case PatternKind.CoreRadiationV17: yield return CoreRadiationRoutineV17(); break;
+            case PatternKind.PipeCascadeV17: yield return PipeCascadeRoutineV17(); break;
+            case PatternKind.DirectionalVentV17: yield return DirectionalVentRoutineV17(false); break;
+            case PatternKind.CrossVentV17: yield return DirectionalVentRoutineV17(true); break;
+            case PatternKind.FinalOverloadV17: yield return FinalOverloadRoutineV17(); break;
             case PatternKind.CheckerA: yield return CheckerRoutineV10(0); break;
             case PatternKind.CheckerB: yield return CheckerRoutineV10(1); break;
             case PatternKind.SweepL2R: yield return SweepColumnsRoutineV10(true); break;

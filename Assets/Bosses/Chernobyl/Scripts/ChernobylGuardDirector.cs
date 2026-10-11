@@ -197,6 +197,7 @@ public sealed class ChernobylGuardDirector : MonoBehaviour
 
     private Bounds GetArenaBounds()
     {
+        if (RoomLayoutV24.TryGetBounds(room, out Bounds layoutBounds)) return layoutBounds;
         if (room != null)
         {
             Transform left = room.GetSpawnPoint(GateDirection.Left);

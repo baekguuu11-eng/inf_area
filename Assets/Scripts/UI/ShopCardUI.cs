@@ -21,6 +21,7 @@ public class ShopCardUI : MonoBehaviour
     private ShopManager.ShopItem currentItem;
     private ShopManager shopManager;
     private bool isSoldOut;
+    private Image chipIconV22;
 
     private RectTransform statRoot;
     private TMP_Text[] statLabels;
@@ -68,9 +69,19 @@ public class ShopCardUI : MonoBehaviour
         }
 
         UpdateWeaponStats(isWeapon ? profile : null);
+        bool chip=item.itemType==ShopManager.ShopItemType.Chip;
+        if(chipIconV22==null)
+        {
+            GameObject g=new GameObject("ChipIconV22",typeof(RectTransform),typeof(Image));g.transform.SetParent(transform,false);
+            chipIconV22=g.GetComponent<Image>();chipIconV22.raycastTarget=false;
+            SetRect(g.GetComponent<RectTransform>(),new Vector2(0,-80),new Vector2(68,68),new Vector2(.5f,.5f));
+        }
+        chipIconV22.gameObject.SetActive(chip);
+        if(chip) {chipIconV22.sprite=ChipCatalogV22.Icon(item.chipType);if(nameText!=null) nameText.color=ChipCatalogV22.ColorFor(item.chipType);}
+        else if(nameText!=null) nameText.color=Color.white;
 
         if (priceText != null) priceText.text = item.price + " 바이트";
-        if (buttonText != null) buttonText.text = "구매";
+        if (buttonText != null) buttonText.text = item.itemType==ShopManager.ShopItemType.Chip && ChipSlotManager.Instance!=null && ChipSlotManager.Instance.OwnsChip(item.chipType) ? (ChipSlotManager.Instance.IsChipEquipped(item.chipType)?"장착 중":"보유 중") : "구매";
         if (buyButton != null)
         {
             buyButton.interactable = manager == null || manager.CanPurchase(item);

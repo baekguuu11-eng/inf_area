@@ -117,13 +117,14 @@ public class PlayerStats : MonoBehaviour
         newSignature = newSignature * 31 + Quantize(ShopRunUpgradeState.WeaponDamageMultiplier);
         newSignature = newSignature * 31 + Quantize(ShopRunUpgradeState.SkillCooldownMultiplier);
         newSignature = newSignature * 31 + overclockHealthBonus;
+        newSignature = newSignature * 31 + (chips!=null?chips.MaxHealthBonus:0);
 
         if (!force && newSignature == signature)
             return;
 
         signature = newSignature;
 
-        MaxHealth = Mathf.Max(1, baseMaxHealth + overclockHealthBonus);
+        MaxHealth = Mathf.Max(1, baseMaxHealth + overclockHealthBonus + (chips!=null?chips.MaxHealthBonus:0));
         MoveSpeed = Mathf.Max(0.1f, baseMoveSpeed * moveMultiplier);
         DefenseMultiplier = Mathf.Clamp(baseDefenseMultiplier * defenseMultiplier, 0.05f, 5f);
 

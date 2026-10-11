@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class ChipSlotManager : MonoBehaviour
+public partial class ChipSlotManager : MonoBehaviour
 {
     public static ChipSlotManager Instance { get; private set; }
 
@@ -21,7 +21,8 @@ public class ChipSlotManager : MonoBehaviour
 
         Defense,            // 7번
         MaxHealth,          // 8번
-        MoveSpeed           // 9번
+        MoveSpeed,
+        RoomRepair, AmmoRecovery, DataCollector, AmmoEfficiency, DeathBurst, SlowRounds
     }
 
     [Header("UI Slots")]
@@ -87,51 +88,19 @@ public class ChipSlotManager : MonoBehaviour
     private Sprite[] currentSlotSprites;
     private bool[] currentSlotVisible;
 
-    public float MeleeDamageMultiplier => IsChipEquipped(ChipType.MeleeDamage) ? meleeDamageMultiplier : 1f;
-    public float MeleeAttackSpeedMultiplier => IsChipEquipped(ChipType.MeleeAttackSpeed) ? meleeAttackSpeedMultiplier : 1f;
-    public float MeleeRangeMultiplier => IsChipEquipped(ChipType.MeleeRange) ? meleeRangeMultiplier : 1f;
-
-    public float RangedDamageMultiplier => IsChipEquipped(ChipType.RangedDamage) ? rangedDamageMultiplier : 1f;
-    public float RangedAttackSpeedMultiplier => IsChipEquipped(ChipType.RangedAttackSpeed) ? rangedAttackSpeedMultiplier : 1f;
-    public bool IsRangedPierceEnabled => IsChipEquipped(ChipType.RangedPierce) && rangedPierceEnabled;
-
-    public float DefenseDamageMultiplier => IsChipEquipped(ChipType.Defense) ? defenseDamageMultiplier : 1f;
-    public float MoveSpeedMultiplier => IsChipEquipped(ChipType.MoveSpeed) ? moveSpeedMultiplier : 1f;
-
-    public static string GetChipDisplayName(ChipType chipType)
-    {
-        switch (chipType)
-        {
-            case ChipType.MeleeDamage: return "절단 증폭 칩";
-            case ChipType.MeleeAttackSpeed: return "서보 오버클럭 칩";
-            case ChipType.MeleeRange: return "신장 프로토콜 칩";
-            case ChipType.RangedDamage: return "탄도 증폭 칩";
-            case ChipType.RangedAttackSpeed: return "급속 순환 칩";
-            case ChipType.RangedPierce: return "관통 연산 칩";
-            case ChipType.Defense: return "방벽 프로토콜 칩";
-            case ChipType.MaxHealth: return "생체 확장 칩";
-            case ChipType.MoveSpeed: return "기동 최적화 칩";
-            default: return "미확인 칩";
-        }
-    }
-
-    public static string GetChipEffectText(ChipType chipType)
-    {
-        switch (chipType)
-        {
-            case ChipType.MeleeDamage: return "근접 공격력 +20%";
-            case ChipType.MeleeAttackSpeed: return "근접 공격속도 +15%";
-            case ChipType.MeleeRange: return "근접 사거리 +15%";
-            case ChipType.RangedDamage: return "원거리 공격력 +18%";
-            case ChipType.RangedAttackSpeed: return "원거리 연사속도 +12%";
-            case ChipType.RangedPierce: return "투사체 관통 +1회";
-            case ChipType.Defense: return "받는 피해 18% 감소";
-            case ChipType.MaxHealth: return "최대 체력 +1";
-            case ChipType.MoveSpeed: return "이동속도 +12%";
-            default: return string.Empty;
-        }
-    }
-
+    public float MeleeDamageMultiplier => IsChipEquipped(ChipType.MeleeDamage)?1.20f:1f;
+    public float MeleeAttackSpeedMultiplier => 1f;
+    public float MeleeRangeMultiplier => 1f;
+    public float RangedDamageMultiplier => 1f;
+    public float RangedAttackSpeedMultiplier => 1f;
+    public bool IsRangedPierceEnabled => false;
+    public float DefenseDamageMultiplier => 1f;
+    public float MoveSpeedMultiplier => IsChipEquipped(ChipType.MoveSpeed)?1.12f:1f;
+    public int MaxHealthBonus => IsChipEquipped(ChipType.MaxHealth)?1:0;
+    public static string GetChipDisplayName(ChipType type) => ChipCatalogV22.Name(type);
+    public static string GetChipEffectText(ChipType type) => ChipCatalogV22.Description(type);
+    public IReadOnlyList<ChipType> Equipped => equippedChips;
+    public bool SlotsFull => equippedChips.Count>=maxEquippedCount;
     private void Awake()
     {
         Instance = this;
@@ -148,56 +117,19 @@ public class ChipSlotManager : MonoBehaviour
     private void Start()
     {
         RefreshSlotUI(true);
+        MapManager map=FindAnyObjectByType<MapManager>();if(map!=null) VisitRoomV22(map.CurrentRoom);
     }
 
     private void Update()
     {
-        if (GetNumberKeyDown(KeyCode.Keypad1, KeyCode.Alpha1))
-        {
-            ToggleChip(ChipType.MeleeDamage);
-        }
-
-        if (GetNumberKeyDown(KeyCode.Keypad2, KeyCode.Alpha2))
-        {
-            ToggleChip(ChipType.MeleeAttackSpeed);
-        }
-
-        if (GetNumberKeyDown(KeyCode.Keypad3, KeyCode.Alpha3))
-        {
-            ToggleChip(ChipType.MeleeRange);
-        }
-
-        if (GetNumberKeyDown(KeyCode.Keypad4, KeyCode.Alpha4))
-        {
-            ToggleChip(ChipType.RangedDamage);
-        }
-
-        if (GetNumberKeyDown(KeyCode.Keypad5, KeyCode.Alpha5))
-        {
-            ToggleChip(ChipType.RangedAttackSpeed);
-        }
-
-        if (GetNumberKeyDown(KeyCode.Keypad6, KeyCode.Alpha6))
-        {
-            ToggleChip(ChipType.RangedPierce);
-        }
-
-        if (GetNumberKeyDown(KeyCode.Keypad7, KeyCode.Alpha7))
-        {
-            ToggleChip(ChipType.Defense);
-        }
-
-        if (GetNumberKeyDown(KeyCode.Keypad8, KeyCode.Alpha8))
-        {
-            ToggleChip(ChipType.MaxHealth);
-        }
-
-        if (GetNumberKeyDown(KeyCode.Keypad9, KeyCode.Alpha9))
-        {
-            ToggleChip(ChipType.MoveSpeed);
-        }
+        if(GameInputState.IsLocked || ChipPanelV22.CapturesInput) return;
+        PlayerHealth hp=FindAnyObjectByType<PlayerHealth>();if(hp==null || hp.IsDead) return;
+        if(Input.GetKeyDown(KeyCode.C)) { ChipPanelV22.OpenInventory(this); return; }
+        if(Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl) || Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) return;
+        for(int i=0;i<ChipCatalogV22.Types.Length;i++)
+            if(GetNumberKeyDown((KeyCode)((int)KeyCode.Keypad1+i),(KeyCode)((int)KeyCode.Alpha1+i))) ToggleChip(ChipCatalogV22.Types[i]);
     }
-
+    private void OnDestroy() { if(Instance==this) Instance=null; }
     private bool GetNumberKeyDown(KeyCode keypadKey, KeyCode topNumberKey)
     {
         if (Input.GetKeyDown(keypadKey))
@@ -249,7 +181,7 @@ public class ChipSlotManager : MonoBehaviour
     /// </summary>
     public bool PurchaseChip(ChipType chipType)
     {
-        if (chipType == ChipType.None || ownedChips.Contains(chipType))
+        if (!ChipCatalogV22.Contains(chipType) || ownedChips.Contains(chipType))
             return false;
 
         ownedChips.Add(chipType);
@@ -258,23 +190,23 @@ public class ChipSlotManager : MonoBehaviour
         return true;
     }
 
-    public int GetChipHotkeyNumber(ChipType chipType)
+    public int GetChipHotkeyNumber(ChipType type) { return System.Array.IndexOf(ChipCatalogV22.Types,type)+1; }
+    public void PurchaseChipToSlot(ChipType type,int index)
     {
-        switch (chipType)
-        {
-            case ChipType.MeleeDamage: return 1;
-            case ChipType.MeleeAttackSpeed: return 2;
-            case ChipType.MeleeRange: return 3;
-            case ChipType.RangedDamage: return 4;
-            case ChipType.RangedAttackSpeed: return 5;
-            case ChipType.RangedPierce: return 6;
-            case ChipType.Defense: return 7;
-            case ChipType.MaxHealth: return 8;
-            case ChipType.MoveSpeed: return 9;
-            default: return 0;
-        }
+        if(!ChipCatalogV22.Contains(type)) return;
+        ownedChips.Add(type); EquipIntoSlot(type,index);
     }
-
+    public void EquipIntoSlot(ChipType type,int index)
+    {
+        if(!OwnsChip(type) || IsChipEquipped(type)) return;
+        if(SlotsFull)
+        {
+            if(index<0 || index>=equippedChips.Count) return;
+            RemoveChipEffect(equippedChips[index]); equippedChips[index]=type;
+        }
+        else equippedChips.Add(type);
+        ApplyChipEffect(type); RefreshSlotUI(false); PlaySound(equipSound);
+    }
     public void EquipChip(ChipType chipType)
     {
         if (chipType == ChipType.None || !OwnsChip(chipType))
@@ -287,32 +219,8 @@ public class ChipSlotManager : MonoBehaviour
             return;
         }
 
-        bool replacedOldChip = false;
-
-        while (equippedChips.Count >= maxEquippedCount)
-        {
-            replacedOldChip = true;
-
-            ChipType oldestChip = equippedChips[0];
-            RemoveChipEffect(oldestChip);
-            equippedChips.RemoveAt(0);
-        }
-
-        equippedChips.Add(chipType);
-        ApplyChipEffect(chipType);
-
-        RefreshSlotUI(false);
-
-        if (replacedOldChip)
-        {
-            PlaySound(replaceSound);
-        }
-        else
-        {
-            PlaySound(equipSound);
-        }
-
-        Debug.Log("Chip Equipped: " + chipType);
+        if(SlotsFull) { ChipPanelV22.OpenReplacement(this,chipType,index=>EquipIntoSlot(chipType,index)); return; }
+        EquipIntoSlot(chipType,-1);
     }
 
     public void UnequipChip(ChipType chipType)
@@ -324,6 +232,7 @@ public class ChipSlotManager : MonoBehaviour
 
         RemoveChipEffect(chipType);
         equippedChips.Remove(chipType);
+        RefreshPlayerStats();
 
         RefreshSlotUI(false);
         PlaySound(unequipSound);
@@ -336,95 +245,12 @@ public class ChipSlotManager : MonoBehaviour
         return equippedChips.Contains(chipType);
     }
 
-    private void ApplyChipEffect(ChipType chipType)
+    private void ApplyChipEffect(ChipType type) { RefreshPlayerStats(); }
+    private void RemoveChipEffect(ChipType type) { }
+    private void RefreshPlayerStats()
     {
-        switch (chipType)
-        {
-            case ChipType.MaxHealth:
-                EnableOverclockEffect();
-                break;
-
-            case ChipType.MeleeDamage:
-                break;
-
-            case ChipType.MeleeAttackSpeed:
-                break;
-
-            case ChipType.MeleeRange:
-                break;
-
-            case ChipType.RangedDamage:
-                break;
-
-            case ChipType.RangedAttackSpeed:
-                break;
-
-            case ChipType.RangedPierce:
-                break;
-
-            case ChipType.Defense:
-                break;
-
-            case ChipType.MoveSpeed:
-                break;
-        }
+        PlayerStats stats=FindAnyObjectByType<PlayerStats>(); if(stats!=null) stats.ForceRefresh();
     }
-
-    private void RemoveChipEffect(ChipType chipType)
-    {
-        switch (chipType)
-        {
-            case ChipType.MaxHealth:
-                DisableOverclockEffect();
-                break;
-
-            case ChipType.MeleeDamage:
-                break;
-
-            case ChipType.MeleeAttackSpeed:
-                break;
-
-            case ChipType.MeleeRange:
-                break;
-
-            case ChipType.RangedDamage:
-                break;
-
-            case ChipType.RangedAttackSpeed:
-                break;
-
-            case ChipType.RangedPierce:
-                break;
-
-            case ChipType.Defense:
-                break;
-
-            case ChipType.MoveSpeed:
-                break;
-        }
-    }
-
-    private void EnableOverclockEffect()
-    {
-        if (overclockObject == null)
-        {
-            Debug.LogWarning("ChipSlotManager: Overclock Object가 연결되지 않았습니다.");
-            return;
-        }
-
-        overclockObject.SendMessage("EnableOverclock", SendMessageOptions.DontRequireReceiver);
-    }
-
-    private void DisableOverclockEffect()
-    {
-        if (overclockObject == null)
-        {
-            return;
-        }
-
-        overclockObject.SendMessage("DisableOverclock", SendMessageOptions.DontRequireReceiver);
-    }
-
     private void RefreshSlotUI(bool instant)
     {
         if (equippedSlotImages == null)
@@ -723,39 +549,5 @@ public class ChipSlotManager : MonoBehaviour
         return 1f + c3 * Mathf.Pow(t - 1f, 3f) + c1 * Mathf.Pow(t - 1f, 2f);
     }
 
-    private Sprite GetChipSprite(ChipType chipType)
-    {
-        switch (chipType)
-        {
-            case ChipType.MeleeDamage:
-                return meleeDamageSprite;
-
-            case ChipType.MeleeAttackSpeed:
-                return meleeAttackSpeedSprite;
-
-            case ChipType.MeleeRange:
-                return meleeRangeSprite;
-
-            case ChipType.RangedDamage:
-                return rangedDamageSprite;
-
-            case ChipType.RangedAttackSpeed:
-                return rangedAttackSpeedSprite;
-
-            case ChipType.RangedPierce:
-                return rangedPierceSprite;
-
-            case ChipType.Defense:
-                return defenseSprite;
-
-            case ChipType.MaxHealth:
-                return maxHealthSprite;
-
-            case ChipType.MoveSpeed:
-                return moveSpeedSprite;
-
-            default:
-                return null;
-        }
-    }
+    public Sprite GetChipSprite(ChipType type) { return ChipCatalogV22.Icon(type); }
 }

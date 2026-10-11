@@ -1,0 +1,29 @@
+{
+  "changed": [
+    "Assets/Scripts/Player/PlayerHealth.cs",
+    "Assets/Scripts/Systems/TeamGameSFX.cs",
+    "Assets/Bosses/Chernobyl/Scripts/ChernobylExplosionV20.cs",
+    "Assets/Bosses/Chernobyl/Scripts/ChernobylGridVisualV21.cs",
+    "Assets/Bosses/Chernobyl/Scripts/ChernobylThermalV19.cs"
+  ],
+  "added": [
+    "Sound/UserPlayerV23/Originals/Create_a_short_PLAYE_#3-1791024128422.wav",
+    "Assets/Editor/ChernobylV23Validation.cs.meta",
+    "Assets/Editor/ChernobylV23Validation.cs",
+    "Assets/Resources/CombatSFX/UserPlayerV23/PlayerHit.wav.meta",
+    "Assets/Resources/CombatSFX/UserPlayerV23/PlayerHit.wav",
+    "Assets/Bosses/Chernobyl/Scripts/ChernobylEscapeV23.cs.meta",
+    "Assets/Bosses/Chernobyl/Scripts/ChernobylEscapeV23.cs",
+    "Assets/Bosses/Chernobyl/Scripts/ChernobylPatternsV23.cs",
+    "Assets/Bosses/Chernobyl/Scripts/ChernobylPatternsV23.cs.meta"
+  ],
+  "removed": [],
+  "syntax": "PASS tree-sitter on changed/added C#; not compilation",
+  "pattern_contracts": "PASS 768 masks via C-translated arithmetic, preserving integer division; Unity editor menu also supplied but not run",
+  "preservation": "Executor, JHL, chips, BGM hashes unchanged; supplied WAV original preserved",
+  "audio": "PCM16 stereo 48kHz, 0.63s; main attack begins about 0.019s into runtime copy",
+  "unity_compile": "NOT RUN - Unity/C# compiler unavailable",
+  "play_mode": "NOT RUN",
+  "video": "Unavailable attachment; not viewed",
+  "route_search": "Time-expanded cardinal walking search, reaction delay 0.16s, player bounds plus 0.035 margin, arena/core obstruction; no dash required. Not runtime verified."
+}

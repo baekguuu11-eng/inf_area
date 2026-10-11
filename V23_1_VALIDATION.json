@@ -1,0 +1,11 @@
+{
+  "changed": [
+    "Assets/Bosses/Chernobyl/Scripts/ChernobylExplosionV20.cs",
+    "Assets/Bosses/Chernobyl/Scripts/ChernobylThermalV19.cs"
+  ],
+  "syntax": "PASS parsing only",
+  "scheduled_frequency_ratio": 0.8,
+  "all_other_project_files": "byte-identical to V23 FULL",
+  "unity_compile": "NOT RUN",
+  "play_mode": "NOT RUN"
+}

@@ -60,7 +60,8 @@ public sealed class TeamGameSFX : MonoBehaviour
 
         bytePickup = Resources.Load<AudioClip>("TeamSFX/Pickup/Byte_01");
         dash = Resources.Load<AudioClip>("TeamSFX/Player/Dash_01");
-        playerHit = Resources.Load<AudioClip>("TeamSFX/Player/Hit_01");
+        playerHit = Resources.Load<AudioClip>("CombatSFX/UserPlayerV23/PlayerHit");
+        if(playerHit==null) playerHit=Resources.Load<AudioClip>("TeamSFX/Player/Hit_01");
         enemyDeath = Resources.Load<AudioClip>("TeamSFX/Enemy/Death_01");
         portalActivate = Resources.Load<AudioClip>("TeamSFX/Portal/Activate_01");
         portalEnter = Resources.Load<AudioClip>("TeamSFX/Portal/Enter_01");
@@ -108,8 +109,7 @@ public sealed class TeamGameSFX : MonoBehaviour
         TeamGameSFX sfx = Instance;
         if (Time.unscaledTime < sfx.nextHitTime) return;
         sfx.nextHitTime = Time.unscaledTime + 0.08f;
-        // The teammate-selected source is intentionally kept restrained because it is a
-        // bright/electronic terminal-family sound rather than a body-heavy hit.
+        // V23 player-supplied impact; original source preserved outside runtime Resources.
         sfx.PlayOneShot(sfx.playerSource, sfx.playerHit, 0.42f, 0.94f, 1.02f);
     }
 

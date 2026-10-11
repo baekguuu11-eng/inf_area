@@ -65,7 +65,7 @@ public sealed class GameplayPauseSettingsV14 : MonoBehaviour
     private void Update()
     {
         if (SceneManager.GetActiveScene().name != "GameScene") return;
-        if (!Input.GetKeyDown(KeyCode.Escape)) return;
+        if (ChipPanelV22.CapturesInput || !Input.GetKeyDown(KeyCode.Escape)) return;
 
         // ESC first closes the existing shop, preserving the game's current portal-room behavior.
         if (!open && ShopManager.Instance != null && ShopManager.Instance.IsOpen) return;

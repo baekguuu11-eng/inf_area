@@ -1,0 +1,750 @@
+INFECTED AREA - SFX FILE MAPPING
+================================
+
+분석 기준
+- 원본 오디오 파일 자체를 로드하여 재생 가능한 실제 오디오 데이터의 길이, 파형 및 주파수/멜 스펙트럼을 확인함.
+- 파일명/원본 사운드팩의 의미는 보조 정보로만 사용하고, 오디오의 실제 구조와 용도를 함께 비교함.
+- 같은 원본 파일은 한 효과음에만 배정함.
+- 확장자는 원본 확장자를 그대로 유지함.
+
+[01] Player Hit
+최종 파일명:
+01_Player_Hit.ogg
+
+원본 파일명:
+impactMetal_004.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/impactMetal_004.ogg
+
+오디오 분석:
+짧고 강한 금속 충격. 0.39초의 빠른 트랜지언트/감쇠 구조가 피격 순간에 맞음 (길이 약 0.39초)
+
+적합도: ★★★★★
+
+------------------------------------------------
+
+[02] Chip Purchase / Equip
+최종 파일명:
+02_Chip_Purchase_Equip.ogg
+
+원본 파일명:
+confirmation_004.ogg
+
+원본 위치:
+kenney_interfaceSounds/Audio/confirmation_004.ogg
+
+오디오 분석:
+0.49초의 명확한 UI 확인음 (길이 약 0.49초)
+
+적합도: ★★★★★
+
+------------------------------------------------
+
+[03] Enemy Death
+최종 파일명:
+03_Enemy_Death.ogg
+
+원본 파일명:
+glitch_004.ogg
+
+원본 위치:
+kenney_interfaceSounds/Audio/glitch_004.ogg
+
+오디오 분석:
+약 23ms의 짧은 디지털 글리치 트랜지언트 (길이 약 0.02초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[04] Melee Windup
+최종 파일명:
+04_Melee_Windup.ogg
+
+원본 파일명:
+sfx_05a.ogg
+
+원본 위치:
+60-sci-fi-sfx (1)/sfx_05a.ogg
+
+오디오 분석:
+0.42초의 변화하는 광대역 전자음으로 짧은 준비 동작에 적합 (길이 약 0.42초)
+
+적합도: ★★★☆☆
+
+------------------------------------------------
+
+[05] Melee Attack
+최종 파일명:
+05_Melee_Attack.ogg
+
+원본 파일명:
+impactMetal_002.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/impactMetal_002.ogg
+
+오디오 분석:
+0.47초 금속 충격음 (길이 약 0.47초)
+
+적합도: ★★★★★
+
+------------------------------------------------
+
+[06] Melee Sweep
+최종 파일명:
+06_Melee_Sweep.ogg
+
+원본 파일명:
+sfx_08a.ogg
+
+원본 위치:
+60-sci-fi-sfx (1)/sfx_08a.ogg
+
+오디오 분석:
+0.69초 동안 고역 성분이 이동하며 지속되는 스윕형 구조 (길이 약 0.69초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[07] Ranged Target Lock
+최종 파일명:
+07_Ranged_Target_Lock.ogg
+
+원본 파일명:
+tick_004.ogg
+
+원본 위치:
+kenney_interfaceSounds/Audio/tick_004.ogg
+
+오디오 분석:
+55ms의 짧고 명확한 틱 신호 (길이 약 0.05초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[08] Ranged Projectile Fire
+최종 파일명:
+08_Ranged_Projectile_Fire.ogg
+
+원본 파일명:
+laserSmall_002.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/laserSmall_002.ogg
+
+오디오 분석:
+0.34초의 짧은 고역 에너지 계열 효과 (길이 약 0.34초)
+
+적합도: ★★★★★
+
+------------------------------------------------
+
+[09] Ranged Burst
+최종 파일명:
+09_Ranged_Burst.ogg
+
+원본 파일명:
+laserRetro_002.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/laserRetro_002.ogg
+
+오디오 분석:
+0.26초의 짧은 전자 발사 계열 효과 (길이 약 0.26초)
+
+적합도: ★★★☆☆
+
+------------------------------------------------
+
+[10] Tank Slam
+최종 파일명:
+10_Tank_Slam.ogg
+
+원본 파일명:
+impactMetal_000.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/impactMetal_000.ogg
+
+오디오 분석:
+0.63초의 저주파 중심 무거운 금속 충격 (길이 약 0.63초)
+
+적합도: ★★★★★
+
+------------------------------------------------
+
+[11] Tank Charge
+최종 파일명:
+11_Tank_Charge.ogg
+
+원본 파일명:
+spaceEngineLarge_003.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/spaceEngineLarge_003.ogg
+
+오디오 분석:
+5초 지속의 저역 중심 엔진/기계 루프 (길이 약 5.00초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[12] Bomber Arming
+최종 파일명:
+12_Bomber_Arming.ogg
+
+원본 파일명:
+error_005.ogg
+
+원본 위치:
+kenney_interfaceSounds/Audio/error_005.ogg
+
+오디오 분석:
+0.50초의 전자 경고/오류 계열 신호 (길이 약 0.50초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[13] Bomber Explosion
+최종 파일명:
+13_Bomber_Explosion.ogg
+
+원본 파일명:
+explosionCrunch_004.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/explosionCrunch_004.ogg
+
+오디오 분석:
+1.98초의 강한 폭발 크런치 계열 (길이 약 1.98초)
+
+적합도: ★★★★★
+
+------------------------------------------------
+
+[14] Chernobyl Hit
+최종 파일명:
+14_Chernobyl_Hit.ogg
+
+원본 파일명:
+impactMetal_001.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/impactMetal_001.ogg
+
+오디오 분석:
+0.69초의 금속 충격 (길이 약 0.69초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[15] Chernobyl Heavy Hit
+최종 파일명:
+15_Chernobyl_Heavy_Hit.ogg
+
+원본 파일명:
+impactMetal_003.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/impactMetal_003.ogg
+
+오디오 분석:
+0.78초로 비교적 길고 무게감 있는 충격 (길이 약 0.78초)
+
+적합도: ★★★★★
+
+------------------------------------------------
+
+[16] Grid Warning
+최종 파일명:
+16_Grid_Warning.ogg
+
+원본 파일명:
+error_003.ogg
+
+원본 위치:
+kenney_interfaceSounds/Audio/error_003.ogg
+
+오디오 분석:
+0.53초 전자 경고/오류 신호 (길이 약 0.53초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[17] Grid Explosion
+최종 파일명:
+17_Grid_Explosion.ogg
+
+원본 파일명:
+lowFrequency_explosion_001.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/lowFrequency_explosion_001.ogg
+
+오디오 분석:
+1초 저주파 중심 폭발 (길이 약 1.00초)
+
+적합도: ★★★★★
+
+------------------------------------------------
+
+[18] Line Sweep
+최종 파일명:
+18_Line_Sweep.ogg
+
+원본 파일명:
+laserLarge_003.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/laserLarge_003.ogg
+
+오디오 분석:
+0.72초 동안 고역 에너지가 이동하는 레이저형 스윕 (길이 약 0.72초)
+
+적합도: ★★★★★
+
+------------------------------------------------
+
+[19] Cross Blast
+최종 파일명:
+19_Cross_Blast.ogg
+
+원본 파일명:
+forceField_001.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/forceField_001.ogg
+
+오디오 분석:
+0.95초 에너지 방출/필드형 효과 (길이 약 0.95초)
+
+적합도: ★★★☆☆
+
+------------------------------------------------
+
+[20] Checker Pattern
+최종 파일명:
+20_Checker_Pattern.ogg
+
+원본 파일명:
+switch_003.ogg
+
+원본 위치:
+kenney_interfaceSounds/Audio/switch_003.ogg
+
+오디오 분석:
+0.50초의 디지털 스위치/활성화 효과 (길이 약 0.50초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[21] Delayed Tile Warning
+최종 파일명:
+21_Delayed_Tile_Warning.ogg
+
+원본 파일명:
+tick_001.ogg
+
+원본 위치:
+kenney_interfaceSounds/Audio/tick_001.ogg
+
+오디오 분석:
+23ms의 짧은 틱으로 반복 경고에 적합 (길이 약 0.02초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[22] Safe Zone Shift
+최종 파일명:
+22_Safe_Zone_Shift.ogg
+
+원본 파일명:
+select_006.ogg
+
+원본 위치:
+kenney_interfaceSounds/Audio/select_006.ogg
+
+오디오 분석:
+1.94초의 긴 디지털/UI 전환형 효과 (길이 약 1.94초)
+
+적합도: ★★★☆☆
+
+------------------------------------------------
+
+[23] Closing Walls
+최종 파일명:
+23_Closing_Walls.ogg
+
+원본 파일명:
+doorClose_002.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/doorClose_002.ogg
+
+오디오 분석:
+0.53초의 실제 기계식 닫힘 효과 (길이 약 0.53초)
+
+적합도: ★★★★★
+
+------------------------------------------------
+
+[24] Rotating Lines
+최종 파일명:
+24_Rotating_Lines.ogg
+
+원본 파일명:
+engineCircular_004.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/engineCircular_004.ogg
+
+오디오 분석:
+5초 순환형 기계음 (길이 약 5.00초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[25] Target Lock
+최종 파일명:
+25_Target_Lock.ogg
+
+원본 파일명:
+select_007.ogg
+
+원본 위치:
+kenney_interfaceSounds/Audio/select_007.ogg
+
+오디오 분석:
+47ms의 짧은 전자 선택 신호 (길이 약 0.05초)
+
+적합도: ★★★☆☆
+
+------------------------------------------------
+
+[26] Shockwave Charge
+최종 파일명:
+26_Shockwave_Charge.ogg
+
+원본 파일명:
+sfx_16a.ogg
+
+원본 위치:
+60-sci-fi-sfx (1)/sfx_16a.ogg
+
+오디오 분석:
+2.61초 동안 변화가 지속되는 에너지성 빌드업 (길이 약 2.61초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[27] Shockwave Fire
+최종 파일명:
+27_Shockwave_Fire.ogg
+
+원본 파일명:
+lowFrequency_explosion_000.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/lowFrequency_explosion_000.ogg
+
+오디오 분석:
+2초의 저주파 중심 강한 방출 (길이 약 2.00초)
+
+적합도: ★★★★★
+
+------------------------------------------------
+
+[28] Anti-Burst
+최종 파일명:
+28_Anti_Burst.ogg
+
+원본 파일명:
+forceField_004.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/forceField_004.ogg
+
+오디오 분석:
+0.95초의 방어/에너지 필드 방출형 효과 (길이 약 0.95초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[29] Page Transition
+최종 파일명:
+29_Page_Transition.ogg
+
+원본 파일명:
+scroll_001.ogg
+
+원본 위치:
+kenney_interfaceSounds/Audio/scroll_001.ogg
+
+오디오 분석:
+1초의 연속적인 UI 스크롤/전환 효과 (길이 약 1.00초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[30] JHL Face Hit
+최종 파일명:
+적합한 후보 없음
+
+원본 파일명:
+없음
+
+판단:
+첨부된 원본 중 이 용도에 충분히 직접적인 후보가 없어 억지 배정하지 않음
+
+적합도: -
+
+------------------------------------------------
+
+[31] JHL Heavy Hit / Stagger
+최종 파일명:
+31_JHL_Heavy_Hit_Stagger.ogg
+
+원본 파일명:
+explosionCrunch_001.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/explosionCrunch_001.ogg
+
+오디오 분석:
+1.36초의 강한 충격/폭발성 효과로 경직 연출에 사용 가능 (길이 약 1.36초)
+
+적합도: ★★★☆☆
+
+------------------------------------------------
+
+[32] Hand Windup
+최종 파일명:
+32_Hand_Windup.ogg
+
+원본 파일명:
+sfx_12a.ogg
+
+원본 위치:
+60-sci-fi-sfx (1)/sfx_12a.ogg
+
+오디오 분석:
+0.41초의 고역 중심 에너지 빌드업 구조 (길이 약 0.41초)
+
+적합도: ★★★☆☆
+
+------------------------------------------------
+
+[33] Hand Slam
+최종 파일명:
+33_Hand_Slam.ogg
+
+원본 파일명:
+explosionCrunch_003.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/explosionCrunch_003.ogg
+
+오디오 분석:
+1.55초의 강한 충격/폭발 계열 (길이 약 1.55초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[34] Hand Sweep
+최종 파일명:
+34_Hand_Sweep.ogg
+
+원본 파일명:
+laserLarge_001.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/laserLarge_001.ogg
+
+오디오 분석:
+0.72초의 이동성 있는 광대역 에너지 스윕 (길이 약 0.72초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[35] Hand Punch
+최종 파일명:
+적합한 후보 없음
+
+원본 파일명:
+없음
+
+판단:
+첨부된 원본 중 이 용도에 충분히 직접적인 후보가 없어 억지 배정하지 않음
+
+적합도: -
+
+------------------------------------------------
+
+[36] Hand Wall Lock
+최종 파일명:
+36_Hand_Wall_Lock.ogg
+
+원본 파일명:
+switch_005.ogg
+
+원본 위치:
+kenney_interfaceSounds/Audio/switch_005.ogg
+
+오디오 분석:
+0.61초의 기계식 스위치/잠금 동작 (길이 약 0.61초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[37] Compression
+최종 파일명:
+37_Compression.ogg
+
+원본 파일명:
+sfx_10a.ogg
+
+원본 위치:
+60-sci-fi-sfx (1)/sfx_10a.ogg
+
+오디오 분석:
+0.30초의 광대역 디지털 변형 효과 (길이 약 0.30초)
+
+적합도: ★★★☆☆
+
+------------------------------------------------
+
+[38] Hand Prison
+최종 파일명:
+38_Hand_Prison.ogg
+
+원본 파일명:
+forceField_002.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/forceField_002.ogg
+
+오디오 분석:
+0.96초의 에너지 필드/구속 계열 효과 (길이 약 0.96초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[39] Projectile Fire
+최종 파일명:
+39_Projectile_Fire.ogg
+
+원본 파일명:
+laserSmall_004.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/laserSmall_004.ogg
+
+오디오 분석:
+0.41초의 짧은 에너지 발사 계열 효과 (길이 약 0.41초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[40] Laser Charge
+최종 파일명:
+40_Laser_Charge.ogg
+
+원본 파일명:
+sfx_18a.ogg
+
+원본 위치:
+60-sci-fi-sfx (1)/sfx_18a.ogg
+
+오디오 분석:
+3.43초의 지속적인 에너지 빌드업/변화 (길이 약 3.43초)
+
+적합도: ★★★★☆
+
+------------------------------------------------
+
+[41] Laser Fire
+최종 파일명:
+41_Laser_Fire.ogg
+
+원본 파일명:
+laserLarge_004.ogg
+
+원본 위치:
+sci-fi_sounds/Audio/laserLarge_004.ogg
+
+오디오 분석:
+0.68초의 강한 대형 에너지 발사 계열 (길이 약 0.69초)
+
+적합도: ★★★★★
+
+------------------------------------------------
+
+[42] Massive / Tracking Beam
+최종 파일명:
+42_Massive_Tracking_Beam.ogg
+
+원본 파일명:
+sfx_11a.ogg
+
+원본 위치:
+60-sci-fi-sfx (1)/sfx_11a.ogg
+
+오디오 분석:
+6.86초 동안 거의 지속되는 다중 대역 루프형 사운드로 지속 빔에 가장 근접 (길이 약 6.86초)
+
+적합도: ★★★☆☆
+
+------------------------------------------------
+
+[43] Roar Repulse
+최종 파일명:
+43_Roar_Repulse.ogg
+
+원본 파일명:
+sfx_06b.ogg
+
+원본 위치:
+60-sci-fi-sfx (1)/sfx_06b.ogg
+
+오디오 분석:
+2.22초의 광대역 저역 포함 방출형 효과. 기계적 포효/에너지 방출에 대체 가능 (길이 약 2.22초)
+
+적합도: ★★★☆☆
+
+------------------------------------------------
+
+[44] JHL Phase Transition / Full Access
+최종 파일명:
+44_JHL_Phase_Transition_Full_Access.ogg
+
+원본 파일명:
+sfx_16b.ogg
+
+원본 위치:
+60-sci-fi-sfx (1)/sfx_16b.ogg
+
+오디오 분석:
+2.57초의 복합적인 변화형 전자 효과로 큰 시스템 전환에 사용 가능 (길이 약 2.57초)
+
+적합도: ★★★★☆
+
+------------------------------------------------

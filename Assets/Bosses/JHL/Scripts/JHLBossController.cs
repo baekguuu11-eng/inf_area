@@ -144,12 +144,19 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
     private Coroutine faceHitFeedbackRoutineV12;
     private float nextFaceHitFeedbackTimeV12;
 
+    private JHLCombatV25 combatV25;
+    public void InitializeV25(JHLCombatV25 combat)
+    {
+        combatV25 = combat; health = combat.Health; ownerRoom = combat.Room;
+        arenaBounds = ownerRoom.EnemySpawnArea; face = combat.Face;
+        leftHand = combat.Left; rightHand = combat.Right;
+    }
     public EnemyHealth Health => health;
     public RoomController OwnerRoom => ownerRoom;
-    public int Phase => phase;
-    public bool IsDead => dead;
+    public int Phase => combatV25 != null ? combatV25.Phase : phase;
+    public bool IsDead => combatV25 != null ? combatV25.IsDead : dead;
     public string DebugStateName => state.ToString();
-    public string DebugCurrentPatternName => patternRunning ? currentPattern.ToString() : "-";
+    public string DebugCurrentPatternName => combatV25 != null ? combatV25.Pattern : patternRunning ? currentPattern.ToString() : "-";
     public string DebugLastPatternName => lastPatternName;
     public string DebugSelectedPatternName => debugSelectedPattern.ToString();
     public BoxCollider2D ArenaBounds => arenaBounds;
@@ -253,6 +260,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     private void LateUpdate()
     {
+        if (combatV25 != null) return;
         if (dead || faceMotion == null || leftMotion == null || rightMotion == null) return;
         Camera cam = Camera.main;
         if (cam == null || !cam.orthographic) return;
@@ -265,6 +273,8 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
             : cam.orthographicSize;
         float screenHeight = Mathf.Max(4f, baseHalfHeight * 2f);
         float screenWidth = Mathf.Max(6f, screenHeight * cam.aspect);
+        if (RoomLayoutV24.TryGetBounds(ownerRoom, out Bounds fixedFrame))
+        { screenWidth = fixedFrame.size.x; screenHeight = fixedFrame.size.y; }
         faceSize = new Vector2(screenWidth * 0.50f, screenHeight * 0.30f);
         handSize = new Vector2(screenWidth * 0.38f, screenHeight * 0.45f);
 
@@ -287,6 +297,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     private void OnDestroy()
     {
+        if (combatV25 != null) return;
         if (health != null) health.Damaged -= OnBossDamaged;
         if (antiPressureInterruptRoutine != null) StopCoroutine(antiPressureInterruptRoutine);
         if (auxiliaryPatternRoutine != null) StopCoroutine(auxiliaryPatternRoutine);
@@ -301,6 +312,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     public void BeginIntro()
     {
+        if (combatV25 != null) { combatV25.Begin(); return; }
         if (dead || combatStarted || state != BossState.Dormant) return;
         StartCoroutine(IntroRoutine());
     }
@@ -455,6 +467,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     public void DebugCyclePattern(int delta)
     {
+        if (combatV25 != null) { combatV25.DebugCycle(delta); return; }
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Array values = Enum.GetValues(typeof(JHLPatternKind));
         int count = values.Length;
@@ -467,6 +480,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     public void DebugForcePattern()
     {
+        if (combatV25 != null) { combatV25.DebugForce(); return; }
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (combatStarted && !dead) debugForceSelectedPattern = true;
 #endif
@@ -474,12 +488,14 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     public void DebugBeginCombatAtHealth(float normalizedHealth)
     {
+        if (combatV25 != null) { combatV25.DebugStart(normalizedHealth); return; }
         if (dead) return;
         DebugResetCombat(normalizedHealth, normalizedHealth <= PhaseThreeRatio ? 3 : normalizedHealth <= PhaseTwoRatio ? 2 : 1);
     }
 
     public void DebugResetCombat(float normalizedHealth, int requestedPhase)
     {
+        if (combatV25 != null) { combatV25.DebugStart(normalizedHealth); return; }
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (dead || health == null) return;
         StopAllCoroutines();
@@ -535,6 +551,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     public void DebugForcePattern(JHLPatternKind pattern)
     {
+        if (combatV25 != null) { combatV25.DebugForce(); return; }
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         if (dead || !combatStarted) return;
         if (combatRoutine != null) StopCoroutine(combatRoutine);
@@ -560,6 +577,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     public void DebugForceCleanup()
     {
+        if (combatV25 != null) return;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         StopAllCoroutines();
         patternRunning = false;
@@ -612,7 +630,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
             RecalculateScreenHomes(phase);
             yield return HandlePendingPhaseTransitions();
             if (dead) yield break;
-            bool pressurePair = false;
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (debugForceSelectedPattern)
             {
@@ -625,7 +643,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
                 currentPattern = JHLPatternKind.FullAccess;
             else if (antiPressurePending && Time.time >= antiPressureCooldownUntil)
             {
-                currentPattern = IsPlayerInFaceMeleeZone() ? JHLPatternKind.RoarRepulse : JHLPatternKind.RemoteSuppression;
+                currentPattern = JHLPatternKind.RoarRepulse; // Same evadable response for every weapon
                 antiPressurePending = false;
                 meleePressureDamage = rangedPressureDamage = 0f;
                 antiPressureCooldownUntil = Time.time + (phase == 1 ? 8f : phase == 2 ? 7f : 6f);
@@ -633,34 +651,19 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
             else
             {
                 currentPattern = SelectPattern();
-                pressurePair = phase >= 2 && attacksSinceComboV15 >= (phase == 2 ? 2 : 1);
+
             }
             patternRunning = true;
             state = BossState.Combat;
-            if (pressurePair)
-            {
-                // One hand channel + stationary, clearly announced face-channel attack.
-                currentPattern = JHLPatternKind.HandSweep;
-                lastPatternName = "V16 SWEEP + LOCKED AIM";
-                RememberPattern(currentPattern);
-                auxiliaryPatternRoutine = StartCoroutine(PressureAimV16());
-                yield return HandSweepRoutine(Random.value < 0.5f, 0.95f, 1);
-                while (!dead && auxiliaryPatternRoutine != null) yield return null;
-                attacksSinceComboV15 = 0;
-            }
-            else
-            {
-                lastPatternName = currentPattern.ToString();
-                RememberPattern(currentPattern);
-                yield return RunPattern(currentPattern);
-                attacksSinceComboV15++;
-            }
+            lastPatternName = currentPattern == JHLPatternKind.SweepLaserCombo ? "SWEEP + FINGER GUN" : currentPattern.ToString();
+            RememberPattern(currentPattern);
+            yield return RunPattern(currentPattern);
             patternRunning = false;
             if (dead) yield break;
-            // Residual finger bullets keep their declared lifetime; only the counter clears hazards.
+            // Each projectile pattern owns and drains its wave before another spatial pattern starts.
             SetHandsSolid(false);
             SetTrails(false, false);
-            float gap = phase == 1 ? 0.48f : phase == 2 ? 0.34f : 0.24f;
+            float gap = phase == 1 ? 0.16f : phase == 2 ? 0.10f : 0.07f;
             if (currentPattern == JHLPatternKind.MassiveCentralBeam) gap += 0.28f;
             if (currentPattern == JHLPatternKind.FullAccess) gap = 0.85f;
             yield return ReturnPartsToHomeAnimated(gap);
@@ -815,7 +818,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
         leftMotion.SetMotionProfile(targetPhase >= 3 ? 3.9f : 3.4f, 1.08f, 34f);
         rightMotion.SetMotionProfile(targetPhase >= 3 ? 3.9f : 3.4f, 1.08f, 34f);
 
-        faceMotion.SetTarget(faceHome + Vector3.down * (targetPhase >= 3 ? 0.55f : 0.28f), JHLPartMotionState.Attack);
+        faceMotion.SetTarget(faceHome, JHLPartMotionState.Attack);
         leftMotion.SetTarget(leftHome + Vector3.right * (targetPhase >= 3 ? 0.60f : 0.32f), JHLPartMotionState.Attack);
         rightMotion.SetTarget(rightHome + Vector3.left * (targetPhase >= 3 ? 0.60f : 0.32f), JHLPartMotionState.Attack);
         faceMotion.SetScaleMultiplier(targetPhase >= 3 ? new Vector3(1.05f, 0.95f, 1f) : new Vector3(1.03f, 0.97f, 1f));
@@ -864,16 +867,20 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     private IEnumerator RunPattern(JHLPatternKind pattern)
     {
+        PrepareHandsV18(pattern);
         switch (pattern)
         {
-            case JHLPatternKind.HandSlam: yield return HandSlamRoutine(Random.value < 0.5f ? leftMotion : rightMotion, 0.66f, 1); break;
+            case JHLPatternKind.HandSlam:
+                yield return HandSlamRoutine(Random.value < 0.5f ? leftMotion : rightMotion, 0.85f, 1);
+                if (phase >= 3 && !dead) { yield return new WaitForSeconds(0.25f); yield return HandSlamRoutine(Random.value < 0.5f ? leftMotion : rightMotion, 0.78f, 1); }
+                break;
             case JHLPatternKind.HandSweep: yield return HandSweepRoutine(Random.value < 0.5f, 0.74f, 1); break;
             case JHLPatternKind.StraightLaser: yield return StraightLaserRoutine(0.78f, 0.34f, 1); break;
-            case JHLPatternKind.FingerBarrage: yield return FingerBarrageRoutine(); break;
+            case JHLPatternKind.FingerBarrage: yield return GunVolleyV18(false, false); break;
             case JHLPatternKind.DoubleTapSlam: yield return DoubleTapSlamRoutine(); break;
             case JHLPatternKind.SidePunch: yield return SidePunchRoutine(); break;
             case JHLPatternKind.TripleAimLaser: yield return TripleAimLaserRoutine(); break;
-            case JHLPatternKind.ProjectileFan: yield return ProjectileFanRoutine(); break;
+            case JHLPatternKind.ProjectileFan: yield return GunVolleyV18(false, true); break;
             case JHLPatternKind.EnhancedSlam: yield return EnhancedSlamRoutine(); break;
             case JHLPatternKind.EnhancedSweep: yield return EnhancedSweepRoutine(); break;
             case JHLPatternKind.Compression: yield return CompressionRoutine(false); break;
@@ -891,12 +898,12 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
             case JHLPatternKind.SplitBeam: yield return SplitBeamRoutine(); break;
             case JHLPatternKind.LaserCurtain: yield return LaserCurtainRoutine(); break;
             case JHLPatternKind.SpiralBeam: yield return SpiralBeamRoutine(); break;
-            case JHLPatternKind.CrossfireBarrage: yield return CrossfireBarrageRoutine(); break;
-            case JHLPatternKind.SweepLaserCombo: yield return SweepLaserComboRoutine(); break;
+            case JHLPatternKind.CrossfireBarrage: yield return GunVolleyV18(true, true); break;
+            case JHLPatternKind.SweepLaserCombo: yield return SweepBarrageRoutineV17(); break;
             case JHLPatternKind.QuadSlam: yield return QuadSlamRoutine(); break;
             case JHLPatternKind.RapidLaserBurst: yield return RapidLaserBurstRoutine(); break;
             case JHLPatternKind.FinalCompression: yield return FinalCompressionRoutine(); break;
-            case JHLPatternKind.MovingGate: yield return MovingGateRoutine(); break;
+            case JHLPatternKind.MovingGate: yield return ApproachGateRoutineV17(); break;
             case JHLPatternKind.DiagonalCrossPunch: yield return DiagonalCrossPunchRoutine(); break;
             case JHLPatternKind.PredictiveBombardment: yield return PredictiveBombardmentRoutine(); break;
             case JHLPatternKind.BeamPinch: yield return BeamPinchRoutine(); break;
@@ -956,7 +963,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
         CameraFeedbackController feedback = CameraFeedbackController.Instance;
         if (feedback != null) feedback.Impact(phase >= 3 ? CameraImpactLevelV11.Heavy : CameraImpactLevelV11.Medium, Vector2.down, phase >= 3);
         if (cameraFx != null) cameraFx.PulseLight(1f);
-        yield return new WaitForSeconds(0.10f);
+        yield return new WaitForSeconds(ApproachDurationV17());
 
         SetTrailForMotion(motion, false);
         motion.SetScaleMultiplier(Vector3.one);
@@ -1057,7 +1064,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
         DestroyTracked(telegraph);
 
         // Use exactly the world geometry declared by the warning.
-        GameObject beam = CreateBeam(origin, dir, length, width, 0.34f, new Color(1f, 0.14f, 0.44f, 0.68f), Color.white);
+        GameObject beam = CreateBeam(origin, dir, length, width, 0.75f, new Color(1f, 0.14f, 0.44f, 0.68f), Color.white);
         if (bossAudio != null) bossAudio.PlayBeamFire();
         faceMotion.SetScaleMultiplier(new Vector3(1.01f, 1.04f, 1f));
         faceMotion.AddVelocityImpulse(-dir * 1.8f);
@@ -1068,7 +1075,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
             cameraFx.SetCharge(0f);
             cameraFx.PulseLight(1f);
         }
-        yield return SustainStaticBeamDamage(origin, dir, length, width, damage, 0.34f);
+        yield return SustainStaticBeamDamage(origin, dir, length, width, damage, 0.75f);
         DestroyTracked(beam);
         faceMotion.SetScaleMultiplier(Vector3.one);
         faceMotion.SetTarget(faceHome, JHLPartMotionState.Recovery);
@@ -1090,14 +1097,25 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
         motion.SetScaleMultiplier(new Vector3(0.98f, 1.02f, 1f));
         yield return new WaitForSeconds(0.40f);
 
-        int count = phase >= 2 ? 6 : 5;
+        int count = phase == 1 ? 9 : phase == 2 ? 12 : 15;
+        Vector2 lockedOrigin = tip.position;
+        Vector2 lockedDirection = ((Vector2)player.position - lockedOrigin).normalized;
+        if (lockedDirection.sqrMagnitude < 0.01f) lockedDirection = Vector2.down;
+        List<GameObject> aimWarnings = new List<GameObject>();
+        for (int ray = -1; ray <= 1; ray++)
+            aimWarnings.Add(CreateLineTelegraph(lockedOrigin, RotateVector(lockedDirection, ray * 16f), 3f, 0.3f,
+                new Color(1f, 0.12f, 0.32f, 0.3f), 0.75f));
+        yield return new WaitForSeconds(0.75f);
+        foreach (GameObject aimWarning in aimWarnings) DestroyTracked(aimWarning);
         if (bossAudio != null) bossAudio.PlayHandWindup();
         for (int i = 0; i < count; i++)
         {
             if (dead || player == null) yield break;
-            Vector2 origin = tip.position;
-            Vector2 direction = ((Vector2)player.position - origin).normalized;
-            JHLProjectile projectile = JHLProjectile.Create(this, origin, direction, phase >= 3 ? 9.5f : 8.2f, 1);
+            Vector2 origin = lockedOrigin;
+            Vector2 direction = RotateVector(lockedDirection, (i % 3 - 1) * 16f);
+            JHLProjectile projectile = JHLProjectile.Create(this, origin, direction,
+                phase == 1 ? 8.5f : phase == 2 ? 9.5f : 10.5f, 1);
+            if (projectile != null) projectile.SetLifetimeV17(1.4f);
             if (bossAudio != null) bossAudio.PlayProjectile();
             if (projectile != null) RegisterSpawnedObject(projectile.gameObject);
             motion.AddVelocityImpulse(-direction * 0.55f);
@@ -1107,6 +1125,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
         }
         motion.SetScaleMultiplier(Vector3.one);
         motion.SetRotation(0f, JHLPartMotionState.Recovery);
+        yield return new WaitForSeconds(0.12f);
     }
 
     private IEnumerator EnhancedSlamRoutine()
@@ -1224,7 +1243,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
         if (bossAudio != null) bossAudio.PlayBeamCharge();
 
         faceMotion.SetMotionProfile(3.0f, 1.10f, 24f);
-        faceMotion.SetTarget(faceHome + Vector3.down * 0.42f, JHLPartMotionState.Anticipation);
+        faceMotion.SetTarget(faceHome, JHLPartMotionState.Anticipation);
         faceMotion.SetScaleMultiplier(new Vector3(1.03f, 0.95f, 1f));
         if (cameraFx != null)
         {
@@ -1636,7 +1655,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
     {
         GetCameraFrame(out Vector3 center, out float halfW, out float halfH);
         int columns = 7;
-        int safeIndex = Random.Range(1, columns - 1);
+        int safeIndex = columns / 2;
         float spacing = (halfW * 1.76f) / (columns - 1);
         float beamWidth = Mathf.Min(0.46f, spacing * 0.42f);
         List<GameObject> warnings = new List<GameObject>();
@@ -1644,11 +1663,11 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
         Vector2 down = Vector2.down;
         for (int i = 0; i < columns; i++)
         {
-            if (i == safeIndex) continue;
+            if (Mathf.Abs(i - safeIndex) <= 1) continue;
             float x = center.x - halfW * 0.88f + spacing * i;
             Vector2 origin = new Vector2(x, center.y + halfH * 0.93f);
             origins.Add(origin);
-            warnings.Add(CreateLineTelegraph(origin, down, halfH * 1.90f, beamWidth * 0.38f, new Color(1f, 0.05f, 0.26f, 0.23f), 0.90f));
+            warnings.Add(CreateLineTelegraph(origin, down, halfH * 1.90f, beamWidth, new Color(1f, 0.05f, 0.26f, 0.23f), 0.90f));
         }
         yield return new WaitForSeconds(0.90f);
         for (int i = 0; i < warnings.Count; i++) DestroyTracked(warnings[i]);
@@ -1656,13 +1675,13 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
         for (int i = 0; i < origins.Count; i++)
         {
             float length = halfH * 1.90f;
-            beams.Add(CreateBeam(origins[i], down, length, beamWidth, 0.55f, new Color(1f, 0.08f, 0.34f, 0.62f), Color.white));
+            beams.Add(CreateBeam(origins[i], down, length, beamWidth, 1.35f, new Color(1f, 0.08f, 0.34f, 0.62f), Color.white));
         }
         if (bossAudio != null) bossAudio.PlayBeamFire();
         if (cameraFx != null) cameraFx.PulseHeavy(0.70f);
         bool curtainHit = false;
         float curtainElapsed = 0f;
-        while (curtainElapsed < 0.55f)
+        while (curtainElapsed < 1.35f && !dead)
         {
             curtainElapsed += Time.deltaTime;
             if (!curtainHit)
@@ -1913,51 +1932,55 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
     private IEnumerator RoarRepulseRoutine()
     {
         if (player == null || playerBody == null || faceMotion == null) yield break;
-        CleanupSpawnedObjects();
-        SetHandsSolid(false);
-        faceMotion.SetMotionProfile(3.2f,1.12f,26f);
-        faceMotion.SetScaleMultiplier(new Vector3(0.94f,1.07f,1f));
-        faceMotion.SetTarget(faceHome + Vector3.up * 0.35f, JHLPartMotionState.Anticipation);
-        if (combatEffects != null) combatEffects.SpawnCharge(face,0.48f,Mathf.Max(0.7f,faceSize.y*0.34f),Color.white);
-        if (bossAudio != null) bossAudio.PlayRoar();
-        if (cameraFx != null){cameraFx.SetCharge(0.8f);cameraFx.SetFraming(0.035f);}
-        yield return new WaitForSeconds(0.48f);
-
+        CleanupSpawnedObjects(); SetHandsSolid(false);
+        // Visible success before defensive pressure. Face stays damageable throughout.
+        if (combatEffects != null) combatEffects.SpawnImpact(face.position, 0.9f, Color.white);
+        if (bossAudio != null) bossAudio.PlayHit(true);
+        yield return ReturnPartsToHomeAnimated(0.35f);
         if (dead || playerHealth == null || playerHealth.IsDead) yield break;
+        Vector2 origin = face.position;
+        Vector2 away = ((Vector2)player.position - origin).normalized;
+        if (away.sqrMagnitude < 0.01f) away = Vector2.down;
+        float length = BeamLengthToArena(origin, away);
+        const float width = 2.1f;
+        float warning = phase == 1 ? 0.85f : phase == 2 ? 0.75f : 0.65f;
+        GameObject mark = CreateLineTelegraph(origin, away, length, width,
+            new Color(1f, 0.68f, 0.12f, 0.35f), warning);
+        faceMotion.SetScaleMultiplier(new Vector3(0.94f, 1.06f, 1f));
+        if (bossAudio != null) bossAudio.PlayRoar();
+        yield return new WaitForSeconds(warning);
+        DestroyTracked(mark);
+        if (dead || playerHealth == null || playerHealth.IsDead) yield break;
+        Vector2 delta = playerBody.position - origin;
+        float forward = Vector2.Dot(delta, away);
+        float lateral = Mathf.Abs(delta.x * away.y - delta.y * away.x);
+        Collider2D body = player.GetComponent<Collider2D>();
+        float radius = body != null ? Mathf.Max(body.bounds.extents.x, body.bounds.extents.y) : 0.3f;
         PlayerDashController dash = player.GetComponent<PlayerDashController>();
-        if (dash != null) dash.CancelForExternalForce();
-        inputLock = GameInputState.Acquire("JHLRoarRepulse");
-        Vector2 start = playerBody.position;
-        Vector2 away = start - (Vector2)face.position;
-        if (away.sqrMagnitude < 0.001f) away = Vector2.down;
-        away.Normalize();
-        Vector2 target = ArenaEdgeFromPoint(start, away, 0.42f);
-        target = ResolveForcePushTarget(start, target, 0.30f);
-        if (combatEffects != null) combatEffects.SpawnImpact(face.position, Mathf.Max(faceSize.x*0.42f,2.5f), Color.white);
-        CameraFeedbackController feedback=CameraFeedbackController.Instance;
-        if(feedback!=null)feedback.Impact(CameraImpactLevelV11.Boss,away,true);
-        if(cameraFx!=null){cameraFx.SetCharge(0f);cameraFx.PulseHeavy(1f);}
-        faceMotion.SetScaleMultiplier(new Vector3(1.08f,0.94f,1f));
-        faceMotion.AddVelocityImpulse(-away*2.0f);
-        if(playerHealth!=null)playerHealth.GrantTemporaryInvulnerability(0.52f);
-
-        float elapsed=0f;
-        const float pushDuration=0.34f;
-        while(elapsed<pushDuration && playerBody!=null && !dead && !playerHealth.IsDead)
+        // Escaping the declared strip avoids the push; no automatic arena-edge displacement.
+        if (forward >= -radius && forward <= length + radius && lateral <= width * 0.5f + radius)
         {
-            elapsed += Time.fixedDeltaTime;
-            float t=Mathf.Clamp01(elapsed/pushDuration);
-            float eased=1f-Mathf.Pow(1f-t,3f);
-            playerBody.MovePosition(Vector2.Lerp(start,target,eased));
-            playerBody.linearVelocity=Vector2.zero;
-            yield return new WaitForFixedUpdate();
+            if (dash != null) dash.CancelForExternalForce();
+            inputLock = GameInputState.Acquire("JHLRoarRepulse");
+            Vector2 start = playerBody.position;
+            Vector2 target = ClampToArena(start + away * (phase == 1 ? 2.8f : phase == 2 ? 3.2f : 3.6f), 0.55f);
+            target = ResolveForcePushTarget(start, target, radius);
+            playerHealth.GrantTemporaryInvulnerability(0.95f);
+            float elapsed = 0f;
+            while (elapsed < 0.30f && !dead && playerBody != null && !playerHealth.IsDead)
+            {
+                elapsed += Time.fixedDeltaTime;
+                float t = Mathf.Clamp01(elapsed / 0.30f);
+                playerBody.MovePosition(Vector2.Lerp(start, target, 1f - Mathf.Pow(1f - t, 3f)));
+                playerBody.linearVelocity = Vector2.zero;
+                yield return new WaitForFixedUpdate();
+            }
+            ReleaseInputLock();
         }
-        if(playerBody!=null && !dead && !playerHealth.IsDead){playerBody.position=target;playerBody.linearVelocity=Vector2.zero;}
+        if (cameraFx != null) cameraFx.PulseLight(0.65f);
         faceMotion.SetScaleMultiplier(Vector3.one);
-        faceMotion.SetTarget(faceHome,JHLPartMotionState.Recovery);
-        if(cameraFx!=null)cameraFx.SetFraming(0f);
-        ReleaseInputLock();
-        yield return new WaitForSeconds(0.18f);
+        faceMotion.SetTarget(faceHome, JHLPartMotionState.Recovery);
+        yield return new WaitForSeconds(0.65f);
     }
 
     private IEnumerator RemoteSuppressionRoutine()
@@ -2008,7 +2031,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
         Vector2 origin = faceFireOrigin != null ? faceFireOrigin.position : face.position;
         Vector2 dir = AngleToVector(angle);
         float length = BeamLengthToArena(origin, dir);
-        GameObject marker = CreateLineTelegraph(origin, dir, length, width * 0.48f, new Color(1f, 0.06f, 0.26f, 0.25f), warning);
+        GameObject marker = CreateLineTelegraph(origin, dir, length, width, new Color(1f, 0.06f, 0.26f, 0.25f), warning);
         if (cameraFx != null) cameraFx.SetCharge(0.38f);
         yield return new WaitForSeconds(warning);
         DestroyTracked(marker);
@@ -2028,6 +2051,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     public bool HandleRequestedDeath(EnemyHealth requestedHealth, Vector2 hitDirection, EnemyHitKind hitKind)
     {
+        if (combatV25 != null) return combatV25.Die(hitDirection);
         if (requestedHealth != health || dead) return false;
         dead = true;
         if (openingV15 != null) openingV15.ResetCombat();
@@ -2172,6 +2196,8 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
         if (dead || Time.time < antiPressureCooldownUntil || antiPressurePending) return;
         antiPressurePending = true;
         antiPressurePattern = pattern;
+        if (combatEffects != null && face != null) combatEffects.SpawnImpact(face.position, 0.65f, new Color(0.5f, 1f, 1f));
+        if (bossAudio != null) bossAudio.PlayHit(true);
         // Finish the current committed attack; never cancel its warning into another hit.
     }
 
@@ -2241,6 +2267,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     public void RegisterSpawnedObject(GameObject target)
     {
+        spawnedObjects.RemoveAll(item => item == null);
         if (target != null && !spawnedObjects.Contains(target)) spawnedObjects.Add(target);
     }
 
@@ -2422,6 +2449,16 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
     {
         if (handTransform == null || damage <= 0)
             return false;
+
+        JHLArticulatedHandV18 rig = handTransform.GetComponent<JHLArticulatedHandV18>();
+        if (rig != null)
+        {
+            if (playerHealth == null || playerHealth.IsDead) return false;
+            Collider2D body = playerHealth.GetComponent<Collider2D>();
+            if (!rig.Touches(body)) return false;
+            playerHealth.TakeDamage(damage);
+            return true;
+        }
 
         int playerLayer = LayerMask.NameToLayer("Player");
         int mask = playerLayer >= 0 ? 1 << playerLayer : Physics2D.AllLayers;
@@ -2606,6 +2643,8 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
 
     private void GetCameraFrame(out Vector3 center, out float halfWidth, out float halfHeight)
     {
+        if (RoomLayoutV24.TryGetBounds(ownerRoom, out Bounds fixedFrame))
+        { center = fixedFrame.center; halfWidth = fixedFrame.extents.x; halfHeight = fixedFrame.extents.y; return; }
         Camera cam = Camera.main;
         if (cam != null && cam.orthographic)
         {
@@ -2630,6 +2669,7 @@ public sealed partial class JHLBossController : MonoBehaviour, IEnemyDeathOverri
     /// </summary>
     private Bounds GetCombatBounds()
     {
+        if (RoomLayoutV24.TryGetBounds(ownerRoom, out Bounds layoutBounds)) return layoutBounds;
         if (ownerRoom != null)
         {
             Transform left = ownerRoom.GetSpawnPoint(GateDirection.Left);

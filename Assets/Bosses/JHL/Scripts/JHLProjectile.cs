@@ -41,6 +41,11 @@ public sealed class JHLProjectile : MonoBehaviour
         return projectile;
     }
 
+    public void SetLifetimeV17(float seconds)
+    {
+        expiresAt = Time.time + Mathf.Max(0.1f, seconds);
+    }
+
     private void Update()
     {
         if (consumed) return;

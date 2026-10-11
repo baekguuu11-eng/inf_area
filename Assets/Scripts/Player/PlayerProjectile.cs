@@ -178,7 +178,7 @@ public class PlayerProjectile : MonoBehaviour
             bool lethal = appliedDamage >= enemy.CurrentHealth;
             EnemyRole role = enemy.GetComponentInParent<EnemyRole>();
             bool tank = role != null && role.CurrentRole == EnemyRole.Role.Tank;
-            enemy.TakeDamage(new DamageContext(appliedDamage, direction, hitPoint, EnemyHitKind.Ranged, stoppingPower));
+            if (!enemy.TryTakeDamage(new DamageContext(appliedDamage, direction, hitPoint, EnemyHitKind.Ranged, stoppingPower))) { Terminate(); return; }
             CombatImpactFXV11.EmitWeaponHit(weapon, hitPoint, direction, lethal, tank, travelled);
             if (PlayerCombatSFX.Instance != null) PlayerCombatSFX.Instance.PlayRangedImpact(weapon, enemy, hitPoint);
 

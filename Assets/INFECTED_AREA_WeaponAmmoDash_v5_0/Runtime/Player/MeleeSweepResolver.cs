@@ -171,7 +171,7 @@ public sealed class MeleeSweepResolver : MonoBehaviour
             bool lethal = damage >= health.CurrentHealth;
             EnemyRole role = health.GetComponentInParent<EnemyRole>();
             bool tank = role != null && role.CurrentRole == EnemyRole.Role.Tank;
-            health.TakeDamage(new DamageContext(damage, dir, trueHitPoint, EnemyHitKind.Melee, knockback));
+            if (!health.TryTakeDamage(new DamageContext(damage, dir, trueHitPoint, EnemyHitKind.Melee, knockback))) continue;
             CombatImpactFXV11.EmitWeaponHit(weapon, trueHitPoint, dir, lethal, tank, 0f);
             if (combatSfx != null) combatSfx.PlayMeleeImpact(weapon, health, trueHitPoint);
             if (!health.IsDead && weapon != null && weapon.weaponId == "debug_whip")

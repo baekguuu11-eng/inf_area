@@ -20,12 +20,14 @@ public sealed class JHLPatternDirector : MonoBehaviour
 
     private JHLPatternKind lastPatternV15;
     private bool hasLastV15;
+    private int introducedPhaseV17;
+    private readonly Queue<JHLPatternKind> introductionsV17 = new Queue<JHLPatternKind>();
 
     public JHLPatternFamily LastFamily { get; private set; } = JHLPatternFamily.HandSingle;
 
     public void ResetHistory()
     {
-        hasLastV15 = false;
+        hasLastV15 = false; introducedPhaseV17 = 0; introductionsV17.Clear();
         recentPatterns.Clear();
         recentFamilies.Clear();
         LastFamily = JHLPatternFamily.HandSingle;
@@ -54,6 +56,14 @@ public sealed class JHLPatternDirector : MonoBehaviour
         if (phase >= 3 && healthRatio <= 0.15f && !fullAccessUsed)
             return JHLPatternKind.FullAccess;
 
+        if (introducedPhaseV17 != phase)
+        {
+            introducedPhaseV17 = phase; introductionsV17.Clear();
+            if (phase <= 1) introductionsV17.Enqueue(JHLPatternKind.HandSlam);
+            else if (phase == 2) { introductionsV17.Enqueue(JHLPatternKind.TwinSlam); introductionsV17.Enqueue(JHLPatternKind.TrackingThinBeam); introductionsV17.Enqueue(JHLPatternKind.LaserCurtain); introductionsV17.Enqueue(JHLPatternKind.SweepLaserCombo); }
+            else { introductionsV17.Enqueue(JHLPatternKind.SlamChain); introductionsV17.Enqueue(JHLPatternKind.LaserSweep); introductionsV17.Enqueue(JHLPatternKind.CrossfireBarrage); introductionsV17.Enqueue(JHLPatternKind.BeamPinch); }
+        }
+        if (introductionsV17.Count > 0) return introductionsV17.Dequeue();
         List<JHLPatternKind> candidates = BuildPool(phase);
         float edge = Mathf.Abs(playerPosition.x - cameraCenter.x) / Mathf.Max(0.1f, cameraHalfWidth);
         float speed = playerVelocity.magnitude;
@@ -183,14 +193,16 @@ public sealed class JHLPatternDirector : MonoBehaviour
 
     private static List<JHLPatternKind> BuildPool(int phase)
     {
-        if (phase <= 1) return new List<JHLPatternKind> {
-            JHLPatternKind.HandSlam, JHLPatternKind.HandSweep, JHLPatternKind.StraightLaser, JHLPatternKind.FingerBarrage };
-        if (phase == 2) return new List<JHLPatternKind> {
-            JHLPatternKind.DoubleTapSlam, JHLPatternKind.HandSweep, JHLPatternKind.Compression,
-            JHLPatternKind.StraightLaser, JHLPatternKind.FingerBarrage };
-        return new List<JHLPatternKind> {
-            JHLPatternKind.DoubleTapSlam, JHLPatternKind.HandSweep, JHLPatternKind.Compression,
-            JHLPatternKind.MassiveCentralBeam, JHLPatternKind.TrackingThinBeam };
+        List<JHLPatternKind> pool = new List<JHLPatternKind> {
+            JHLPatternKind.HandSlam, JHLPatternKind.HandSweep, JHLPatternKind.StraightLaser,
+            JHLPatternKind.FingerBarrage, JHLPatternKind.DoubleTapSlam, JHLPatternKind.SidePunch,
+            JHLPatternKind.ProjectileFan, JHLPatternKind.MovingGate, JHLPatternKind.CrossSlam,
+            JHLPatternKind.Compression };
+        if (phase >= 2) pool.AddRange(new[] { JHLPatternKind.TwinSlam, JHLPatternKind.TrackingThinBeam,
+            JHLPatternKind.LaserCurtain, JHLPatternKind.SweepLaserCombo });
+        if (phase >= 3) pool.AddRange(new[] { JHLPatternKind.SlamChain, JHLPatternKind.LaserSweep,
+            JHLPatternKind.CrossfireBarrage, JHLPatternKind.BeamPinch });
+        return pool;
     }
 
     private static float BaseWeight(JHLPatternKind pattern)

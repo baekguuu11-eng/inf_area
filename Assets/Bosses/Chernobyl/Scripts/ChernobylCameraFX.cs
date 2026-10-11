@@ -131,9 +131,14 @@ public sealed class ChernobylCameraFX : MonoBehaviour
         PulseTransition(phase);
     }
 
+    private float cutsceneZoomV22;
+    public void SetCutsceneZoomV22(float amount) {cutsceneZoomV22=Mathf.Clamp(amount,0f,.05f);}
     public void EndBoss()
     {
+        bool wasActive = bossActive;
+        cutsceneZoomV22=0f;
         bossActive = false;
+        if (wasActive && targetCamera != null && baseOrthoSize > 0f) targetCamera.orthographicSize = baseOrthoSize;
         zoomPulse = bloomPulse = chromaPulse = exposurePulse = lensPulse = vignettePulse = 0f;
     }
 
@@ -231,12 +236,8 @@ public sealed class ChernobylCameraFX : MonoBehaviour
         // 픽셀 아트가 무너지지 않는 범위에서 1~4% 정도의 짧은 줌 펀치만 사용한다.
         if (targetCamera != null && targetCamera.orthographic && bossActive)
         {
-            float desired = baseOrthoSize * (1f + zoomPulse + meltdownBreath * (phase >= 3 ? 0.0035f : 0f));
+            float desired = baseOrthoSize * (1f - cutsceneZoomV22 + zoomPulse + meltdownBreath * (phase >= 3 ? 0.0035f : 0f));
             targetCamera.orthographicSize = Mathf.Lerp(targetCamera.orthographicSize, desired, 1f - Mathf.Exp(-dt * 16f));
-        }
-        else if (targetCamera != null && targetCamera.orthographic && !bossActive && baseOrthoSize > 0.01f)
-        {
-            targetCamera.orthographicSize = Mathf.Lerp(targetCamera.orthographicSize, baseOrthoSize, 1f - Mathf.Exp(-dt * 10f));
         }
     }
 }
