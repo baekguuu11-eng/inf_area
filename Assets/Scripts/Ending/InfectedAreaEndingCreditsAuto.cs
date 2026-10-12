@@ -1,4 +1,4 @@
-using System.Collections;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using TMPro;
@@ -6,1408 +6,360 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityEngine.Video;
-
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
 
+// Public entry points and serialized font/music references retained for existing scenes.
+[DefaultExecutionOrder(-1000)]
 [DisallowMultipleComponent]
 public class InfectedAreaEndingCreditsAuto : MonoBehaviour
 {
-    private static InfectedAreaEndingCreditsAuto instance;
-
-    [Header("Debug")]
-    [SerializeField] private bool enableTKeyDebug = true;
-    [SerializeField] private bool showDebugButton = false;
-
-    [Header("Timing")]
-    [SerializeField] private float totalDuration = 120f;
-    [SerializeField] private float fadeInDuration = 2.2f;
-    [SerializeField] private float fadeOutDuration = 1.2f;
-    [SerializeField] private float textFitDuration = 44f;
-    [SerializeField] private float galleryStartTime = 40f;
-    [SerializeField] private float slideDuration = 4.5f;
-    [SerializeField] private float slideFadeDuration = 0.45f;
-    [SerializeField] private float videoMaxDuration = 8f;
-
-    [Header("Text Scroll")]
-    [SerializeField] private bool autoFitTextInDuration = true;
-    [SerializeField] private float scrollSpeed = 180f;
-    [SerializeField] private float startTextTopY = -180f;
-    [SerializeField] private float textWidth = 1180f;
-
-    [Header("Text Spacing")]
-    [SerializeField] private float titleFontSize = 42f;
-    [SerializeField] private float bodyFontSize = 27f;
-    [SerializeField] private float smallFontSize = 22f;
-    [SerializeField] private float lineSpacing = 32f;
-    [SerializeField] private float paragraphSpacing = 78f;
-    [SerializeField] private float sectionSpacing = 150f;
-    [SerializeField] private float compactSpacing = 28f;
-
-    [Header("Font")]
-    [SerializeField] private TMP_FontAsset koreanFont;
-
-    [Header("Audio")]
-    [SerializeField] private AudioClip endingMusic;
-    [SerializeField] private float musicVolume = 0.85f;
-    [SerializeField] private float musicStartDelay = 1f;
-    [SerializeField] private float musicFadeOutDuration = 4f;
-    [SerializeField] private bool muteOtherAudioSources = true;
-
-    [Header("Final")]
-    [SerializeField] private string finalThanksText = "감사합니다^^";
-    [SerializeField] private float finalThanksShowTime = 6f;
-
-    [Header("Gallery")]
-    [SerializeField] private Sprite[] gallerySprites;
-    [SerializeField] private VideoClip[] galleryVideos;
-
-    [Header("Decorations")]
-    [SerializeField] private Sprite[] decorationSprites;
-    [SerializeField] private int decorationCount = 5;
-    [SerializeField] private float decorationAlpha = 0.08f;
-    [SerializeField] private float decorationMoveAmount = 22f;
-    [SerializeField] private float decorationSpeed = 0.35f;
-
-    [Header("Scene")]
-    [SerializeField] private bool loadMainMenuAfterEnding = false;
-    [SerializeField] private string mainMenuSceneName = "MainMenu";
-
-    private Canvas canvas;
-    private CanvasGroup rootGroup;
-    private RectTransform canvasRect;
-
-    private Image blackBackground;
-
-    private RectTransform textRoot;
-    private VerticalLayoutGroup textLayout;
-
-    private CanvasGroup galleryGroup;
-    private Image galleryImage;
-    private RawImage galleryVideoImage;
-    private VideoPlayer videoPlayer;
-    private RenderTexture videoTexture;
-    private TMP_Text galleryCaption;
-
-    private CanvasGroup decorationGroup;
-    private readonly List<RectTransform> decorationRects = new List<RectTransform>();
-    private readonly List<Vector2> decorationBasePositions = new List<Vector2>();
-    private readonly List<float> decorationPhases = new List<float>();
-
-    private CanvasGroup finalThanksGroup;
-    private TMP_Text finalThanksTMP;
-
-    private AudioSource endingAudioSource;
-    private Coroutine mainRoutine;
-    private Coroutine galleryRoutine;
-    private Coroutine musicRoutine;
-    private Coroutine musicFadeRoutine;
-
-    private bool isPlaying;
-    private float elapsed;
-    private float runtimeScrollSpeed;
-    private float contentHeight;
-
-    private readonly List<string> streamingVideoPaths = new List<string>();
-
-    private struct GalleryItem
+    [Serializable] public class VideoLane
     {
-        public Sprite sprite;
-        public VideoClip videoClip;
-        public string videoPath;
-        public bool IsVideo
-        {
-            get { return videoClip != null || !string.IsNullOrEmpty(videoPath); }
-        }
+        public string file;
+        public float x = -.37f, width = .22f, duration = 26f, delay, alpha = .50f, tilt = -3f;
     }
+    [Serializable] public class Settings
+    {
+        public float logoTime = 46f, creditsTime = 49f, finalSeconds = 7f;
+        public float fallbackDuration = 149.736f, volume = .85f;
+        public float headingSize = 38f, labelSize = 24f, nameSize = 30f, rowGap = 18f, sectionGap = 80f;
+        public string team = "KOD", finalText = "플레이해 주셔서 감사합니다.";
+        public VideoLane[] videos;
+    }
+    [Header("Debug: T = full, Shift+T = logo / credits, Escape = stop")]
+    [SerializeField] private bool enableTKeyDebug = true;
+    [SerializeField] private bool showDebugButton;
+    [Header("Existing scene references")]
+    [SerializeField] private TMP_FontAsset koreanFont;
+    [SerializeField] private AudioClip endingMusic;
+    [SerializeField] private bool loadMainMenuAfterEnding;
+    [SerializeField] private string mainMenuSceneName = "MainMenu";
+    [Header("Optional resource overrides")]
+    [SerializeField] private TextAsset creditsText;
+    [SerializeField] private TextAsset settingsJson;
+    [SerializeField] private Sprite gameLogo;
 
-    private readonly List<GalleryItem> galleryItems = new List<GalleryItem>();
+    private static InfectedAreaEndingCreditsAuto instance;
+    private static int stoppedFrame = -1;
+    public static bool CapturesInput => (instance != null && instance.playing) || stoppedFrame == Time.frameCount;
+    private Settings cfg;
+    private GameObject overlay;
+    private RectTransform screen, roll, logo;
+    private CanvasGroup logoGroup, rollGroup, finalGroup;
+    private AudioSource music;
+    private bool playing, focusPaused, applicationPaused;
+    private double dspStart, pauseDSP;
+    private float savedScale, offset, duration, rollHeight;
+    private IDisposable inputToken;
+    private readonly List<AudioState> audioStates = new List<AudioState>();
+    private readonly List<Lane> lanes = new List<Lane>();
+    private struct AudioState { public AudioSource source; public bool mute, wasPlaying; }
+    private sealed class Lane
+    {
+        public VideoLane cfg;
+        public RectTransform rect;
+        public CanvasGroup group;
+        public RawImage image;
+        public VideoPlayer player;
+        public RenderTexture target;
+        public bool prepared, failed;
+        public double prepareAt;
+    }
+    public bool IsPlaying => playing;
+    public float MusicTime => playing ? offset + (float)((focusPaused ? pauseDSP : AudioSettings.dspTime) - dspStart) : 0f;
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() { instance = null; stoppedFrame = -1; }
     private void Awake()
     {
-        if (instance != null && instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
+        if (instance != null && instance != this) { enabled = false; return; }
         instance = this;
-
-        BuildOrRepairAll();
-        HideInstant();
     }
-
     private void Update()
     {
-        UpdateDecorations();
-
-        if (!enableTKeyDebug)
+        bool start = false, preview = false, stop = false;
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (enableTKeyDebug)
         {
+            start = Input.GetKeyDown(KeyCode.T);
+            preview = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        }
+        stop = Input.GetKeyDown(KeyCode.Escape);
+#endif
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null)
+        {
+            if (enableTKeyDebug)
+            {
+                start |= Keyboard.current.tKey.wasPressedThisFrame;
+                preview |= Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed;
+            }
+            stop |= Keyboard.current.escapeKey.wasPressedThisFrame;
+        }
+#endif
+        if (start) { if (preview) PreviewCredits(); else PlayEndingCredits(); }
+        if (!playing) return;
+        if (stop) { StopEndingCredits(); return; }
+        // Pause/audio-focus must not advance the visual timeline while music is suspended.
+        bool shouldPause = applicationPaused || AudioListener.pause;
+        SetClockPaused(shouldPause);
+        if (focusPaused) return;
+        float t = MusicTime;
+        if (t >= duration)
+        {
+            bool go = loadMainMenuAfterEnding;
+            StopEndingCredits();
+            if (go) { KODBBootSplashController.SkipSplashForMenuReturn(); SceneManager.LoadScene(mainMenuSceneName); }
             return;
         }
-
-        bool pressed = false;
-
-#if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKeyDown(KeyCode.T))
-        {
-            pressed = true;
-        }
-#endif
-
-#if ENABLE_INPUT_SYSTEM
-        if (Keyboard.current != null && Keyboard.current.tKey.wasPressedThisFrame)
-        {
-            pressed = true;
-        }
-#endif
-
-        if (pressed)
-        {
-            PlayEndingCredits();
-        }
+        DrawTimeline(t);
     }
-
     private void OnGUI()
     {
-        if (!showDebugButton)
-        {
-            return;
-        }
-
-        if (GUI.Button(new Rect(20, 20, 260, 60), "TEST ENDING CREDITS"))
-        {
-            PlayEndingCredits();
-        }
+        if (showDebugButton && GUI.Button(new Rect(20,20,260,45), "PREVIEW ENDING CREDITS")) PreviewCredits();
     }
-
-    [ContextMenu("TEST - Play Ending Credits")]
-    public void PlayEndingCredits()
+    [ContextMenu("Play full ending (T)")]
+    public void PlayEndingCredits() { if (!playing) Begin(false); }
+    [ContextMenu("Preview logo and credits (Shift+T)")]
+    public void PreviewCredits() { StopEndingCredits(); Begin(true); }
+    private void LoadSettings()
     {
-        if (isPlaying)
-        {
-            return;
-        }
-
-        if (mainRoutine != null)
-        {
-            StopCoroutine(mainRoutine);
-        }
-
-        mainRoutine = StartCoroutine(PlayEndingRoutine());
+        cfg = new Settings();
+        TextAsset data = settingsJson != null ? settingsJson : Resources.Load<TextAsset>("EndingCredits/EndingCreditsSettings");
+        try { if (data != null) JsonUtility.FromJsonOverwrite(data.text, cfg); }
+        catch (Exception e) { Debug.LogWarning("[Credits] Invalid settings: " + e.Message); }
+        duration = endingMusic != null ? endingMusic.length : Mathf.Max(30, cfg.fallbackDuration);
+        cfg.finalSeconds = Mathf.Clamp(cfg.finalSeconds, 3, duration * .2f);
+        cfg.logoTime = Mathf.Clamp(cfg.logoTime, 0, duration - cfg.finalSeconds - 12);
+        cfg.creditsTime = Mathf.Clamp(cfg.creditsTime, cfg.logoTime + 2, duration - cfg.finalSeconds - 5);
     }
-
-    [ContextMenu("TEST - Stop Ending Credits")]
+    private void Begin(bool preview)
+    {
+        LoadSettings();
+        if (koreanFont == null) koreanFont = Resources.Load<TMP_FontAsset>("Fonts & Materials/Galmuri11 SDF");
+        if (gameLogo == null) gameLogo = Resources.Load<Sprite>("EndingCredits/GameLogo");
+        if (creditsText == null) creditsText = Resources.Load<TextAsset>("EndingCredits/EndingCreditsText");
+        if (koreanFont == null || creditsText == null)
+        { Debug.LogError("[Credits] Korean font or credits text missing. Run Tools/Infected Area/Configure KOD Credits."); return; }
+        savedScale = Time.timeScale;
+        playing = true;
+        inputToken = GameInputState.Acquire("KODEndingCredits");
+        Time.timeScale = 0;
+        try
+        {
+            BuildUI();
+            audioStates.Clear();
+            foreach (AudioSource src in FindObjectsByType<AudioSource>(FindObjectsSortMode.None))
+            {
+                audioStates.Add(new AudioState { source = src, mute = src.mute, wasPlaying = src.isPlaying });
+                if (src.isPlaying) src.Pause();
+                src.mute = true;
+            }
+            music = overlay.AddComponent<AudioSource>();
+            music.playOnAwake = false; music.loop = false; music.spatialBlend = 0;
+            music.volume = Mathf.Clamp01(cfg.volume); music.clip = endingMusic;
+            offset = preview ? cfg.logoTime : 0;
+            dspStart = AudioSettings.dspTime + .15;
+            if (endingMusic != null) { music.time = offset; music.PlayScheduled(dspStart); }
+            else Debug.LogWarning("[Credits] Ending music missing: using silent timeline.");
+            DrawTimeline(offset - .15f);
+        }
+        catch (Exception e) { Debug.LogException(e); StopEndingCredits(); }
+    }
+    private void BuildUI()
+    {
+        overlay = new GameObject("KOD_Credits", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        overlay.transform.SetParent(transform, false);
+        Canvas canvas = overlay.GetComponent<Canvas>(); canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.sortingOrder = 32750;
+        CanvasScaler scaler = overlay.GetComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920,1080); scaler.matchWidthOrHeight = 1;
+        screen = overlay.GetComponent<RectTransform>();
+        Image black = new GameObject("Black", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+        black.transform.SetParent(screen, false); Stretch(black.rectTransform); black.color = Color.black; black.raycastTarget = true;
+        // Keep every gallery behind the text. The center is an opaque reading column.
+        RectTransform gallery = Rect("Development films", screen, Vector2.zero, Vector2.zero); Stretch(gallery);
+        if (cfg.videos != null)
+        {
+            var ordered = new List<VideoLane>();
+            foreach (VideoLane spec in cfg.videos) if (spec != null) ordered.Add(spec);
+            ordered.Sort((a,b) => a.width.CompareTo(b.width));
+            foreach (VideoLane spec in ordered) if (!string.IsNullOrWhiteSpace(spec.file)) BuildLane(gallery, spec);
+        }
+        Image shade = new GameObject("Reading column", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+        shade.transform.SetParent(screen, false); shade.color = Color.black; shade.raycastTarget = false;
+        shade.rectTransform.anchorMin = new Vector2(.25f,0); shade.rectTransform.anchorMax = new Vector2(.75f,1); shade.rectTransform.offsetMin = shade.rectTransform.offsetMax = Vector2.zero;
+        RectTransform viewport = Rect("Credits viewport", screen, Vector2.zero, Vector2.zero);
+        viewport.anchorMin = new Vector2(.25f,.09f); viewport.anchorMax = new Vector2(.75f,.91f); viewport.offsetMin = viewport.offsetMax = Vector2.zero;
+        viewport.gameObject.AddComponent<RectMask2D>();
+        rollGroup = viewport.gameObject.AddComponent<CanvasGroup>();
+        roll = Rect("Editable credits", viewport, new Vector2(900,1), Vector2.zero);
+        roll.anchorMin = roll.anchorMax = new Vector2(.5f,0); roll.pivot = new Vector2(.5f,1);
+        BuildText();
+        logo = Rect("Game logo", screen, new Vector2(1120,520), Vector2.zero);
+        logoGroup = logo.gameObject.AddComponent<CanvasGroup>();
+        if (gameLogo != null) { Image im = logo.gameObject.AddComponent<Image>(); im.sprite = gameLogo; im.preserveAspect = true; im.raycastTarget = false; }
+        else Text("INFECTED AREA", logo, 72, new Vector2(1100,200), Vector2.zero);
+        RectTransform thanks = Rect("Final thanks", screen, new Vector2(1000,300), Vector2.zero);
+        finalGroup = thanks.gameObject.AddComponent<CanvasGroup>();
+        Text(cfg.finalText, thanks, 42, new Vector2(1000,130), new Vector2(0,35));
+        Text(cfg.team, thanks, 28, new Vector2(1000,80), new Vector2(0,-65));
+        Canvas.ForceUpdateCanvases();
+    }
+    private void BuildText()
+    {
+        float y = 0;
+        foreach (string raw in creditsText.text.Split('\n'))
+        {
+            string line = raw.Trim();
+            if (line.Length == 0 || line.StartsWith("//")) continue;
+            if (line.StartsWith("#"))
+            {
+                y += y > 0 ? cfg.sectionGap : 20;
+                Text(line.TrimStart('#').Trim(), roll, cfg.headingSize, new Vector2(880,66), new Vector2(0,-y-33), true);
+                y += 98; continue;
+            }
+            string[] fields = line.Split('|');
+            string label = fields[0].Trim(), names = fields.Length > 1 ? fields[1].Trim() : "";
+            if (names == "미정" || names == "없음") continue;
+            float labelHeight = 0;
+            if (names.Length > 0)
+            {
+                TMP_Text role = Text(label, roll, cfg.labelSize, new Vector2(850,48), new Vector2(0,-y-24), true);
+                labelHeight = Mathf.Max(38, role.GetPreferredValues(label,850,0).y + 6);
+                role.rectTransform.sizeDelta = new Vector2(850,labelHeight);
+                role.rectTransform.anchoredPosition = new Vector2(0,-y-labelHeight/2);
+            }
+            string value = names.Length > 0 ? names : label;
+            TMP_Text person = Text(value, roll, cfg.nameSize, new Vector2(860,50), new Vector2(0,-y-labelHeight-25), true);
+            float nameHeight = Mathf.Max(44,person.GetPreferredValues(value,860,0).y+8);
+            person.rectTransform.sizeDelta = new Vector2(860,nameHeight);
+            person.rectTransform.anchoredPosition = new Vector2(0,-y-labelHeight-nameHeight/2);
+            y += labelHeight + nameHeight + Mathf.Max(0,cfg.rowGap);
+        }
+        rollHeight = y + 40; roll.sizeDelta = new Vector2(900,rollHeight);
+    }
+    private TMP_Text Text(string value, Transform parent, float size, Vector2 box, Vector2 position, bool top = false)
+    {
+        RectTransform rt = Rect("Text",parent,box,position);
+        if (top) rt.anchorMin = rt.anchorMax = new Vector2(.5f,1);
+        TextMeshProUGUI t = rt.gameObject.AddComponent<TextMeshProUGUI>();
+        t.font = koreanFont; t.fontSize = Mathf.Clamp(size,16,100); t.text = value; t.color = Color.white;
+        t.alignment = TextAlignmentOptions.Center; t.richText = false; t.raycastTarget = false;
+        t.overflowMode = TextOverflowModes.Overflow;
+        return t;
+    }
+    private void BuildLane(Transform parent, VideoLane spec)
+    {
+        string root = Path.GetFullPath(Path.Combine(Application.streamingAssetsPath,"EndingCredits/Videos"));
+        string path = Path.GetFullPath(Path.Combine(root,spec.file));
+        if (!path.StartsWith(root + Path.DirectorySeparatorChar,StringComparison.Ordinal) || !File.Exists(path))
+        { Debug.LogWarning("[Credits] Video not found: " + spec.file); return; }
+        Lane lane = new Lane { cfg = spec, prepareAt = Time.realtimeSinceStartupAsDouble };
+        lane.rect = Rect("Film " + spec.file,parent,new Vector2(400,225),Vector2.zero);
+        lane.group = lane.rect.gameObject.AddComponent<CanvasGroup>(); lane.group.alpha = 0;
+        lane.rect.localRotation = Quaternion.Euler(0,0,spec.tilt);
+        lane.image = lane.rect.gameObject.AddComponent<RawImage>(); lane.image.raycastTarget = false;
+        lane.player = lane.rect.gameObject.AddComponent<VideoPlayer>();
+        lane.player.playOnAwake = false; lane.player.isLooping = true; lane.player.skipOnDrop = true;
+        lane.player.audioOutputMode = VideoAudioOutputMode.None;
+        lane.player.renderMode = VideoRenderMode.RenderTexture; lane.player.source = VideoSource.Url;
+        lane.player.url = new Uri(path).AbsoluteUri;
+        lane.player.timeUpdateMode = VideoTimeUpdateMode.UnscaledGameTime;
+        lane.player.prepareCompleted += p =>
+        {
+            if (!playing || lane.failed) return;
+            float ratio = p.height > 0 ? (float)p.width/p.height : 16f/9;
+            int h = Mathf.Clamp(Mathf.RoundToInt(640f / Mathf.Max(.25f,ratio)),128,720);
+            lane.target = new RenderTexture(640,h,0,RenderTextureFormat.ARGB32);
+            lane.target.Create(); p.targetTexture = lane.target; lane.image.texture = lane.target; lane.prepared = true;
+        };
+        lane.player.errorReceived += (p,message) => { lane.failed = true; lane.group.alpha = 0; p.Stop(); Debug.LogWarning("[Credits] " + spec.file + ": " + message); };
+        lanes.Add(lane); lane.player.Prepare();
+    }
+    private void DrawTimeline(float t)
+    {
+        float finalAt = duration - cfg.finalSeconds;
+        logoGroup.alpha = t < cfg.logoTime ? 0 : Mathf.Clamp01((t-cfg.logoTime)/.2f);
+        rollGroup.alpha = Mathf.Clamp01((t-cfg.creditsTime)/1f) * Mathf.Clamp01((finalAt-t)/1f);
+        float u = Mathf.InverseLerp(cfg.creditsTime,finalAt,t);
+        // Scale column to narrower windows without clipping names.
+        float width = screen.rect.width;
+        float scale = Mathf.Min(1,(width*.50f-24)/900f);
+        roll.localScale = Vector3.one * Mathf.Max(.25f,scale);
+        float viewportHeight = screen.rect.height*.82f;
+        roll.anchoredPosition = new Vector2(0,Mathf.Lerp(-20,rollHeight*scale+viewportHeight+20,u));
+        // Keep the logo ahead of the credits with the exact same vertical displacement.
+        logo.anchoredPosition = new Vector2(0,roll.anchoredPosition.y + 20);
+        finalGroup.alpha = Mathf.Clamp01((t-finalAt)/1.4f)*Mathf.Clamp01((duration-t)/1.2f);
+        logoGroup.transform.localScale = Vector3.one * Mathf.Min(1,width/1400);
+        finalGroup.transform.localScale = Vector3.one * Mathf.Min(1,width/1100);
+        if (music != null) music.volume = Mathf.Clamp01(cfg.volume) * Mathf.Clamp01((duration-t)/3);
+        foreach (Lane lane in lanes)
+        {
+            if (!lane.prepared || lane.failed)
+            {
+                if (!lane.failed && Time.realtimeSinceStartupAsDouble-lane.prepareAt > 15)
+                { lane.failed = true; lane.player.Stop(); Debug.LogWarning("[Credits] Video prepare timeout: " + lane.cfg.file); }
+                continue;
+            }
+            float local = t-cfg.creditsTime-Mathf.Max(0,lane.cfg.delay);
+            bool visible = local >= 0 && t < finalAt;
+            if (visible && !lane.player.isPlaying) lane.player.Play();
+            if (!visible && lane.player.isPlaying) lane.player.Pause();
+            float q = Mathf.Repeat(Mathf.Max(0,local),Mathf.Max(8,lane.cfg.duration))/Mathf.Max(8,lane.cfg.duration);
+            float w = width*Mathf.Clamp(lane.cfg.width,.10f,.27f);
+            float aspect = lane.player.height > 0 ? (float)lane.player.width/lane.player.height : 16f/9;
+            float h = w/Mathf.Max(.25f,aspect);
+            lane.rect.sizeDelta = new Vector2(w,h);
+            lane.rect.anchoredPosition = new Vector2(width*Mathf.Clamp(lane.cfg.x,-.48f,.48f), Mathf.Lerp(-540-h,540+h,q));
+            lane.group.alpha = visible ? Mathf.Clamp01(lane.cfg.alpha)*Mathf.Clamp01(q*8)*Mathf.Clamp01((1-q)*8)*Mathf.Clamp01((finalAt-t)/2) : 0;
+        }
+    }
+    private void SetClockPaused(bool pause)
+    {
+        if (!playing || focusPaused == pause) return;
+        focusPaused = pause;
+        if (pause)
+        {
+            pauseDSP = AudioSettings.dspTime;
+            if (music != null) music.Pause();
+            foreach (Lane l in lanes) if (l.player != null) l.player.Pause();
+        }
+        else
+        {
+            dspStart += AudioSettings.dspTime-pauseDSP;
+            if (music != null) music.UnPause();
+        }
+    }
+    private void OnApplicationPause(bool pause) { applicationPaused = pause; SetClockPaused(pause || AudioListener.pause); }
+    [ContextMenu("Stop ending")]
     public void StopEndingCredits()
     {
-        StopAllEndingCoroutines();
-        StopEndingMusicImmediate();
-        HideInstant();
-
-        isPlaying = false;
-        elapsed = 0f;
-        Time.timeScale = 1f;
+        if (!playing) return;
+        playing = false; focusPaused = false; stoppedFrame = Time.frameCount;
+        if (music != null) music.Stop();
+        foreach (Lane lane in lanes)
+        {
+            lane.failed = true;
+            if (lane.player != null) { lane.player.Stop(); lane.player.targetTexture = null; }
+            if (lane.target != null) { lane.target.Release(); Destroy(lane.target); }
+        }
+        lanes.Clear();
+        foreach (AudioState state in audioStates)
+            if (state.source != null) { state.source.mute = state.mute; if (state.wasPlaying) state.source.UnPause(); }
+        audioStates.Clear();
+        if (inputToken != null) { inputToken.Dispose(); inputToken = null; }
+        Time.timeScale = savedScale;
+        if (overlay != null) { overlay.SetActive(false); Destroy(overlay); }
     }
-
-    private IEnumerator PlayEndingRoutine()
+    private void OnDisable() { StopEndingCredits(); }
+    private void OnDestroy() { StopEndingCredits(); if (instance == this) instance = null; }
+    private static RectTransform Rect(string name,Transform parent,Vector2 size,Vector2 position)
     {
-        isPlaying = true;
-        elapsed = 0f;
-
-        BuildOrRepairAll();
-        BuildCreditsText();
-        BuildGalleryItems();
-
-        if (muteOtherAudioSources)
-        {
-            StopAllOtherAudioSources();
-        }
-
-        Time.timeScale = 0f;
-
-        PrepareStartState();
-
-        if (musicRoutine != null)
-        {
-            StopCoroutine(musicRoutine);
-        }
-
-        musicRoutine = StartCoroutine(PlayMusicDelayedRoutine());
-
-        if (galleryRoutine != null)
-        {
-            StopCoroutine(galleryRoutine);
-        }
-
-        galleryRoutine = StartCoroutine(PlayGalleryRoutine());
-
-        yield return FadeRoot(0f, 1f, fadeInDuration);
-
-        while (elapsed < totalDuration)
-        {
-            float dt = Time.unscaledDeltaTime;
-            elapsed += dt;
-
-            Vector2 pos = textRoot.anchoredPosition;
-            pos.y += runtimeScrollSpeed * dt;
-            textRoot.anchoredPosition = pos;
-
-            if (elapsed >= totalDuration - finalThanksShowTime)
-            {
-                ShowFinalThanks();
-                StartMusicFadeOutOnce();
-            }
-
-            yield return null;
-        }
-
-        yield return FadeRoot(1f, 0f, fadeOutDuration);
-
-        StopAllEndingCoroutines();
-        StopEndingMusicImmediate();
-        HideInstant();
-
-        isPlaying = false;
-        elapsed = 0f;
-        Time.timeScale = 1f;
-
-        if (loadMainMenuAfterEnding && !string.IsNullOrEmpty(mainMenuSceneName))
-        {
-            SceneManager.LoadScene(mainMenuSceneName);
-        }
+        RectTransform rt = new GameObject(name,typeof(RectTransform)).GetComponent<RectTransform>();
+        rt.SetParent(parent,false); rt.anchorMin = rt.anchorMax = new Vector2(.5f,.5f); rt.sizeDelta = size; rt.anchoredPosition = position; return rt;
     }
-
-    private void BuildOrRepairAll()
-    {
-        BuildCanvas();
-        BuildBlackBackground();
-        BuildTextRoot();
-        BuildGalleryRoot();
-        BuildDecorationRoot();
-        BuildFinalThanks();
-        BuildAudio();
-    }
-
-    private void BuildCanvas()
-    {
-        Transform old = transform.Find("EndingCreditsCanvas_FIXED");
-
-        if (old == null)
-        {
-            GameObject canvasObject = new GameObject(
-                "EndingCreditsCanvas_FIXED",
-                typeof(RectTransform),
-                typeof(Canvas),
-                typeof(CanvasScaler),
-                typeof(GraphicRaycaster),
-                typeof(CanvasGroup)
-            );
-
-            canvasObject.transform.SetParent(transform, false);
-
-            canvas = canvasObject.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 30000;
-
-            CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.matchWidthOrHeight = 0.5f;
-
-            rootGroup = canvasObject.GetComponent<CanvasGroup>();
-        }
-        else
-        {
-            canvas = old.GetComponent<Canvas>();
-            if (canvas == null) canvas = old.gameObject.AddComponent<Canvas>();
-
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 30000;
-
-            CanvasScaler scaler = old.GetComponent<CanvasScaler>();
-            if (scaler == null) scaler = old.gameObject.AddComponent<CanvasScaler>();
-
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.matchWidthOrHeight = 0.5f;
-
-            rootGroup = old.GetComponent<CanvasGroup>();
-            if (rootGroup == null) rootGroup = old.gameObject.AddComponent<CanvasGroup>();
-        }
-
-        canvasRect = canvas.GetComponent<RectTransform>();
-        Stretch(canvasRect);
-    }
-
-    private void BuildBlackBackground()
-    {
-        Transform bgTransform = canvas.transform.Find("BlackBackground");
-
-        if (bgTransform == null)
-        {
-            GameObject bg = new GameObject("BlackBackground", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-            bg.transform.SetParent(canvas.transform, false);
-
-            blackBackground = bg.GetComponent<Image>();
-        }
-        else
-        {
-            blackBackground = bgTransform.GetComponent<Image>();
-            if (blackBackground == null) blackBackground = bgTransform.gameObject.AddComponent<Image>();
-        }
-
-        blackBackground.color = Color.black;
-        blackBackground.raycastTarget = true;
-        Stretch(blackBackground.rectTransform);
-        blackBackground.transform.SetAsFirstSibling();
-    }
-
-    private void BuildTextRoot()
-    {
-        Transform textTransform = canvas.transform.Find("TextRoot");
-
-        if (textTransform == null)
-        {
-            GameObject textObject = new GameObject("TextRoot", typeof(RectTransform), typeof(VerticalLayoutGroup));
-            textObject.transform.SetParent(canvas.transform, false);
-
-            textRoot = textObject.GetComponent<RectTransform>();
-        }
-        else
-        {
-            textRoot = textTransform.GetComponent<RectTransform>();
-            if (textRoot == null) textRoot = textTransform.gameObject.AddComponent<RectTransform>();
-
-            textLayout = textTransform.GetComponent<VerticalLayoutGroup>();
-            if (textLayout == null) textLayout = textTransform.gameObject.AddComponent<VerticalLayoutGroup>();
-        }
-
-        textRoot.anchorMin = new Vector2(0.5f, 0.5f);
-        textRoot.anchorMax = new Vector2(0.5f, 0.5f);
-        textRoot.pivot = new Vector2(0.5f, 1f);
-        textRoot.sizeDelta = new Vector2(textWidth, 10000f);
-        textRoot.anchoredPosition = new Vector2(0f, startTextTopY);
-        textRoot.localScale = Vector3.one;
-
-        textLayout = textRoot.GetComponent<VerticalLayoutGroup>();
-        textLayout.childAlignment = TextAnchor.UpperCenter;
-        textLayout.spacing = paragraphSpacing;
-        textLayout.padding = new RectOffset(0, 0, 0, 0);
-        textLayout.childControlWidth = true;
-        textLayout.childControlHeight = true;
-        textLayout.childForceExpandWidth = false;
-        textLayout.childForceExpandHeight = false;
-    }
-
-    private void BuildGalleryRoot()
-    {
-        Transform galleryTransform = canvas.transform.Find("GalleryRoot");
-
-        if (galleryTransform == null)
-        {
-            GameObject galleryObject = new GameObject("GalleryRoot", typeof(RectTransform), typeof(CanvasGroup));
-            galleryObject.transform.SetParent(canvas.transform, false);
-
-            RectTransform galleryRect = galleryObject.GetComponent<RectTransform>();
-            galleryRect.anchorMin = new Vector2(0.5f, 0.5f);
-            galleryRect.anchorMax = new Vector2(0.5f, 0.5f);
-            galleryRect.pivot = new Vector2(0.5f, 0.5f);
-            galleryRect.sizeDelta = new Vector2(1100f, 650f);
-            galleryRect.anchoredPosition = new Vector2(0f, -35f);
-
-            galleryGroup = galleryObject.GetComponent<CanvasGroup>();
-        }
-        else
-        {
-            galleryGroup = galleryTransform.GetComponent<CanvasGroup>();
-            if (galleryGroup == null) galleryGroup = galleryTransform.gameObject.AddComponent<CanvasGroup>();
-        }
-
-        RectTransform root = galleryGroup.GetComponent<RectTransform>();
-
-        Transform imageTransform = root.Find("GalleryImage");
-        if (imageTransform == null)
-        {
-            GameObject imageObject = new GameObject("GalleryImage", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-            imageObject.transform.SetParent(root, false);
-            galleryImage = imageObject.GetComponent<Image>();
-        }
-        else
-        {
-            galleryImage = imageTransform.GetComponent<Image>();
-            if (galleryImage == null) galleryImage = imageTransform.gameObject.AddComponent<Image>();
-        }
-
-        RectTransform imageRect = galleryImage.rectTransform;
-        imageRect.anchorMin = new Vector2(0.5f, 0.5f);
-        imageRect.anchorMax = new Vector2(0.5f, 0.5f);
-        imageRect.pivot = new Vector2(0.5f, 0.5f);
-        imageRect.sizeDelta = new Vector2(1000f, 560f);
-        imageRect.anchoredPosition = new Vector2(0f, 20f);
-        galleryImage.preserveAspect = true;
-        galleryImage.raycastTarget = false;
-
-        Transform rawTransform = root.Find("GalleryVideo");
-        if (rawTransform == null)
-        {
-            GameObject rawObject = new GameObject("GalleryVideo", typeof(RectTransform), typeof(CanvasRenderer), typeof(RawImage));
-            rawObject.transform.SetParent(root, false);
-            galleryVideoImage = rawObject.GetComponent<RawImage>();
-        }
-        else
-        {
-            galleryVideoImage = rawTransform.GetComponent<RawImage>();
-            if (galleryVideoImage == null) galleryVideoImage = rawTransform.gameObject.AddComponent<RawImage>();
-        }
-
-        RectTransform rawRect = galleryVideoImage.rectTransform;
-        rawRect.anchorMin = new Vector2(0.5f, 0.5f);
-        rawRect.anchorMax = new Vector2(0.5f, 0.5f);
-        rawRect.pivot = new Vector2(0.5f, 0.5f);
-        rawRect.sizeDelta = new Vector2(1000f, 560f);
-        rawRect.anchoredPosition = new Vector2(0f, 20f);
-        galleryVideoImage.raycastTarget = false;
-        galleryVideoImage.gameObject.SetActive(false);
-
-        Transform captionTransform = root.Find("GalleryCaption");
-        if (captionTransform == null)
-        {
-            GameObject captionObject = new GameObject("GalleryCaption", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-            captionObject.transform.SetParent(root, false);
-            galleryCaption = captionObject.GetComponent<TMP_Text>();
-        }
-        else
-        {
-            galleryCaption = captionTransform.GetComponent<TMP_Text>();
-            if (galleryCaption == null) galleryCaption = captionTransform.gameObject.AddComponent<TextMeshProUGUI>();
-        }
-
-        if (koreanFont != null)
-        {
-            galleryCaption.font = koreanFont;
-        }
-
-        galleryCaption.text = "";
-        galleryCaption.fontSize = 24f;
-        galleryCaption.alignment = TextAlignmentOptions.Center;
-        galleryCaption.color = new Color(0.78f, 0.92f, 1f, 1f);
-        galleryCaption.raycastTarget = false;
-
-        RectTransform captionRect = galleryCaption.rectTransform;
-        captionRect.anchorMin = new Vector2(0.5f, 0f);
-        captionRect.anchorMax = new Vector2(0.5f, 0f);
-        captionRect.pivot = new Vector2(0.5f, 0f);
-        captionRect.sizeDelta = new Vector2(1000f, 54f);
-        captionRect.anchoredPosition = new Vector2(0f, -30f);
-
-        videoPlayer = GetComponent<VideoPlayer>();
-        if (videoPlayer == null) videoPlayer = gameObject.AddComponent<VideoPlayer>();
-
-        videoPlayer.playOnAwake = false;
-        videoPlayer.isLooping = false;
-        videoPlayer.renderMode = VideoRenderMode.RenderTexture;
-        videoPlayer.audioOutputMode = VideoAudioOutputMode.None;
-        videoPlayer.skipOnDrop = true;
-
-        if (videoTexture == null)
-        {
-            videoTexture = new RenderTexture(1280, 720, 0);
-            videoTexture.name = "EndingCreditsVideoRT";
-        }
-
-        videoPlayer.targetTexture = videoTexture;
-        galleryVideoImage.texture = videoTexture;
-
-        galleryGroup.alpha = 0f;
-        galleryGroup.interactable = false;
-        galleryGroup.blocksRaycasts = false;
-    }
-
-    private void BuildDecorationRoot()
-    {
-        Transform decoTransform = canvas.transform.Find("DecorationRoot");
-
-        if (decoTransform == null)
-        {
-            GameObject decoObject = new GameObject("DecorationRoot", typeof(RectTransform), typeof(CanvasGroup));
-            decoObject.transform.SetParent(canvas.transform, false);
-
-            decorationGroup = decoObject.GetComponent<CanvasGroup>();
-            Stretch(decoObject.GetComponent<RectTransform>());
-        }
-        else
-        {
-            decorationGroup = decoTransform.GetComponent<CanvasGroup>();
-            if (decorationGroup == null) decorationGroup = decoTransform.gameObject.AddComponent<CanvasGroup>();
-            Stretch(decorationGroup.GetComponent<RectTransform>());
-        }
-
-        decorationGroup.alpha = 1f;
-        decorationGroup.interactable = false;
-        decorationGroup.blocksRaycasts = false;
-
-        decorationGroup.transform.SetSiblingIndex(1);
-
-        BuildDecorations();
-    }
-
-    private void BuildDecorations()
-    {
-        decorationRects.Clear();
-        decorationBasePositions.Clear();
-        decorationPhases.Clear();
-
-        RectTransform parent = decorationGroup.GetComponent<RectTransform>();
-
-        for (int i = parent.childCount - 1; i >= 0; i--)
-        {
-            Destroy(parent.GetChild(i).gameObject);
-        }
-
-        Sprite[] sprites = GetDecorationSprites();
-
-        int count = Mathf.Max(0, decorationCount);
-
-        for (int i = 0; i < count; i++)
-        {
-            GameObject deco = new GameObject("Decoration_" + i, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
-            deco.transform.SetParent(parent, false);
-
-            Image img = deco.GetComponent<Image>();
-            img.raycastTarget = false;
-            img.color = new Color(1f, 1f, 1f, decorationAlpha);
-
-            if (sprites != null && sprites.Length > 0)
-            {
-                img.sprite = sprites[i % sprites.Length];
-                img.preserveAspect = true;
-            }
-            else
-            {
-                img.sprite = null;
-                img.color = new Color(0.1f, 0.9f, 1f, decorationAlpha);
-            }
-
-            RectTransform rt = deco.GetComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0.5f, 0.5f);
-            rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-
-            float x = Mathf.Lerp(-760f, 760f, Mathf.Repeat(i * 0.37f, 1f));
-            float y = Mathf.Lerp(-350f, 360f, Mathf.Repeat(i * 0.53f, 1f));
-            float size = Mathf.Lerp(45f, 95f, Mathf.Repeat(i * 0.21f, 1f));
-
-            rt.anchoredPosition = new Vector2(x, y);
-            rt.sizeDelta = new Vector2(size, size);
-            rt.localRotation = Quaternion.Euler(0f, 0f, i * 31f);
-
-            decorationRects.Add(rt);
-            decorationBasePositions.Add(rt.anchoredPosition);
-            decorationPhases.Add(i * 1.7f);
-        }
-    }
-
-    private void BuildFinalThanks()
-    {
-        Transform thanksTransform = canvas.transform.Find("FinalThanks");
-
-        if (thanksTransform == null)
-        {
-            GameObject thanksObject = new GameObject("FinalThanks", typeof(RectTransform), typeof(CanvasGroup), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-            thanksObject.transform.SetParent(canvas.transform, false);
-
-            finalThanksGroup = thanksObject.GetComponent<CanvasGroup>();
-            finalThanksTMP = thanksObject.GetComponent<TMP_Text>();
-        }
-        else
-        {
-            finalThanksGroup = thanksTransform.GetComponent<CanvasGroup>();
-            if (finalThanksGroup == null) finalThanksGroup = thanksTransform.gameObject.AddComponent<CanvasGroup>();
-
-            finalThanksTMP = thanksTransform.GetComponent<TMP_Text>();
-            if (finalThanksTMP == null) finalThanksTMP = thanksTransform.gameObject.AddComponent<TextMeshProUGUI>();
-        }
-
-        RectTransform rect = finalThanksTMP.rectTransform;
-        rect.anchorMin = new Vector2(0.5f, 0.5f);
-        rect.anchorMax = new Vector2(0.5f, 0.5f);
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.sizeDelta = new Vector2(900f, 140f);
-        rect.anchoredPosition = Vector2.zero;
-
-        if (koreanFont != null)
-        {
-            finalThanksTMP.font = koreanFont;
-        }
-
-        finalThanksTMP.text = finalThanksText;
-        finalThanksTMP.fontSize = 58f;
-        finalThanksTMP.alignment = TextAlignmentOptions.Center;
-        finalThanksTMP.color = Color.white;
-        finalThanksTMP.raycastTarget = false;
-
-        finalThanksGroup.alpha = 0f;
-        finalThanksGroup.interactable = false;
-        finalThanksGroup.blocksRaycasts = false;
-
-        finalThanksTMP.transform.SetAsLastSibling();
-    }
-
-    private void BuildAudio()
-    {
-        endingAudioSource = GetComponent<AudioSource>();
-        if (endingAudioSource == null)
-        {
-            endingAudioSource = gameObject.AddComponent<AudioSource>();
-        }
-
-        endingAudioSource.playOnAwake = false;
-        endingAudioSource.loop = false;
-        endingAudioSource.ignoreListenerPause = true;
-        endingAudioSource.volume = musicVolume;
-    }
-
-    private void BuildCreditsText()
-    {
-        ClearTextRoot();
-
-        string raw = LoadCreditsText();
-
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            raw = GetDefaultCreditsText();
-        }
-
-        string[] lines = raw.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
-
-        bool previousWasCompactHeader = false;
-
-        AddSpacer(80f);
-
-        for (int i = 0; i < lines.Length; i++)
-        {
-            string line = lines[i];
-
-            if (line == null)
-            {
-                continue;
-            }
-
-            string trimmed = line.Trim();
-
-            if (trimmed.Length == 0)
-            {
-                AddSpacer(paragraphSpacing * 0.45f);
-                previousWasCompactHeader = false;
-                continue;
-            }
-
-            if (trimmed == "---")
-            {
-                AddSpacer(sectionSpacing);
-                previousWasCompactHeader = false;
-                continue;
-            }
-
-            if (trimmed.StartsWith("# "))
-            {
-                string title = trimmed.Substring(2).Trim();
-                AddText(title, titleFontSize, FontStyles.Bold, new Color(0.86f, 0.96f, 1f, 1f), false);
-                AddSpacer(sectionSpacing * 0.35f);
-
-                previousWasCompactHeader =
-                    title.ToUpperInvariant().Contains("PROJECT TEAM") ||
-                    title.ToUpperInvariant().Contains("CREDITS");
-
-                continue;
-            }
-
-            if (trimmed.StartsWith("## "))
-            {
-                AddText(trimmed.Substring(3).Trim(), bodyFontSize + 4f, FontStyles.Bold, new Color(0.75f, 0.92f, 1f, 1f), false);
-                AddSpacer(paragraphSpacing * 0.35f);
-                previousWasCompactHeader = false;
-                continue;
-            }
-
-            if (trimmed.StartsWith("- "))
-            {
-                AddText(trimmed.Substring(2).Trim(), smallFontSize, FontStyles.Normal, Color.white, true);
-                AddSpacer(compactSpacing);
-                previousWasCompactHeader = true;
-                continue;
-            }
-
-            AddText(trimmed, bodyFontSize, previousWasCompactHeader ? FontStyles.Bold : FontStyles.Normal, Color.white, previousWasCompactHeader);
-
-            if (previousWasCompactHeader)
-            {
-                AddSpacer(compactSpacing);
-            }
-            else
-            {
-                AddSpacer(paragraphSpacing * 0.55f);
-            }
-        }
-
-        AddSpacer(220f);
-
-        Canvas.ForceUpdateCanvases();
-        LayoutRebuilder.ForceRebuildLayoutImmediate(textRoot);
-
-        contentHeight = CalculateContentHeight();
-
-        if (autoFitTextInDuration)
-        {
-            float screenHalfHeight = 540f;
-            float distance = contentHeight + screenHalfHeight + 160f - startTextTopY;
-            runtimeScrollSpeed = distance / Mathf.Max(1f, textFitDuration);
-        }
-        else
-        {
-            runtimeScrollSpeed = scrollSpeed;
-        }
-
-        if (runtimeScrollSpeed < 80f)
-        {
-            runtimeScrollSpeed = 80f;
-        }
-    }
-
-    private TMP_Text AddText(string text, float fontSize, FontStyles style, Color color, bool compact)
-    {
-        GameObject textObject = new GameObject("CreditText", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI), typeof(LayoutElement));
-        textObject.transform.SetParent(textRoot, false);
-
-        TMP_Text tmp = textObject.GetComponent<TMP_Text>();
-
-        if (koreanFont != null)
-        {
-            tmp.font = koreanFont;
-        }
-
-        tmp.text = text;
-        tmp.fontSize = fontSize;
-        tmp.fontStyle = style;
-        tmp.color = color;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.lineSpacing = lineSpacing;
-        tmp.textWrappingMode = TextWrappingModes.Normal;
-        tmp.overflowMode = TextOverflowModes.Overflow;
-        tmp.raycastTarget = false;
-
-        RectTransform rect = tmp.rectTransform;
-        rect.sizeDelta = new Vector2(textWidth, GetTextHeight(text, fontSize, compact));
-
-        LayoutElement layout = textObject.GetComponent<LayoutElement>();
-        layout.preferredWidth = textWidth;
-        layout.preferredHeight = GetTextHeight(text, fontSize, compact);
-
-        return tmp;
-    }
-
-    private void AddSpacer(float height)
-    {
-        GameObject spacer = new GameObject("Spacer", typeof(RectTransform), typeof(LayoutElement));
-        spacer.transform.SetParent(textRoot, false);
-
-        LayoutElement layout = spacer.GetComponent<LayoutElement>();
-        layout.preferredHeight = height;
-        layout.minHeight = height;
-
-        RectTransform rect = spacer.GetComponent<RectTransform>();
-        rect.sizeDelta = new Vector2(1f, height);
-    }
-
-    private float GetTextHeight(string text, float fontSize, bool compact)
-    {
-        int lineCount = 1;
-
-        if (!string.IsNullOrEmpty(text))
-        {
-            lineCount = text.Split('\n').Length;
-        }
-
-        float multiplier = compact ? 1.28f : 1.58f;
-        float height = fontSize * multiplier * lineCount;
-        height += lineSpacing * Mathf.Max(0, lineCount - 1);
-        height += compact ? 8f : 18f;
-
-        return Mathf.Max(height, fontSize + 18f);
-    }
-
-    private float CalculateContentHeight()
-    {
-        float total = 0f;
-
-        for (int i = 0; i < textRoot.childCount; i++)
-        {
-            RectTransform child = textRoot.GetChild(i) as RectTransform;
-            if (child != null)
-            {
-                total += child.sizeDelta.y;
-            }
-        }
-
-        VerticalLayoutGroup layout = textRoot.GetComponent<VerticalLayoutGroup>();
-        if (layout != null && textRoot.childCount > 1)
-        {
-            total += layout.spacing * (textRoot.childCount - 1);
-        }
-
-        return total;
-    }
-
-    private string LoadCreditsText()
-    {
-        TextAsset textAsset = Resources.Load<TextAsset>("EndingCredits/EndingCreditsText");
-
-        if (textAsset != null)
-        {
-            return textAsset.text;
-        }
-
-        return "";
-    }
-
-    private string GetDefaultCreditsText()
-    {
-        return
-            "# INFECTED AREA\n" +
-            "엔딩 크레딧\n" +
-            "---\n" +
-            "# 당신은 백신이 아니었다.\n" +
-            "감염구역은 당신을 치료제로 부르지 않았다.\n" +
-            "그저 가장 오래 버틴 감염체에게 마지막 문을 열 권한을 주었을 뿐.\n" +
-            "\n" +
-            "쓰러진 적들의 데이터는 모두 같은 문장을 남겼다.\n" +
-            "“우리도 한때는 탈출하고 싶었다.”\n" +
-            "\n" +
-            "검은 연구소의 심장은 멈췄고,\n" +
-            "닫혀 있던 격리문 너머로 처음 바람이 들어왔다.\n" +
-            "\n" +
-            "감염은 끝나지 않았을지도 모른다.\n" +
-            "하지만 누군가는 마침내 괴물이 아닌 이름으로 아침을 맞이했다.\n" +
-            "---\n" +
-            "# PROJECT TEAM\n" +
-            "김두현\n" +
-            "이주윤\n" +
-            "김희주\n" +
-            "박믿음\n" +
-            "---\n" +
-            "# CREDITS\n" +
-            "- 기획  ____________________\n" +
-            "- 프로그래밍  ____________________\n" +
-            "- 아트 / UI  ____________________\n" +
-            "- 사운드 / 음악  ____________________\n" +
-            "- 테스트 플레이  ____________________\n" +
-            "- 도움 준 사람들  ____________________\n" +
-            "---\n" +
-            "# MAKING PROCESS\n" +
-            "잠시 후 제작 과정의 기록이 이어집니다.\n";
-    }
-
-    private void ClearTextRoot()
-    {
-        if (textRoot == null)
-        {
-            return;
-        }
-
-        for (int i = textRoot.childCount - 1; i >= 0; i--)
-        {
-            Destroy(textRoot.GetChild(i).gameObject);
-        }
-    }
-
-    private void BuildGalleryItems()
-    {
-        galleryItems.Clear();
-        streamingVideoPaths.Clear();
-
-        Sprite[] resourceSprites = Resources.LoadAll<Sprite>("EndingCredits/Gallery");
-
-        if (resourceSprites != null)
-        {
-            for (int i = 0; i < resourceSprites.Length; i++)
-            {
-                if (resourceSprites[i] != null)
-                {
-                    GalleryItem item = new GalleryItem();
-                    item.sprite = resourceSprites[i];
-                    galleryItems.Add(item);
-                }
-            }
-        }
-
-        if (gallerySprites != null)
-        {
-            for (int i = 0; i < gallerySprites.Length; i++)
-            {
-                if (gallerySprites[i] != null)
-                {
-                    GalleryItem item = new GalleryItem();
-                    item.sprite = gallerySprites[i];
-                    galleryItems.Add(item);
-                }
-            }
-        }
-
-        if (galleryVideos != null)
-        {
-            for (int i = 0; i < galleryVideos.Length; i++)
-            {
-                if (galleryVideos[i] != null)
-                {
-                    GalleryItem item = new GalleryItem();
-                    item.videoClip = galleryVideos[i];
-                    galleryItems.Add(item);
-                }
-            }
-        }
-
-        AddStreamingVideos();
-
-        Debug.Log("[EndingCredits] Gallery items: " + galleryItems.Count);
-    }
-
-    private void AddStreamingVideos()
-    {
-        string folder = Path.Combine(Application.streamingAssetsPath, "EndingCredits/Videos");
-
-        if (!Directory.Exists(folder))
-        {
-            return;
-        }
-
-        string[] files = Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories);
-
-        for (int i = 0; i < files.Length; i++)
-        {
-            string ext = Path.GetExtension(files[i]).ToLowerInvariant();
-
-            if (ext == ".mp4" || ext == ".mov" || ext == ".webm" || ext == ".m4v")
-            {
-                string path = files[i].Replace('\\', '/');
-
-                GalleryItem item = new GalleryItem();
-                item.videoPath = path;
-                galleryItems.Add(item);
-
-                streamingVideoPaths.Add(path);
-            }
-        }
-    }
-
-    private IEnumerator PlayGalleryRoutine()
-    {
-        if (galleryGroup == null)
-        {
-            yield break;
-        }
-
-        galleryGroup.alpha = 0f;
-
-        while (elapsed < galleryStartTime)
-        {
-            yield return null;
-        }
-
-        if (galleryItems.Count <= 0)
-        {
-            Debug.Log("[EndingCredits] Gallery items: 0");
-            yield break;
-        }
-
-        for (int i = 0; i < galleryItems.Count; i++)
-        {
-            GalleryItem item = galleryItems[i];
-
-            if (item.IsVideo)
-            {
-                yield return PlayVideoItem(item, i);
-            }
-            else
-            {
-                yield return PlaySpriteItem(item, i);
-            }
-        }
-
-        galleryGroup.alpha = 0f;
-    }
-
-    private IEnumerator PlaySpriteItem(GalleryItem item, int index)
-    {
-        StopVideoDisplay();
-
-        galleryImage.gameObject.SetActive(true);
-        galleryVideoImage.gameObject.SetActive(false);
-
-        galleryImage.sprite = item.sprite;
-        galleryImage.preserveAspect = true;
-
-        if (galleryCaption != null)
-        {
-            galleryCaption.text = "제작 과정 기록  " + (index + 1).ToString("00");
-        }
-
-        yield return FadeGallery(0f, 1f, slideFadeDuration);
-
-        float timer = 0f;
-        while (timer < slideDuration && elapsed < totalDuration)
-        {
-            timer += Time.unscaledDeltaTime;
-            yield return null;
-        }
-
-        yield return FadeGallery(1f, 0f, slideFadeDuration);
-    }
-
-    private IEnumerator PlayVideoItem(GalleryItem item, int index)
-    {
-        galleryImage.gameObject.SetActive(false);
-        galleryVideoImage.gameObject.SetActive(true);
-
-        if (galleryCaption != null)
-        {
-            galleryCaption.text = "제작 과정 영상  " + (index + 1).ToString("00");
-        }
-
-        videoPlayer.Stop();
-
-        if (item.videoClip != null)
-        {
-            videoPlayer.source = VideoSource.VideoClip;
-            videoPlayer.clip = item.videoClip;
-        }
-        else
-        {
-            videoPlayer.source = VideoSource.Url;
-            videoPlayer.url = item.videoPath;
-        }
-
-        videoPlayer.targetTexture = videoTexture;
-        galleryVideoImage.texture = videoTexture;
-
-        videoPlayer.Prepare();
-
-        float prepareTimer = 0f;
-        while (!videoPlayer.isPrepared && prepareTimer < 3f)
-        {
-            prepareTimer += Time.unscaledDeltaTime;
-            yield return null;
-        }
-
-        yield return FadeGallery(0f, 1f, slideFadeDuration);
-
-        videoPlayer.Play();
-
-        float timer = 0f;
-        while (timer < videoMaxDuration && elapsed < totalDuration)
-        {
-            timer += Time.unscaledDeltaTime;
-
-            if (videoPlayer.isPrepared && !videoPlayer.isPlaying && timer > 0.8f)
-            {
-                break;
-            }
-
-            yield return null;
-        }
-
-        videoPlayer.Stop();
-
-        yield return FadeGallery(1f, 0f, slideFadeDuration);
-    }
-
-    private void StopVideoDisplay()
-    {
-        if (videoPlayer != null)
-        {
-            videoPlayer.Stop();
-        }
-
-        if (galleryVideoImage != null)
-        {
-            galleryVideoImage.gameObject.SetActive(false);
-        }
-    }
-
-    private IEnumerator FadeGallery(float from, float to, float duration)
-    {
-        float timer = 0f;
-        galleryGroup.alpha = from;
-
-        while (timer < duration)
-        {
-            timer += Time.unscaledDeltaTime;
-            float t = Mathf.Clamp01(timer / duration);
-            galleryGroup.alpha = Mathf.Lerp(from, to, t);
-            yield return null;
-        }
-
-        galleryGroup.alpha = to;
-    }
-
-    private void PrepareStartState()
-    {
-        if (canvas != null)
-        {
-            canvas.gameObject.SetActive(true);
-        }
-
-        rootGroup.alpha = 0f;
-        rootGroup.interactable = true;
-        rootGroup.blocksRaycasts = true;
-
-        if (decorationGroup != null)
-        {
-            decorationGroup.alpha = 1f;
-        }
-
-        if (galleryGroup != null)
-        {
-            galleryGroup.alpha = 0f;
-        }
-
-        if (finalThanksGroup != null)
-        {
-            finalThanksGroup.alpha = 0f;
-        }
-
-        textRoot.anchoredPosition = new Vector2(0f, startTextTopY);
-    }
-
-    private IEnumerator FadeRoot(float from, float to, float duration)
-    {
-        float timer = 0f;
-        rootGroup.alpha = from;
-
-        while (timer < duration)
-        {
-            timer += Time.unscaledDeltaTime;
-            float t = Mathf.Clamp01(timer / duration);
-            rootGroup.alpha = Mathf.Lerp(from, to, t);
-            yield return null;
-        }
-
-        rootGroup.alpha = to;
-    }
-
-    private IEnumerator PlayMusicDelayedRoutine()
-    {
-        if (endingAudioSource == null || endingMusic == null)
-        {
-            yield break;
-        }
-
-        endingAudioSource.Stop();
-        endingAudioSource.clip = endingMusic;
-        endingAudioSource.volume = musicVolume;
-        endingAudioSource.loop = false;
-        endingAudioSource.time = 0f;
-
-        float timer = 0f;
-        while (timer < musicStartDelay)
-        {
-            timer += Time.unscaledDeltaTime;
-            yield return null;
-        }
-
-        endingAudioSource.Play();
-    }
-
-    private void StartMusicFadeOutOnce()
-    {
-        if (musicFadeRoutine != null)
-        {
-            return;
-        }
-
-        musicFadeRoutine = StartCoroutine(FadeOutMusicRoutine());
-    }
-
-    private IEnumerator FadeOutMusicRoutine()
-    {
-        if (endingAudioSource == null)
-        {
-            yield break;
-        }
-
-        float startVolume = endingAudioSource.volume;
-        float timer = 0f;
-
-        while (timer < musicFadeOutDuration)
-        {
-            timer += Time.unscaledDeltaTime;
-            float t = Mathf.Clamp01(timer / musicFadeOutDuration);
-            endingAudioSource.volume = Mathf.Lerp(startVolume, 0f, t);
-            yield return null;
-        }
-
-        endingAudioSource.volume = 0f;
-    }
-
-    private void StopAllOtherAudioSources()
-    {
-        AudioSource[] sources = FindObjectsByType<AudioSource>(
-            FindObjectsInactive.Include,
-            FindObjectsSortMode.None
-        );
-
-        for (int i = 0; i < sources.Length; i++)
-        {
-            AudioSource source = sources[i];
-
-            if (source == null)
-            {
-                continue;
-            }
-
-            if (source == endingAudioSource)
-            {
-                continue;
-            }
-
-            if (source.transform.IsChildOf(transform))
-            {
-                continue;
-            }
-
-            if (source.isPlaying)
-            {
-                source.Stop();
-            }
-
-            source.playOnAwake = false;
-        }
-
-        AudioListener.pause = false;
-    }
-
-    private void StopEndingMusicImmediate()
-    {
-        if (endingAudioSource != null)
-        {
-            endingAudioSource.Stop();
-            endingAudioSource.volume = musicVolume;
-        }
-    }
-
-    private void ShowFinalThanks()
-    {
-        if (finalThanksGroup == null)
-        {
-            return;
-        }
-
-        if (finalThanksGroup.alpha < 1f)
-        {
-            finalThanksGroup.alpha = Mathf.MoveTowards(finalThanksGroup.alpha, 1f, Time.unscaledDeltaTime * 0.8f);
-        }
-    }
-
-    private void HideInstant()
-    {
-        if (rootGroup != null)
-        {
-            rootGroup.alpha = 0f;
-            rootGroup.interactable = false;
-            rootGroup.blocksRaycasts = false;
-        }
-
-        if (galleryGroup != null)
-        {
-            galleryGroup.alpha = 0f;
-        }
-
-        if (finalThanksGroup != null)
-        {
-            finalThanksGroup.alpha = 0f;
-        }
-
-        StopVideoDisplay();
-    }
-
-    private void StopAllEndingCoroutines()
-    {
-        if (mainRoutine != null)
-        {
-            StopCoroutine(mainRoutine);
-            mainRoutine = null;
-        }
-
-        if (galleryRoutine != null)
-        {
-            StopCoroutine(galleryRoutine);
-            galleryRoutine = null;
-        }
-
-        if (musicRoutine != null)
-        {
-            StopCoroutine(musicRoutine);
-            musicRoutine = null;
-        }
-
-        if (musicFadeRoutine != null)
-        {
-            StopCoroutine(musicFadeRoutine);
-            musicFadeRoutine = null;
-        }
-    }
-
-    private Sprite[] GetDecorationSprites()
-    {
-        if (decorationSprites != null && decorationSprites.Length > 0)
-        {
-            return decorationSprites;
-        }
-
-        Sprite[] loaded = Resources.LoadAll<Sprite>("EndingCredits/Decorations");
-
-        if (loaded != null && loaded.Length > 0)
-        {
-            return loaded;
-        }
-
-        return null;
-    }
-
-    private void UpdateDecorations()
-    {
-        if (!isPlaying)
-        {
-            return;
-        }
-
-        for (int i = 0; i < decorationRects.Count; i++)
-        {
-            if (decorationRects[i] == null)
-            {
-                continue;
-            }
-
-            float wave = Mathf.Sin((Time.unscaledTime * decorationSpeed) + decorationPhases[i]);
-            float wave2 = Mathf.Cos((Time.unscaledTime * decorationSpeed * 0.73f) + decorationPhases[i]);
-
-            Vector2 basePos = decorationBasePositions[i];
-            decorationRects[i].anchoredPosition = basePos + new Vector2(wave * decorationMoveAmount, wave2 * decorationMoveAmount);
-        }
-    }
-
-    private void Stretch(RectTransform rect)
-    {
-        if (rect == null)
-        {
-            return;
-        }
-
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.one;
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.offsetMin = Vector2.zero;
-        rect.offsetMax = Vector2.zero;
-        rect.localScale = Vector3.one;
-    }
+    private static void Stretch(RectTransform rt) { rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.offsetMin = rt.offsetMax = Vector2.zero; }
 }

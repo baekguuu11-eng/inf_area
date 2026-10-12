@@ -63,7 +63,7 @@ public sealed class ChipPanelV22 : MonoBehaviour
         RectTransform ir=ic.GetComponent<RectTransform>();ir.anchorMin=ir.anchorMax=new Vector2(0,.5f);ir.anchoredPosition=new Vector2(25,0);ir.sizeDelta=Vector2.one*40;
         Image image=ic.GetComponent<Image>();image.sprite=icon;image.raycastTarget=false;image.color=enabled?Color.white:Color.gray;
     }
-    private void Update() {if(Time.frameCount>openedFrame && (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.C))) Close();}
+    private void Update() {if(InfectedAreaEndingCreditsAuto.CapturesInput)return;if(Time.frameCount>openedFrame && (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.C))) Close();}
     private void Close() {closedFrame=Time.frameCount;Restore();Destroy(gameObject);}
     private void Restore()
     {

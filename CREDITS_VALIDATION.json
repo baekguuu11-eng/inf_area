@@ -1,0 +1,87 @@
+{
+  "changed": [
+    "Assets/Resources/KODBLogo.png",
+    "Assets/Editor/InfectedAreaEndingCreditsInstaller.cs",
+    "Assets/Scenes/GameScene.unity",
+    "Assets/Scripts/MainMenu/KODBBootSplashController.cs",
+    "Assets/Scripts/UI/ShopManager.cs",
+    "Assets/Scripts/UI/GameplayPauseSettingsV14.cs",
+    "Assets/Scripts/UI/ChipPanelV22.cs",
+    "Assets/Scripts/Ending/InfectedAreaEndingCreditsAuto.cs",
+    "Assets/Resources/EndingCredits/EndingCreditsText.txt"
+  ],
+  "added": [
+    "Assets/Resources/EndingCredits/GameLogo.png.meta",
+    "Assets/Resources/EndingCredits/GameLogo.png",
+    "Assets/Resources/EndingCredits/EndingCreditsSettings.json",
+    "Assets/Resources/EndingCredits/EndingCreditsSettings.json.meta"
+  ],
+  "rows": 82,
+  "hidden_pending_rows": 1,
+  "csharp_files": 207,
+  "syntax": "PASS: two preprocessor profiles",
+  "resource_and_video_checks": "PASS",
+  "videos": [
+    {
+      "programs": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1920,
+          "height": 1080
+        },
+        {
+          "codec_name": "aac"
+        }
+      ],
+      "format": {
+        "duration": "7.566667"
+      }
+    },
+    {
+      "programs": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1920,
+          "height": 1080
+        },
+        {
+          "codec_name": "aac"
+        }
+      ],
+      "format": {
+        "duration": "5.766667"
+      }
+    },
+    {
+      "programs": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1920,
+          "height": 1080
+        },
+        {
+          "codec_name": "aac"
+        }
+      ],
+      "format": {
+        "duration": "2.766667"
+      }
+    }
+  ],
+  "unity_compile": "NOT RUN: Unity Editor/C# compiler unavailable",
+  "unity_playmode": "NOT RUN",
+  "music_cue": "46 seconds, based on user instruction; exact violin onset not audition-verified",
+  "baseline": "user Packages(1).zip",
+  "logo_update": {
+    "base": "restored first version, 82 original rows",
+    "logo_time": 46,
+    "scroll_start": 49,
+    "hold_seconds": 3,
+    "motion": "same upward displacement as credits; no logo fade-out",
+    "checks": "C# syntax under two input profiles; continuous motion calculation; exact archive comparison",
+    "unity_playmode": "NOT RUN"
+  }
+}

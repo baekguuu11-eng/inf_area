@@ -156,7 +156,7 @@ public sealed class KODBBootSplashController : MonoBehaviour
         Image logoImage = logoObject.AddComponent<Image>();
         logoImage.color = Color.white;
         logoImage.raycastTarget = false;
-        logoImage.preserveAspect = false;
+        logoImage.preserveAspect = true;
         StretchToParent(logoImage.rectTransform);
 
         runtimeLogoSprite = null;

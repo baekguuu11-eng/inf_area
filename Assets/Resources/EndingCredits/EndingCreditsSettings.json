@@ -1,0 +1,19 @@
+{
+  "logoTime": 46.0,
+  "creditsTime": 49.0,
+  "finalSeconds": 7.0,
+  "fallbackDuration": 149.736,
+  "volume": 0.85,
+  "headingSize": 38,
+  "labelSize": 24,
+  "nameSize": 30,
+  "rowGap": 18,
+  "sectionGap": 80,
+  "team": "KOD",
+  "finalText": "플레이해 주셔서 감사합니다.",
+  "videos": [
+    {"file": "01_making.mp4.mp4", "x": -0.37, "width": 0.22, "duration": 27, "delay": 0, "alpha": 0.65, "tilt": -3},
+    {"file": "02_making.mp4.mp4", "x": 0.38, "width": 0.23, "duration": 23, "delay": 3, "alpha": 0.70, "tilt": 3},
+    {"file": "03_making.mp4.mp4", "x": -0.38, "width": 0.16, "duration": 35, "delay": 10, "alpha": 0.38, "tilt": 2}
+  ]
+}

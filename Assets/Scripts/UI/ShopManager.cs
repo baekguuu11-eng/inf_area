@@ -108,7 +108,7 @@ public class ShopManager : MonoBehaviour
             if (isOpen) CloseShop(); else OpenShop();
         }
 #endif
-        if (isOpen && !ChipPanelV22.CapturesInput && Input.GetKeyDown(KeyCode.Escape)) CloseShop();
+        if (isOpen && !InfectedAreaEndingCreditsAuto.CapturesInput && !ChipPanelV22.CapturesInput && Input.GetKeyDown(KeyCode.Escape)) CloseShop();
     }
 
     public void OpenShop()
